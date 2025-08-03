@@ -120,46 +120,20 @@
       </div>
     </div>
 
-    <!-- 新建文件夹对话框 -->
-    <div v-if="showCreateFolderDialog" class="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
-      <div class="relative w-full max-w-md p-6 rounded-lg shadow-xl" :class="darkMode ? 'bg-gray-800' : 'bg-white'">
-        <div class="mb-4">
-          <h3 class="text-lg font-semibold" :class="darkMode ? 'text-gray-100' : 'text-gray-900'">{{ t("mount.operations.createFolder") }}</h3>
-          <p class="text-sm mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("mount.createFolder.enterName") }}</p>
-        </div>
-
-        <div class="mb-4">
-          <label for="folder-name" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-300' : 'text-gray-700'"> {{ t("mount.createFolder.folderName") }} </label>
-          <input
-            id="folder-name"
-            v-model="newFolderName"
-            type="text"
-            class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'"
-            :placeholder="t('mount.createFolder.placeholder')"
-            @keyup.enter="confirmCreateFolder"
-            ref="folderNameInput"
-          />
-        </div>
-
-        <div class="flex justify-end space-x-2">
-          <button
-            @click="showCreateFolderDialog = false"
-            class="px-4 py-2 rounded-md transition-colors"
-            :class="darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'"
-          >
-            {{ t("mount.createFolder.cancel") }}
-          </button>
-          <button
-            @click="confirmCreateFolder"
-            class="px-4 py-2 rounded-md text-white transition-colors"
-            :class="darkMode ? 'bg-primary-600 hover:bg-primary-700' : 'bg-primary-500 hover:bg-primary-600'"
-          >
-            {{ t("mount.createFolder.create") }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- 通用 InputDialog 组件替换内联对话框 -->
+    <InputDialog
+      :is-open="showCreateFolderDialog"
+      :title="t('mount.operations.createFolder')"
+      :description="t('mount.createFolder.enterName')"
+      :label="t('mount.createFolder.folderName')"
+      :placeholder="t('mount.createFolder.placeholder')"
+      :confirm-text="t('mount.createFolder.create')"
+      :cancel-text="t('mount.createFolder.cancel')"
+      :dark-mode="darkMode"
+      @confirm="handleCreateFolderConfirm"
+      @cancel="handleCreateFolderCancel"
+      @close="showCreateFolderDialog = false"
+    />
   </div>
 </template>
 
@@ -167,6 +141,7 @@
 import { ref, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import FileBasket from "./FileBasket.vue";
+import InputDialog from "../../common/dialogs/InputDialog.vue";
 
 const { t } = useI18n();
 
@@ -227,14 +202,17 @@ const createFolder = () => {
   });
 };
 
-// 确认创建文件夹
-const confirmCreateFolder = () => {
-  if (newFolderName.value.trim()) {
-    emit("createFolder", {
-      name: newFolderName.value.trim(),
-      path: props.currentPath,
-    });
-    showCreateFolderDialog.value = false;
-  }
+// 处理创建文件夹确认
+const handleCreateFolderConfirm = (folderName) => {
+  emit("createFolder", {
+    name: folderName,
+    path: props.currentPath,
+  });
+  showCreateFolderDialog.value = false;
+};
+
+// 处理创建文件夹取消
+const handleCreateFolderCancel = () => {
+  newFolderName.value = "";
 };
 </script>

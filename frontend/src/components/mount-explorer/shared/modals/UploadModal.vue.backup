@@ -249,7 +249,7 @@
               <button
                 v-if="fileItems[index]?.status === 'uploading'"
                 type="button"
-                @click="cancelSingleUpload(index)"
+                @click="() => cancelSingleUpload(index)"
                 class="p-1 rounded-full hover:bg-opacity-20 transition-colors mr-1"
                 :class="darkMode ? 'hover:bg-red-900/60 text-gray-400 hover:text-red-300' : 'hover:bg-red-100 text-gray-500 hover:text-red-500'"
                 :title="t('mount.uploadModal.cancelSingleUpload')"
@@ -378,7 +378,7 @@
         >
           {{ t("mount.uploadModal.cancel") }}
         </button>
-        <button v-if="isUploading" @click="cancelUpload" class="px-4 py-2 rounded-md text-white transition-colors bg-red-500 hover:bg-red-600">
+        <button v-if="isUploading" @click="() => cancelUpload()" class="px-4 py-2 rounded-md text-white transition-colors bg-red-500 hover:bg-red-600">
           {{ t("mount.uploadModal.cancelUpload") }}
         </button>
         <button
@@ -489,10 +489,10 @@ const handlePasteWrapper = (event) => {
 };
 
 // 方法
-const closeModal = () => {
+const closeModal = async () => {
   if (isUploading.value) {
     if (confirm(t("mount.uploadModal.confirmCancelUpload"))) {
-      cancelUpload();
+      await cancelUpload();
       emit("close");
     }
   } else {

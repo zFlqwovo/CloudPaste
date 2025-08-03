@@ -16,7 +16,7 @@ export default {
       defaultUseProxyHint: "When enabled, new files will use Worker proxy by default; when disabled, direct links will be used by default",
       fileOverwriteModeLabel: "File Overwrite Mode",
       fileOverwriteModeHint:
-          "When enabled, files with the same name will be directly overwritten; when disabled, random suffixes will be used to avoid conflicts (e.g., document-a1B2c3.pdf)",
+        "When enabled, files with the same name will be directly overwritten; when disabled, random suffixes will be used to avoid conflicts (e.g., document-a1B2c3.pdf)",
     },
     proxySignSettings: {
       title: "Proxy Signature Settings",
@@ -116,7 +116,7 @@ export default {
     textTypes: "Text File Types",
     textTypesLabel: "Supported text file extensions",
     textTypesPlaceholder:
-        "txt,htm,html,xml,java,properties,sql,js,md,json,conf,ini,vue,php,py,bat,yml,go,sh,c,cpp,h,hpp,tsx,vtt,srt,ass,rs,lrc,dockerfile,makefile,gitignore,license,readme",
+      "txt,htm,html,xml,java,properties,sql,js,md,json,conf,ini,vue,php,py,bat,yml,go,sh,c,cpp,h,hpp,tsx,vtt,srt,ass,rs,lrc,dockerfile,makefile,gitignore,license,readme",
     textTypesHelp: "Comma-separated text file extensions that will be displayed using the text previewer",
 
     imageTypes: "Image File Types",
@@ -128,7 +128,7 @@ export default {
     videoTypesLabel: "Supported video file extensions",
     videoTypesPlaceholder: "mp4,htm,html,mkv,avi,mov,rmvb,webm,flv,m3u8",
     videoTypesHelp:
-        "Video file extensions separated by commas, which will be previewed using a video player (playback depends on browser support, generally only supporting h.264 (mp4) encoded formats).",
+      "Video file extensions separated by commas, which will be previewed using a video player (playback depends on browser support, generally only supporting h.264 (mp4) encoded formats).",
 
     audioTypes: "Audio File Types",
     audioTypesLabel: "Supported audio file extensions",

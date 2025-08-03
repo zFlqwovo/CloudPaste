@@ -203,6 +203,39 @@ export async function abortMultipartUpload(path, uploadId, fileName) {
   return post(`/fs/multipart/abort`, { path, uploadId, fileName });
 }
 
+//============断点续传================
+
+/**
+ * 列出进行中的分片上传
+ * @param {string} path 目标路径（可选，用于过滤特定文件的上传）
+ * @returns {Promise<Object>} 进行中的上传列表响应对象
+ */
+export async function listMultipartUploads(path = "") {
+  return post(`/fs/multipart/list-uploads`, { path });
+}
+
+/**
+ * 列出已上传的分片
+ * @param {string} path 文件路径
+ * @param {string} uploadId 上传ID
+ * @param {string} fileName 文件名
+ * @returns {Promise<Object>} 已上传的分片列表响应对象
+ */
+export async function listMultipartParts(path, uploadId, fileName) {
+  return post(`/fs/multipart/list-parts`, { path, uploadId, fileName });
+}
+
+/**
+ * 为现有上传刷新预签名URL
+ * @param {string} path 文件路径
+ * @param {string} uploadId 现有的上传ID
+ * @param {Array} partNumbers 需要刷新URL的分片编号数组
+ * @returns {Promise<Object>} 刷新的预签名URL列表响应对象
+ */
+export async function refreshMultipartUrls(path, uploadId, partNumbers) {
+  return post(`/fs/multipart/refresh-urls`, { path, uploadId, partNumbers });
+}
+
 /******************************************************************************
  * 预签名URL上传相关API函数
  ******************************************************************************/
@@ -779,16 +812,119 @@ export async function performMultipartUpload(file, path, onProgress, onCancel, o
 
   let uploadId = null;
   let multipartUploader = null;
+  let existingUpload = null;
 
   try {
-    // 1. 初始化前端分片上传（获取预签名URL列表）
-    const initResponse = await initMultipartUpload(path, file.name, file.size, file.type, CHUNK_SIZE);
-    if (!initResponse.success) {
-      throw new Error(initResponse.message || "初始化分片上传失败");
+    console.log(`开始分片上传: 文件=${file.name}, 大小=${file.size}, 路径=${path}`);
+
+    // 1. 检查是否有进行中的上传（AWS S3标准流程）
+    console.log("检查进行中的分片上传...");
+    const uploadsResponse = await listMultipartUploads(path);
+
+    if (uploadsResponse.success && uploadsResponse.data.uploads) {
+      console.log(`S3中进行中的上传数量: ${uploadsResponse.data.uploads.length}`);
+
+      // 查找匹配的上传（基于文件名和大小）
+      const targetFileName = path.endsWith("/") ? path + file.name : path + "/" + file.name;
+      const normalizedTargetPath = targetFileName.replace(/^\/+/, "");
+
+      console.log(`查找目标文件: ${file.name}, 目标路径: ${normalizedTargetPath}`);
+
+      // 列出所有进行中的上传，用于调试
+      uploadsResponse.data.uploads.forEach((upload, index) => {
+        console.log(`上传${index + 1}: key=${upload.key}, uploadId=${upload.uploadId?.substring(0, 20)}..., 创建时间=${upload.initiated}`);
+      });
+
+      // 匹配逻辑：文件名匹配
+      existingUpload = uploadsResponse.data.uploads.find((upload) => {
+        const keyEndsWith = upload.key.endsWith(file.name);
+        const keyMatches = upload.key === normalizedTargetPath;
+
+        console.log(`检查上传: key=${upload.key}, 文件名匹配=${keyEndsWith}, 路径匹配=${keyMatches}`);
+
+        return keyEndsWith; // 先简化匹配逻辑，只要文件名匹配就认为是同一个文件
+      });
+
+      if (existingUpload) {
+        console.log(`发现现有上传: uploadId=${existingUpload.uploadId}, key=${existingUpload.key}, 创建时间=${existingUpload.initiated}`);
+        uploadId = existingUpload.uploadId;
+      } else {
+        console.log("没有找到匹配的现有上传");
+      }
     }
 
-    uploadId = initResponse.data.uploadId;
-    const presignedUrls = initResponse.data.presignedUrls;
+    let presignedUrls;
+    let uploadedParts = [];
+
+    if (existingUpload) {
+      // 2. 如果有现有上传，获取已上传的分片信息
+      console.log("获取已上传的分片信息...");
+      // 使用现有上传中的完整路径
+      const fullPath = path.endsWith("/") ? path + file.name : path + "/" + file.name;
+      console.log(`查询分片信息: path=${fullPath}, uploadId=${uploadId}, fileName=${file.name}`);
+      const partsResponse = await listMultipartParts(fullPath, uploadId, file.name);
+
+      if (partsResponse.success && partsResponse.data.parts) {
+        uploadedParts = partsResponse.data.parts;
+        console.log(`找到${uploadedParts.length}个已上传的分片`);
+      }
+
+      // 3. 为剩余分片生成新的预签名URL
+      const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+      const uploadedPartNumbers = uploadedParts.map((p) => p.partNumber);
+      const remainingPartNumbers = [];
+
+      for (let i = 1; i <= totalParts; i++) {
+        if (!uploadedPartNumbers.includes(i)) {
+          remainingPartNumbers.push(i);
+        }
+      }
+
+      console.log(`需要上传剩余分片: [${remainingPartNumbers.join(", ")}]`);
+
+      // 检查是否还有剩余分片需要上传
+      if (remainingPartNumbers.length > 0) {
+        // 使用新的刷新URL API，为现有uploadId获取剩余分片的预签名URL
+        console.log("为现有uploadId刷新剩余分片的预签名URL...");
+        const refreshResponse = await refreshMultipartUrls(fullPath, uploadId, remainingPartNumbers);
+        if (!refreshResponse.success) {
+          throw new Error(refreshResponse.message || "刷新预签名URL失败");
+        }
+
+        // 将刷新的URL转换为原有格式
+        presignedUrls = refreshResponse.data.presignedUrls;
+        console.log(`成功为现有uploadId刷新了${presignedUrls.length}个分片的预签名URL`);
+      } else {
+        // 所有分片都已上传完成，直接完成上传
+        console.log("所有分片都已上传完成，直接完成上传");
+        const parts = uploadedParts.map((part) => ({
+          PartNumber: part.partNumber,
+          ETag: part.etag,
+        }));
+
+        const completeResponse = await completeMultipartUpload(path, uploadId, parts, file.name, file.size);
+        if (!completeResponse.success) {
+          throw new Error(completeResponse.message || "完成分片上传失败");
+        }
+
+        return {
+          success: true,
+          message: "文件上传完成（断点续传）",
+          data: completeResponse.data,
+        };
+      }
+    } else {
+      // 4. 如果没有现有上传，创建新的上传
+      console.log("创建新的分片上传...");
+      const initResponse = await initMultipartUpload(path, file.name, file.size, file.type, CHUNK_SIZE);
+      if (!initResponse.success) {
+        throw new Error(initResponse.message || "初始化分片上传失败");
+      }
+
+      uploadId = initResponse.data.uploadId;
+      presignedUrls = initResponse.data.presignedUrls;
+      console.log(`创建新上传: uploadId=${uploadId}`);
+    }
 
     // 检查是否已取消
     if (onCancel && onCancel()) {
@@ -808,6 +944,24 @@ export async function performMultipartUpload(file, path, onProgress, onCancel, o
     // 设置文件内容和上传信息
     multipartUploader.setContent(file, CHUNK_SIZE);
     multipartUploader.setUploadInfo(uploadId, presignedUrls, `fs_${path}`);
+
+    // 5. 如果有已上传的分片，恢复状态
+    if (uploadedParts.length > 0) {
+      console.log("恢复已上传的分片状态...");
+
+      // 将S3的分片信息转换为S3MultipartUploader期望的格式
+      const s3Parts = uploadedParts.map((part) => ({
+        PartNumber: part.partNumber,
+        ETag: part.etag,
+        Size: part.size,
+        LastModified: part.lastModified,
+      }));
+
+      // 调用S3MultipartUploader的恢复方法
+      multipartUploader.restoreFromS3ListParts(s3Parts);
+
+      console.log(`已恢复${uploadedParts.length}个分片的状态`);
+    }
 
     // 如果提供了XHR创建回调，需要适配到分片上传器
     if (onXhrCreated) {

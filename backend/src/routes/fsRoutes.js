@@ -754,6 +754,151 @@ fsRoutes.post("/api/fs/multipart/abort", authGateway.requireMountUpload(), unifi
   }
 });
 
+// ===============断点续传==========================
+
+// 列出进行中的分片上传 - 需要挂载页上传权限
+fsRoutes.post("/api/fs/multipart/list-uploads", authGateway.requireMountUpload(), unifiedFsAuthMiddleware, async (c) => {
+  try {
+    setCorsHeaders(c);
+
+    // 获取数据库和加密密钥
+    const db = c.env.DB;
+    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+
+    // 从上下文获取用户信息
+    const userInfo = c.get("userInfo");
+    if (!userInfo) {
+      return c.json(createErrorResponse(ApiStatus.UNAUTHORIZED, "未授权访问"), ApiStatus.UNAUTHORIZED);
+    }
+
+    const userIdOrInfo = userInfo.type === "admin" ? userInfo.id : userInfo.info;
+    const userType = userInfo.type === "admin" ? "admin" : "apiKey";
+
+    // 获取请求参数
+    const body = await c.req.json();
+    const { path = "" } = body;
+
+    // 使用FileSystem抽象层
+    const mountManager = new MountManager(db, encryptionSecret);
+    const fileSystem = new FileSystem(mountManager);
+
+    // 调用FileSystem的listMultipartUploads方法
+    const result = await fileSystem.listMultipartUploads(path, userIdOrInfo, userType);
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "列出进行中的分片上传成功",
+      data: result,
+      success: true,
+    });
+  } catch (error) {
+    console.error("列出进行中的分片上传错误:", error);
+    setCorsHeaders(c);
+    if (error instanceof HTTPException) {
+      return c.json(createErrorResponse(error.status, error.message), error.status);
+    }
+    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "列出进行中的分片上传失败"), ApiStatus.INTERNAL_ERROR);
+  }
+});
+
+// 列出已上传的分片 - 需要挂载页上传权限
+fsRoutes.post("/api/fs/multipart/list-parts", authGateway.requireMountUpload(), unifiedFsAuthMiddleware, async (c) => {
+  try {
+    setCorsHeaders(c);
+
+    // 获取数据库和加密密钥
+    const db = c.env.DB;
+    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+
+    // 从上下文获取用户信息
+    const userInfo = c.get("userInfo");
+    if (!userInfo) {
+      return c.json(createErrorResponse(ApiStatus.UNAUTHORIZED, "未授权访问"), ApiStatus.UNAUTHORIZED);
+    }
+
+    const userIdOrInfo = userInfo.type === "admin" ? userInfo.id : userInfo.info;
+    const userType = userInfo.type === "admin" ? "admin" : "apiKey";
+
+    // 获取请求参数
+    const body = await c.req.json();
+    const { path, uploadId, fileName } = body;
+
+    if (!path || !uploadId || !fileName) {
+      return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "缺少必要参数"), ApiStatus.BAD_REQUEST);
+    }
+
+    // 使用FileSystem抽象层
+    const mountManager = new MountManager(db, encryptionSecret);
+    const fileSystem = new FileSystem(mountManager);
+
+    // 调用FileSystem的listMultipartParts方法
+    const result = await fileSystem.listMultipartParts(path, uploadId, fileName, userIdOrInfo, userType);
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "列出已上传的分片成功",
+      data: result,
+      success: true,
+    });
+  } catch (error) {
+    console.error("列出已上传的分片错误:", error);
+    setCorsHeaders(c);
+    if (error instanceof HTTPException) {
+      return c.json(createErrorResponse(error.status, error.message), error.status);
+    }
+    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "列出已上传的分片失败"), ApiStatus.INTERNAL_ERROR);
+  }
+});
+
+// 为现有上传刷新预签名URL - 需要挂载页上传权限
+fsRoutes.post("/api/fs/multipart/refresh-urls", authGateway.requireMountUpload(), unifiedFsAuthMiddleware, async (c) => {
+  try {
+    setCorsHeaders(c);
+
+    // 获取数据库和加密密钥
+    const db = c.env.DB;
+    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+
+    // 从上下文获取用户信息
+    const userInfo = c.get("userInfo");
+    if (!userInfo) {
+      return c.json(createErrorResponse(ApiStatus.UNAUTHORIZED, "未授权访问"), ApiStatus.UNAUTHORIZED);
+    }
+
+    const userIdOrInfo = userInfo.type === "admin" ? userInfo.id : userInfo.info;
+    const userType = userInfo.type === "admin" ? "admin" : "apiKey";
+
+    // 获取请求参数
+    const body = await c.req.json();
+    const { path, uploadId, partNumbers } = body;
+
+    if (!path || !uploadId || !Array.isArray(partNumbers) || partNumbers.length === 0) {
+      return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "缺少必要参数"), ApiStatus.BAD_REQUEST);
+    }
+
+    // 使用FileSystem抽象层
+    const mountManager = new MountManager(db, encryptionSecret);
+    const fileSystem = new FileSystem(mountManager);
+
+    // 调用FileSystem的refreshMultipartUrls方法
+    const result = await fileSystem.refreshMultipartUrls(path, uploadId, partNumbers, userIdOrInfo, userType);
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "刷新分片上传预签名URL成功",
+      data: result,
+      success: true,
+    });
+  } catch (error) {
+    console.error("刷新分片上传预签名URL错误:", error);
+    setCorsHeaders(c);
+    if (error instanceof HTTPException) {
+      return c.json(createErrorResponse(error.status, error.message), error.status);
+    }
+    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "刷新分片上传预签名URL失败"), ApiStatus.INTERNAL_ERROR);
+  }
+});
+
 // ================ 预签名URL相关路由 ================
 
 // 获取预签名上传URL - 需要挂载页上传权限

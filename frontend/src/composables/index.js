@@ -12,7 +12,6 @@ import { useFilePreview } from "./file-preview/useFilePreview.js";
 
 // ===== 文件系统功能 =====
 import { useFileOperations } from "./file-system/useFileOperations.js";
-import { useFileUpload } from "./file-system/useFileUpload.js";
 import { useDirectorySort } from "./file-system/useDirectorySort.js";
 import { useFileBasket } from "./file-system/useFileBasket.js";
 import { useFileSave } from "./file-system/useFileSave.js";
@@ -30,7 +29,6 @@ export {
   useFilePreviewExtensions,
   useFilePreview,
   useFileOperations,
-  useFileUpload,
   useDirectorySort,
   useFileBasket,
   useFileSave,
@@ -58,7 +56,6 @@ export const FilePreviewComposables = {
  */
 export const FileSystemComposables = {
   useFileOperations,
-  useFileUpload,
   useDirectorySort,
   useFileBasket,
   useFileSave,
@@ -152,7 +149,6 @@ export default {
   useFilePreviewExtensions,
   useFilePreview,
   useFileOperations,
-  useFileUpload,
   useDirectorySort,
   useFileBasket,
   useSelection,

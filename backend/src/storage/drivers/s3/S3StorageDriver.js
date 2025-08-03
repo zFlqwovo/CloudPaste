@@ -555,6 +555,78 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
+   * 列出进行中的分片上传
+   * @param {string} subPath - 子路径（可选，用于过滤特定文件的上传）
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 进行中的上传列表
+   */
+  async listMultipartUploads(subPath = "", options = {}) {
+    this._ensureInitialized();
+
+    const { mount, db } = options;
+
+    // 规范化S3子路径
+    const s3SubPath = normalizeS3SubPath(subPath, this.config, false);
+
+    // 更新挂载点的最后使用时间
+    if (db && mount && mount.id) {
+      await updateMountLastUsed(db, mount.id);
+    }
+
+    // 委托给上传操作模块
+    return await this.uploadOps.listMultipartUploads(s3SubPath, options);
+  }
+
+  /**
+   * 列出已上传的分片
+   * @param {string} subPath - 子路径
+   * @param {string} uploadId - 上传ID
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 已上传的分片列表
+   */
+  async listMultipartParts(subPath, uploadId, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, db } = options;
+
+    // 规范化S3子路径
+    const s3SubPath = normalizeS3SubPath(subPath, this.config, false);
+
+    // 更新挂载点的最后使用时间
+    if (db && mount && mount.id) {
+      await updateMountLastUsed(db, mount.id);
+    }
+
+    // 委托给上传操作模块
+    return await this.uploadOps.listMultipartParts(s3SubPath, uploadId, options);
+  }
+
+  /**
+   * 为现有上传刷新预签名URL
+   * @param {string} subPath - 子路径
+   * @param {string} uploadId - 现有的上传ID
+   * @param {Array} partNumbers - 需要刷新URL的分片编号数组
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 刷新的预签名URL列表
+   */
+  async refreshMultipartUrls(subPath, uploadId, partNumbers, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, db } = options;
+
+    // 规范化S3子路径
+    const s3SubPath = normalizeS3SubPath(subPath, this.config, false);
+
+    // 更新挂载点的最后使用时间
+    if (db && mount && mount.id) {
+      await updateMountLastUsed(db, mount.id);
+    }
+
+    // 委托给上传操作模块
+    return await this.uploadOps.refreshMultipartUrls(s3SubPath, uploadId, partNumbers, options);
+  }
+
+  /**
    * 规范化文件路径（用于后端分片上传）
    * @param {string} subPath - 子路径
    * @param {string} path - 完整路径，用于提取文件名

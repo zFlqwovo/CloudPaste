@@ -1,6 +1,10 @@
 /**
  * 文件上传 Composable
  * 彻底解决进度计算和状态管理问题
+ *
+ * @deprecated 此文件已废弃，请使用 UppyUploadModal.vue + Uppy.js
+ * 原因：项目已迁移到 Uppy.js 作为主要上传解决方案
+ * 替代方案：frontend/src/components/mount-explorer/shared/modals/UppyUploadModal.vue
  */
 
 import { ref, computed } from "vue";
@@ -579,10 +583,17 @@ export function useFileUpload() {
             });
           } else {
             console.log(`使用分片上传方式上传文件: ${file.name}`);
+            // 保存上传路径，用于取消时的abort操作
+            fileItem.uploadPath = currentPath;
+
             response = await fsApi.performMultipartUpload(file, currentPath, updateProgress, checkCancel, (uploaderRef) => {
               // 保存分片上传器引用，用于取消操作
               if (uploaderRef && uploaderRef.multipartUploader) {
                 fileItem.multipartUploader = uploaderRef.multipartUploader;
+                // 保存uploadId，用于取消时的abort操作
+                if (uploaderRef.multipartUploader.uploadId) {
+                  fileItem.uploadId = uploaderRef.multipartUploader.uploadId;
+                }
               } else {
                 fileItem.xhr = uploaderRef;
               }
@@ -641,18 +652,30 @@ export function useFileUpload() {
   /**
    * 取消所有上传
    */
-  const cancelUpload = () => {
+  const cancelUpload = async () => {
     cancelUploadFlag.value = true;
 
     // 取消所有正在上传的文件
-    fileItems.value.forEach((item) => {
+    for (let i = 0; i < fileItems.value.length; i++) {
+      const item = fileItems.value[i];
       if (item.status === "uploading") {
-        // 使用统一的清理函数
+        // 先清理S3分片（仅对multipart上传）
+        if (item.multipartUploader && item.uploadId && item.uploadPath) {
+          try {
+            const file = selectedFiles.value[i];
+            await api.fs.abortMultipartUpload(item.uploadPath, item.uploadId, file.name);
+            console.log(`已中止分片上传: ${file.name}`);
+          } catch (error) {
+            console.warn("中止分片上传失败:", error);
+          }
+        }
+
+        // 再清理前端引用（包括xhr.abort()）
         cleanupFileUploadReferences(item);
         item.status = "error";
         item.message = t("mount.uploadModal.uploadCancelled");
       }
-    });
+    }
 
     resetBatchUploadState();
     showMessage("warning", t("mount.uploadModal.allUploadsCancelled"));
@@ -662,12 +685,23 @@ export function useFileUpload() {
    * 取消单个文件上传
    * @param {number} index - 文件索引
    */
-  const cancelSingleUpload = (index) => {
+  const cancelSingleUpload = async (index) => {
     if (index >= 0 && index < fileItems.value.length) {
       const fileItem = fileItems.value[index];
 
       if (fileItem.status === "uploading") {
-        // 使用统一的清理函数，确保所有引用都被正确清理
+        // 先清理S3分片（仅对multipart上传）
+        if (fileItem.multipartUploader && fileItem.uploadId && fileItem.uploadPath) {
+          try {
+            const file = selectedFiles.value[index];
+            await api.fs.abortMultipartUpload(fileItem.uploadPath, fileItem.uploadId, file.name);
+            console.log(`已中止分片上传: ${file.name}`);
+          } catch (error) {
+            console.warn("中止分片上传失败:", error);
+          }
+        }
+
+        // 再清理前端引用（包括xhr.abort()）
         cleanupFileUploadReferences(fileItem);
 
         fileItem.status = "error";
@@ -747,10 +781,17 @@ export function useFileUpload() {
         });
       } else {
         console.log(`使用分片上传方式重试上传文件: ${file.name}`);
+        // 保存上传路径，用于取消时的abort操作
+        fileItem.uploadPath = currentPath;
+
         response = await fsApi.performMultipartUpload(file, currentPath, updateProgress, checkCancel, (uploaderRef) => {
           // 保存分片上传器引用，用于取消操作
           if (uploaderRef && uploaderRef.multipartUploader) {
             fileItem.multipartUploader = uploaderRef.multipartUploader;
+            // 保存uploadId，用于取消时的abort操作
+            if (uploaderRef.multipartUploader.uploadId) {
+              fileItem.uploadId = uploaderRef.multipartUploader.uploadId;
+            }
           } else {
             fileItem.xhr = uploaderRef;
           }

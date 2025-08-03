@@ -1361,8 +1361,8 @@ async function cleanupOldMigrationRecords(db, currentVersion) {
   try {
     console.log("开始清理旧的迁移记录...");
 
-    // 保留最近的2个版本，删除更早的迁移记录
-    const keepVersions = 2;
+    // 保留最近的5个版本，删除更早的迁移记录
+    const keepVersions = 5;
     const deleteBeforeVersion = currentVersion - keepVersions;
 
     if (deleteBeforeVersion > 0) {

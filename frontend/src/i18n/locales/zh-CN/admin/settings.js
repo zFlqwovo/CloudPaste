@@ -115,7 +115,7 @@ export default {
     textTypes: "文本文件类型",
     textTypesLabel: "支持的文本文件扩展名",
     textTypesPlaceholder:
-        "txt,htm,html,xml,java,properties,sql,js,md,json,conf,ini,vue,php,py,bat,yml,go,sh,c,cpp,h,hpp,tsx,vtt,srt,ass,rs,lrc,dockerfile,makefile,gitignore,license,readme",
+      "txt,htm,html,xml,java,properties,sql,js,md,json,conf,ini,vue,php,py,bat,yml,go,sh,c,cpp,h,hpp,tsx,vtt,srt,ass,rs,lrc,dockerfile,makefile,gitignore,license,readme",
     textTypesHelp: "用逗号分隔的文本文件扩展名，这些文件将使用文本预览器显示",
 
     imageTypes: "图片文件类型",

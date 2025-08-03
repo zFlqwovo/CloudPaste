@@ -239,45 +239,20 @@
       />
     </div>
 
-    <!-- 重命名对话框 -->
-    <div v-if="showRenameDialog" class="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
-      <div class="relative w-full max-w-md p-6 rounded-lg shadow-xl" :class="darkMode ? 'bg-gray-800' : 'bg-white'">
-        <div class="mb-4">
-          <h3 class="text-lg font-semibold" :class="darkMode ? 'text-gray-100' : 'text-gray-900'">{{ t("mount.rename.title") }}</h3>
-          <p class="text-sm mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("mount.rename.enterNewName") }}</p>
-        </div>
-
-        <div class="mb-4">
-          <label for="new-name" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-300' : 'text-gray-700'"> {{ t("mount.rename.newName") }} </label>
-          <input
-            id="new-name"
-            v-model="newName"
-            type="text"
-            class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'"
-            @keyup.enter="confirmRename"
-            ref="renameInput"
-          />
-        </div>
-
-        <div class="flex justify-end space-x-2">
-          <button
-            @click="showRenameDialog = false"
-            class="px-4 py-2 rounded-md transition-colors"
-            :class="darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'"
-          >
-            {{ t("mount.rename.cancel") }}
-          </button>
-          <button
-            @click="confirmRename"
-            class="px-4 py-2 rounded-md text-white transition-colors"
-            :class="darkMode ? 'bg-primary-600 hover:bg-primary-700' : 'bg-primary-500 hover:bg-primary-600'"
-          >
-            {{ t("mount.rename.confirm") }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- 通用 InputDialog 组件替换内联重命名对话框 -->
+    <InputDialog
+      :is-open="showRenameDialog"
+      :title="t('mount.rename.title')"
+      :description="t('mount.rename.enterNewName')"
+      :label="t('mount.rename.newName')"
+      :initial-value="newName"
+      :confirm-text="t('mount.rename.confirm')"
+      :cancel-text="t('mount.rename.cancel')"
+      :dark-mode="darkMode"
+      @confirm="handleRenameConfirm"
+      @cancel="handleRenameCancel"
+      @close="showRenameDialog = false"
+    />
 
     <!-- 链接复制成功通知 -->
     <div v-if="showLinkCopiedNotification" class="fixed bottom-4 right-4 z-50">
@@ -303,6 +278,7 @@ import FileItem from "./FileItem.vue";
 import GalleryView from "./GalleryView.vue";
 import { getFileIcon } from "../../../utils/fileTypeIcons";
 import { useDirectorySort, useFileOperations } from "../../../composables/index.js";
+import InputDialog from "../../common/dialogs/InputDialog.vue";
 
 const { t } = useI18n();
 
@@ -414,15 +390,21 @@ const handleRename = (item) => {
   });
 };
 
-// 确认重命名
-const confirmRename = () => {
-  if (newName.value.trim() && itemToRename.value) {
+// 处理重命名确认
+const handleRenameConfirm = (fileName) => {
+  if (itemToRename.value) {
     emit("rename", {
       item: itemToRename.value,
-      newName: newName.value.trim(),
+      newName: fileName,
     });
     showRenameDialog.value = false;
   }
+};
+
+// 处理重命名取消
+const handleRenameCancel = () => {
+  newName.value = "";
+  itemToRename.value = null;
 };
 
 // 处理删除

@@ -118,13 +118,13 @@ const handleUpdateUploadSettings = async (event) => {
 
     // 使用新的分组更新API（全局设置组，分组ID = 1）
     const response = await api.system.updateGroupSettings(
-        1,
-        {
-          max_upload_size: Math.round(convertedSize),
-          default_use_proxy: defaultProxySettings.value.defaultUseProxy.toString(),
-          file_naming_strategy: fileNamingSettings.value.enableOverwrite ? "overwrite" : "random_suffix",
-        },
-        true
+      1,
+      {
+        max_upload_size: Math.round(convertedSize),
+        default_use_proxy: defaultProxySettings.value.defaultUseProxy.toString(),
+        file_naming_strategy: fileNamingSettings.value.enableOverwrite ? "overwrite" : "random_suffix",
+      },
+      true
     );
 
     if (response && response.success) {
@@ -155,12 +155,12 @@ const handleUpdateProxySignSettings = async (event) => {
   try {
     // 使用新的分组更新API（代理签名设置也属于全局设置组，分组ID = 1）
     const response = await api.system.updateGroupSettings(
-        1,
-        {
-          proxy_sign_all: proxySignSettings.value.signAll.toString(),
-          proxy_sign_expires: proxySignSettings.value.expires.toString(),
-        },
-        true
+      1,
+      {
+        proxy_sign_all: proxySignSettings.value.signAll.toString(),
+        proxy_sign_expires: proxySignSettings.value.expires.toString(),
+      },
+      true
     );
 
     if (response && response.success) {
@@ -195,16 +195,16 @@ const handleUpdateProxySignSettings = async (event) => {
         <div class="space-y-4">
           <!-- 状态消息 -->
           <div
-              v-if="uploadStatus.success"
-              class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-              :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
+            v-if="uploadStatus.success"
+            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
+            :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
           >
             <div class="flex items-center">
               <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clip-rule="evenodd"
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clip-rule="evenodd"
                 />
               </svg>
               <p class="text-sm font-medium">{{ t("admin.global.messages.updateSuccess") }}</p>
@@ -212,16 +212,16 @@ const handleUpdateProxySignSettings = async (event) => {
           </div>
 
           <div
-              v-if="uploadStatus.error"
-              class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-              :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
+            v-if="uploadStatus.error"
+            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
+            :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
           >
             <div class="flex items-center">
               <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clip-rule="evenodd"
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clip-rule="evenodd"
                 />
               </svg>
               <p class="text-sm font-medium">{{ uploadStatus.error }}</p>
@@ -239,21 +239,21 @@ const handleUpdateProxySignSettings = async (event) => {
               <div class="space-y-4">
                 <div class="flex items-center space-x-3 max-w-md">
                   <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      name="maxUploadSize"
-                      id="maxUploadSize"
-                      v-model.number="uploadSettings.max_upload_size"
-                      required
-                      class="flex-1 px-3 py-2 border rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                      :class="darkMode ? 'bg-gray-700 border-gray-600 text-white focus:border-primary-500' : 'bg-white border-gray-300 text-gray-900 focus:border-primary-500'"
-                      placeholder="100"
+                    type="number"
+                    min="1"
+                    step="1"
+                    name="maxUploadSize"
+                    id="maxUploadSize"
+                    v-model.number="uploadSettings.max_upload_size"
+                    required
+                    class="flex-1 px-3 py-2 border rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                    :class="darkMode ? 'bg-gray-700 border-gray-600 text-white focus:border-primary-500' : 'bg-white border-gray-300 text-gray-900 focus:border-primary-500'"
+                    placeholder="100"
                   />
                   <select
-                      v-model="uploadSettings.max_upload_size_unit"
-                      class="px-3 py-2 border rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                      :class="darkMode ? 'bg-gray-700 border-gray-600 text-white focus:border-primary-500' : 'bg-white border-gray-300 text-gray-900 focus:border-primary-500'"
+                    v-model="uploadSettings.max_upload_size_unit"
+                    class="px-3 py-2 border rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                    :class="darkMode ? 'bg-gray-700 border-gray-600 text-white focus:border-primary-500' : 'bg-white border-gray-300 text-gray-900 focus:border-primary-500'"
                   >
                     <option v-for="unit in sizeUnits" :key="unit" :value="unit">
                       {{ unit }}
@@ -272,7 +272,7 @@ const handleUpdateProxySignSettings = async (event) => {
                       <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="defaultUseProxy" v-model="defaultProxySettings.defaultUseProxy" class="sr-only peer" />
                         <div
-                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+                          class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
                         ></div>
                       </label>
                     </div>
@@ -290,7 +290,7 @@ const handleUpdateProxySignSettings = async (event) => {
                       <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="enableOverwrite" v-model="fileNamingSettings.enableOverwrite" class="sr-only peer" />
                         <div
-                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+                          class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
                         ></div>
                       </label>
                     </div>
@@ -299,17 +299,17 @@ const handleUpdateProxySignSettings = async (event) => {
 
                 <div class="flex justify-start">
                   <button
-                      type="submit"
-                      :disabled="uploadStatus.loading"
-                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors"
-                      :class="uploadStatus.loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700'"
+                    type="submit"
+                    :disabled="uploadStatus.loading"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors"
+                    :class="uploadStatus.loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700'"
                   >
                     <svg v-if="uploadStatus.loading" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path
-                          class="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
                     {{ uploadStatus.loading ? t("admin.global.buttons.updating") : t("admin.global.buttons.updateSettings") }}
@@ -327,16 +327,16 @@ const handleUpdateProxySignSettings = async (event) => {
         <div class="space-y-4">
           <!-- 状态消息 -->
           <div
-              v-if="proxySignStatus.success"
-              class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-              :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
+            v-if="proxySignStatus.success"
+            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
+            :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
           >
             <div class="flex items-center">
               <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clip-rule="evenodd"
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clip-rule="evenodd"
                 />
               </svg>
               <p class="text-sm font-medium">{{ t("admin.global.messages.updateSuccess") }}</p>
@@ -344,16 +344,16 @@ const handleUpdateProxySignSettings = async (event) => {
           </div>
 
           <div
-              v-if="proxySignStatus.error"
-              class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-              :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
+            v-if="proxySignStatus.error"
+            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
+            :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
           >
             <div class="flex items-center">
               <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clip-rule="evenodd"
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clip-rule="evenodd"
                 />
               </svg>
               <p class="text-sm font-medium">{{ proxySignStatus.error }}</p>
@@ -373,7 +373,7 @@ const handleUpdateProxySignSettings = async (event) => {
                   <label class="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" id="signAll" v-model="proxySignSettings.signAll" class="sr-only peer" />
                     <div
-                        class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"
+                      class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"
                     ></div>
                   </label>
                 </div>
@@ -386,15 +386,15 @@ const handleUpdateProxySignSettings = async (event) => {
               <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ t("admin.global.proxySignSettings.expiresHint") }}</p>
               <div class="flex items-center space-x-3 max-w-md">
                 <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    name="expires"
-                    id="expires"
-                    v-model.number="proxySignSettings.expires"
-                    class="flex-1 px-3 py-2 border rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                    :class="darkMode ? 'bg-gray-700 border-gray-600 text-white focus:border-primary-500' : 'bg-white border-gray-300 text-gray-900 focus:border-primary-500'"
-                    placeholder="0"
+                  type="number"
+                  min="0"
+                  step="1"
+                  name="expires"
+                  id="expires"
+                  v-model.number="proxySignSettings.expires"
+                  class="flex-1 px-3 py-2 border rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-white focus:border-primary-500' : 'bg-white border-gray-300 text-gray-900 focus:border-primary-500'"
+                  placeholder="0"
                 />
                 <span class="text-sm text-gray-500 dark:text-gray-400">{{ t("admin.global.proxySignSettings.expiresUnit") }}</span>
               </div>
@@ -403,17 +403,17 @@ const handleUpdateProxySignSettings = async (event) => {
             <!-- 保存按钮 -->
             <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
-                  type="submit"
-                  :disabled="proxySignStatus.loading"
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors"
-                  :class="proxySignStatus.loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700'"
+                type="submit"
+                :disabled="proxySignStatus.loading"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors"
+                :class="proxySignStatus.loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700'"
               >
                 <svg v-if="proxySignStatus.loading" class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
                 {{ proxySignStatus.loading ? t("admin.global.buttons.updating") : t("admin.global.buttons.updateSettings") }}

@@ -17,10 +17,10 @@
           <div class="mb-4">
             <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"> 文件名 </label>
             <input
-                type="text"
-                class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-70 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                disabled
-                :value="fileData.filename"
+              type="text"
+              class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-70 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              disabled
+              :value="fileData.filename"
             />
           </div>
 
@@ -30,10 +30,10 @@
             <div class="flex items-center">
               <span class="text-sm mr-1 text-gray-600 dark:text-gray-400">/</span>
               <input
-                  type="text"
-                  class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                  v-model="fileData.slug"
-                  placeholder="例如: my-file"
+                type="text"
+                class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                v-model="fileData.slug"
+                placeholder="例如: my-file"
               />
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空则系统自动生成</p>
@@ -43,10 +43,10 @@
           <div class="mb-4">
             <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"> 备注信息 </label>
             <textarea
-                class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                v-model="fileData.remark"
-                rows="2"
-                placeholder="文件的描述信息"
+              class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              v-model="fileData.remark"
+              rows="2"
+              placeholder="文件的描述信息"
             ></textarea>
           </div>
 
@@ -54,11 +54,11 @@
           <div class="mb-4">
             <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"> 最大查看次数 </label>
             <input
-                type="number"
-                class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                v-model="fileData.max_views"
-                min="0"
-                placeholder="留空表示无限制"
+              type="number"
+              class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              v-model="fileData.max_views"
+              min="0"
+              placeholder="留空表示无限制"
             />
           </div>
 
@@ -66,8 +66,8 @@
           <div class="mb-4">
             <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"> 过期时间 </label>
             <select
-                v-model="expiryOption"
-                class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              v-model="expiryOption"
+              class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
             >
               <option value="1">1小时</option>
               <option value="24">1天</option>
@@ -81,20 +81,20 @@
           <div class="mb-4">
             <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"> 访问密码 </label>
             <input
-                type="text"
-                class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                v-model="fileData.password"
-                placeholder="留空则不修改密码"
-                :disabled="clearPassword"
+              type="text"
+              class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              v-model="fileData.password"
+              placeholder="留空则不修改密码"
+              :disabled="clearPassword"
             />
             <!-- 添加清除密码功能 -->
             <div class="mt-2 flex items-center">
               <input
-                  type="checkbox"
-                  id="clear_password"
-                  v-model="clearPassword"
-                  class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
-                  :disabled="fileData.password.length > 0"
+                type="checkbox"
+                id="clear_password"
+                v-model="clearPassword"
+                class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
+                :disabled="fileData.password.length > 0"
               />
               <label for="clear_password" class="ml-2 block text-sm text-gray-700 dark:text-gray-300"> 清除密码保护 </label>
             </div>
@@ -106,10 +106,10 @@
           <div class="mb-4">
             <div class="flex items-center">
               <input
-                  type="checkbox"
-                  id="use_proxy"
-                  v-model="fileData.use_proxy"
-                  class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+                id="use_proxy"
+                v-model="fileData.use_proxy"
+                class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
               />
               <label for="use_proxy" class="ml-2 block text-sm text-gray-700 dark:text-gray-300"> 使用Worker代理访问 </label>
             </div>
@@ -119,9 +119,9 @@
           <!-- 按钮组 -->
           <div class="flex justify-end space-x-3 mt-6">
             <button
-                type="button"
-                @click="$emit('close')"
-                class="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white"
+              type="button"
+              @click="$emit('close')"
+              class="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white"
             >
               取消
             </button>
@@ -190,49 +190,49 @@ const expiryOption = ref("0"); // 默认为永不过期
 
 // 监听文件数据变化，初始化编辑表单
 watch(
-    () => props.file,
-    (newFile) => {
-      if (newFile) {
-        // 复制文件数据
-        fileData.id = newFile.id;
-        fileData.filename = newFile.filename;
-        fileData.slug = newFile.slug || "";
-        fileData.remark = newFile.remark || "";
-        fileData.max_views = newFile.max_views || null;
-        fileData.expires_at = newFile.expires_at || null;
-        fileData.password = ""; // 出于安全考虑不回显密码
-        // 确保 use_proxy 值正确转换为布尔值，数据库中可能存储为 0 或 1
-        fileData.use_proxy = newFile.use_proxy === 1 || newFile.use_proxy === true;
+  () => props.file,
+  (newFile) => {
+    if (newFile) {
+      // 复制文件数据
+      fileData.id = newFile.id;
+      fileData.filename = newFile.filename;
+      fileData.slug = newFile.slug || "";
+      fileData.remark = newFile.remark || "";
+      fileData.max_views = newFile.max_views || null;
+      fileData.expires_at = newFile.expires_at || null;
+      fileData.password = ""; // 出于安全考虑不回显密码
+      // 确保 use_proxy 值正确转换为布尔值，数据库中可能存储为 0 或 1
+      fileData.use_proxy = newFile.use_proxy === 1 || newFile.use_proxy === true;
 
-        // 如果有过期时间，根据到期日期计算最接近的选项
-        if (newFile.expires_at) {
-          const now = new Date();
-          const expiresAt = new Date(newFile.expires_at);
+      // 如果有过期时间，根据到期日期计算最接近的选项
+      if (newFile.expires_at) {
+        const now = new Date();
+        const expiresAt = new Date(newFile.expires_at);
 
-          // 计算小时差
-          const hoursDiff = Math.round((expiresAt - now) / (1000 * 60 * 60));
+        // 计算小时差
+        const hoursDiff = Math.round((expiresAt - now) / (1000 * 60 * 60));
 
-          // 根据小时差选择最接近的选项
-          if (hoursDiff <= 0) {
-            // 如果已经过期，默认设置为1小时
-            expiryOption.value = "1";
-          } else if (hoursDiff <= 12) {
-            expiryOption.value = "1"; // 1小时
-          } else if (hoursDiff <= 96) {
-            expiryOption.value = "24"; // 1天
-          } else if (hoursDiff <= 336) {
-            expiryOption.value = "168"; // 7天
-          } else if (hoursDiff <= 1440) {
-            expiryOption.value = "720"; // 30天
-          } else {
-            expiryOption.value = "720"; // 默认为30天，如果超过30天
-          }
+        // 根据小时差选择最接近的选项
+        if (hoursDiff <= 0) {
+          // 如果已经过期，默认设置为1小时
+          expiryOption.value = "1";
+        } else if (hoursDiff <= 12) {
+          expiryOption.value = "1"; // 1小时
+        } else if (hoursDiff <= 96) {
+          expiryOption.value = "24"; // 1天
+        } else if (hoursDiff <= 336) {
+          expiryOption.value = "168"; // 7天
+        } else if (hoursDiff <= 1440) {
+          expiryOption.value = "720"; // 30天
         } else {
-          expiryOption.value = "0"; // 永不过期
+          expiryOption.value = "720"; // 默认为30天，如果超过30天
         }
+      } else {
+        expiryOption.value = "0"; // 永不过期
       }
-    },
-    { immediate: true }
+    }
+  },
+  { immediate: true }
 );
 
 /**

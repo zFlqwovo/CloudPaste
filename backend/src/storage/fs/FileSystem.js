@@ -501,6 +501,83 @@ export class FileSystem {
   }
 
   /**
+   * 列出进行中的分片上传
+   * @param {string} path - 目标路径（可选，用于过滤特定文件的上传）
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 进行中的上传列表
+   */
+  async listMultipartUploads(path = "", userIdOrInfo, userType, options = {}) {
+    const { driver, mount, subPath } = await this.mountManager.getDriverByPath(path || "/", userIdOrInfo, userType);
+
+    if (!driver.hasCapability(CAPABILITIES.MULTIPART)) {
+      throw new HTTPException(ApiStatus.NOT_IMPLEMENTED, {
+        message: `存储驱动 ${driver.getType()} 不支持分片上传`,
+      });
+    }
+
+    return await driver.listMultipartUploads(subPath, {
+      mount,
+      db: this.mountManager.db,
+      ...options,
+    });
+  }
+
+  /**
+   * 列出已上传的分片
+   * @param {string} path - 目标路径
+   * @param {string} uploadId - 上传ID
+   * @param {string} fileName - 文件名
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 已上传的分片列表
+   */
+  async listMultipartParts(path, uploadId, fileName, userIdOrInfo, userType, options = {}) {
+    const { driver, mount, subPath } = await this.mountManager.getDriverByPath(path, userIdOrInfo, userType);
+
+    if (!driver.hasCapability(CAPABILITIES.MULTIPART)) {
+      throw new HTTPException(ApiStatus.NOT_IMPLEMENTED, {
+        message: `存储驱动 ${driver.getType()} 不支持分片上传`,
+      });
+    }
+
+    return await driver.listMultipartParts(subPath, uploadId, {
+      mount,
+      db: this.mountManager.db,
+      fileName,
+      ...options,
+    });
+  }
+
+  /**
+   * 为现有上传刷新预签名URL
+   * @param {string} path - 目标路径
+   * @param {string} uploadId - 现有的上传ID
+   * @param {Array} partNumbers - 需要刷新URL的分片编号数组
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 刷新的预签名URL列表
+   */
+  async refreshMultipartUrls(path, uploadId, partNumbers, userIdOrInfo, userType, options = {}) {
+    const { driver, mount, subPath } = await this.mountManager.getDriverByPath(path, userIdOrInfo, userType);
+
+    if (!driver.hasCapability(CAPABILITIES.MULTIPART)) {
+      throw new HTTPException(ApiStatus.NOT_IMPLEMENTED, {
+        message: `存储驱动 ${driver.getType()} 不支持分片上传`,
+      });
+    }
+
+    return await driver.refreshMultipartUrls(subPath, uploadId, partNumbers, {
+      mount,
+      db: this.mountManager.db,
+      ...options,
+    });
+  }
+
+  /**
    * 初始化后端分片上传
    * @param {string} path - 目标路径
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息

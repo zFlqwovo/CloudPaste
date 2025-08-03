@@ -92,7 +92,7 @@
       </div>
 
       <!-- 上传弹窗 -->
-      <UploadModal
+      <UppyUploadModal
         :is-open="isUploadModalOpen"
         :current-path="currentPath"
         :dark-mode="darkMode"
@@ -118,80 +118,47 @@
       <!-- 任务管理弹窗 -->
       <TasksModal :is-open="isTasksModalOpen" :dark-mode="darkMode" @close="handleCloseTasksModal" />
 
-      <!-- 删除确认对话框 -->
-      <div v-if="showDeleteDialog" class="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
-        <div class="relative w-full max-w-md p-6 rounded-lg shadow-xl" :class="darkMode ? 'bg-gray-800' : 'bg-white'">
-          <div class="mb-4">
-            <h3 class="text-lg font-semibold" :class="darkMode ? 'text-gray-100' : 'text-gray-900'">
-              {{ itemsToDelete.length === 1 ? t("mount.delete.title") : t("mount.batchDelete.title") }}
-            </h3>
-            <p class="text-sm mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
-              <template v-if="itemsToDelete.length === 1">
-                {{
-                  t("mount.delete.message", {
-                    type: itemsToDelete[0]?.isDirectory ? t("mount.fileTypes.folder") : t("mount.fileTypes.file"),
-                    name: itemsToDelete[0]?.name,
-                  })
-                }}
-                {{ itemsToDelete[0]?.isDirectory ? t("mount.delete.folderWarning") : "" }}
-              </template>
-              <template v-else>
-                {{ t("mount.batchDelete.message", { count: itemsToDelete.length }) }}
-                <div class="mt-2">
-                  <div class="text-xs font-medium mb-1">{{ t("mount.batchDelete.selectedItems") }}</div>
-                  <div class="max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs">
-                    <div v-for="item in itemsToDelete.slice(0, 10)" :key="item.path" class="flex items-center py-0.5">
-                      <span class="truncate">{{ item.name }}</span>
-                      <span v-if="item.isDirectory" class="ml-1 text-gray-500">{{ t("mount.batchDelete.folder") }}</span>
-                    </div>
-                    <div v-if="itemsToDelete.length > 10" class="text-gray-500 py-0.5">
-                      {{ t("mount.batchDelete.moreItems", { count: itemsToDelete.length - 10 }) }}
-                    </div>
-                  </div>
+      <!-- 通用 ConfirmDialog 组件替换内联对话框 -->
+      <ConfirmDialog
+        :is-open="showDeleteDialog"
+        :title="itemsToDelete.length === 1 ? t('mount.delete.title') : t('mount.batchDelete.title')"
+        :confirm-text="itemsToDelete.length === 1 ? t('mount.delete.confirm') : t('mount.batchDelete.confirmButton')"
+        :cancel-text="itemsToDelete.length === 1 ? t('mount.delete.cancel') : t('mount.batchDelete.cancelButton')"
+        :loading="isDeleting"
+        :loading-text="itemsToDelete.length === 1 ? t('mount.delete.deleting') : t('mount.batchDelete.deleting')"
+        :dark-mode="darkMode"
+        confirm-type="danger"
+        @confirm="confirmDelete"
+        @cancel="cancelDelete"
+        @close="showDeleteDialog = false"
+      >
+        <template #content>
+          <template v-if="itemsToDelete.length === 1">
+            {{
+              t("mount.delete.message", {
+                type: itemsToDelete[0]?.isDirectory ? t("mount.fileTypes.folder") : t("mount.fileTypes.file"),
+                name: itemsToDelete[0]?.name,
+              })
+            }}
+            {{ itemsToDelete[0]?.isDirectory ? t("mount.delete.folderWarning") : "" }}
+          </template>
+          <template v-else>
+            {{ t("mount.batchDelete.message", { count: itemsToDelete.length }) }}
+            <div class="mt-2">
+              <div class="text-xs font-medium mb-1">{{ t("mount.batchDelete.selectedItems") }}</div>
+              <div class="max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-700 rounded p-2 text-xs">
+                <div v-for="item in itemsToDelete.slice(0, 10)" :key="item.path" class="flex items-center py-0.5">
+                  <span class="truncate">{{ item.name }}</span>
+                  <span v-if="item.isDirectory" class="ml-1 text-gray-500">{{ t("mount.batchDelete.folder") }}</span>
                 </div>
-              </template>
-            </p>
-          </div>
-
-          <div class="flex justify-end space-x-2">
-            <button
-              @click="cancelDelete"
-              :disabled="isDeleting"
-              class="px-4 py-2 rounded-md transition-colors"
-              :class="[darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100', isDeleting ? 'opacity-50 cursor-not-allowed' : '']"
-            >
-              {{ itemsToDelete.length === 1 ? t("mount.delete.cancel") : t("mount.batchDelete.cancelButton") }}
-            </button>
-            <button
-              @click="confirmDelete"
-              :disabled="isDeleting"
-              class="px-4 py-2 rounded-md text-white transition-colors flex items-center space-x-2"
-              :class="[isDeleting ? 'bg-red-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700']"
-            >
-              <!-- 删除中的loading图标 -->
-              <svg v-if="isDeleting" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <span>
-                {{
-                  isDeleting
-                    ? itemsToDelete.length === 1
-                      ? t("mount.delete.deleting")
-                      : t("mount.batchDelete.deleting")
-                    : itemsToDelete.length === 1
-                    ? t("mount.delete.confirm")
-                    : t("mount.batchDelete.confirmButton")
-                }}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
+                <div v-if="itemsToDelete.length > 10" class="text-gray-500 py-0.5">
+                  {{ t("mount.batchDelete.moreItems", { count: itemsToDelete.length - 10 }) }}
+                </div>
+              </div>
+            </div>
+          </template>
+        </template>
+      </ConfirmDialog>
 
       <!-- 消息提示 -->
       <div v-if="message" class="mb-4">
@@ -363,10 +330,11 @@ import BreadcrumbNav from "../components/mount-explorer/shared/BreadcrumbNav.vue
 import DirectoryList from "../components/mount-explorer/directory/DirectoryList.vue";
 import FileOperations from "../components/mount-explorer/shared/FileOperations.vue";
 import FilePreview from "../components/mount-explorer/preview/FilePreview.vue";
-import UploadModal from "../components/mount-explorer/shared/modals/UploadModal.vue";
+import UppyUploadModal from "../components/mount-explorer/shared/modals/UppyUploadModal.vue";
 import CopyModal from "../components/mount-explorer/shared/modals/CopyModal.vue";
 import TasksModal from "../components/mount-explorer/shared/modals/TasksModal.vue";
 import SearchModal from "../components/mount-explorer/shared/modals/SearchModal.vue";
+import ConfirmDialog from "../components/common/dialogs/ConfirmDialog.vue";
 
 const { t } = useI18n();
 
@@ -684,13 +652,13 @@ const batchDelete = () => {
 };
 
 /**
- * 取消删除
+ * 🔧 取消删除 
  */
 const cancelDelete = () => {
   // 删除过程中不允许取消
   if (isDeleting.value) return;
 
-  showDeleteDialog.value = false;
+  // 清理删除状态
   itemsToDelete.value = [];
 };
 
