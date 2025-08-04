@@ -13,9 +13,9 @@ const loadVditor = async () => {
   if (!VditorClass) {
     await loadVditorCSS();
 
-    // 从本地dist目录加载Vditor
+    // 从本地assets/vditor目录加载Vditor
     const script = document.createElement("script");
-    script.src = "/dist/index.min.js";
+    script.src = "/assets/vditor/index.min.js";
 
     return new Promise((resolve, reject) => {
       script.onload = () => {
@@ -33,7 +33,7 @@ const loadVditorCSS = async () => {
   if (!vditorCSSLoaded) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/dist/index.css";
+    link.href = "/assets/vditor/index.css";
     document.head.appendChild(link);
     vditorCSSLoaded = true;
   }

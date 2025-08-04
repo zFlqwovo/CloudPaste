@@ -1,11 +1,11 @@
 # Cloudflare Pages SPA配置
+# 解决静态资源MIME类型问题和SPA路由fallback
 
-# ===== 静态资源直接访问=====
+# ===== 静态资源直接访问（优先级最高）=====
 # 这些规则确保静态文件不会被SPA fallback拦截
 
-# Vite构建的静态资源
+# Vite构建的静态资源和Vditor编辑器资源
 /assets/*           /assets/:splat          200
-/dist/*             /dist/:splat            200
 
 # 图标和图片资源
 /icons/*            /icons/:splat           200
@@ -49,7 +49,7 @@
 /favicon.ico        /favicon.ico            200
 /apple-touch-icon.png  /apple-touch-icon.png  200
 
-# ===== SPA路由fallback=====
+# ===== SPA路由fallback（优先级较低）=====
 # 只有非静态资源的路径才会fallback到index.html
 
 # 文本分享页面

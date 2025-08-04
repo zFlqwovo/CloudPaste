@@ -30,9 +30,9 @@ const loadVditor = async () => {
   if (!VditorClass) {
     await loadVditorCSS();
 
-    // 从本地dist目录加载Vditor
+    // 从本地assets/vditor目录加载Vditor
     const script = document.createElement("script");
-    script.src = "/dist/index.min.js";
+    script.src = "/assets/vditor/index.min.js";
 
     return new Promise((resolve, reject) => {
       script.onload = () => {
@@ -50,7 +50,7 @@ const loadVditorCSS = async () => {
   if (!vditorCSSLoaded) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/dist/index.css";
+    link.href = "/assets/vditor/index.css";
     document.head.appendChild(link);
     vditorCSSLoaded = true;
   }
@@ -116,7 +116,7 @@ const emit = defineEmits(["update:modelValue", "editor-ready", "content-change",
 // 编辑器实例
 let editor = null;
 
-// 纯文本内容 
+// 纯文本内容
 const plainTextContent = ref("");
 // 原始纯文本内容（保留格式）
 const originalPlainTextContent = ref("");
@@ -172,13 +172,13 @@ const initEditor = async () => {
         mode: "both",
         theme: {
           current: contentTheme,
-          path: "/dist/css/content-theme",
+          path: "/assets/vditor/css/content-theme",
         },
         hljs: {
           lineNumber: true,
           style: props.darkMode ? "vs2015" : "github",
-          js: "/dist/js/highlight.js/third-languages.js",
-          css: (style) => `/dist/js/highlight.js/styles/${style}.min.css`,
+          js: "/assets/vditor/js/highlight.js/third-languages.js",
+          css: (style) => `/assets/vditor/js/highlight.js/styles/${style}.min.css`,
         },
         actions: ["desktop", "tablet", "mobile", "mp-wechat", "zhihu"],
         markdown: {
@@ -329,7 +329,7 @@ const initEditor = async () => {
   }
 };
 
-// 安全设置编辑器内容 
+// 安全设置编辑器内容
 const safeSetValue = (content) => {
   if (!editor || !editor.setValue || typeof editor.setValue !== "function") return;
 
@@ -351,7 +351,7 @@ const syncContentFromPlainText = () => {
   emit("content-change", plainTextContent.value);
 };
 
-// 获取编辑器内容 
+// 获取编辑器内容
 const getValue = () => {
   if (props.isPlainTextMode) {
     return originalPlainTextContent.value || plainTextContent.value;
@@ -501,7 +501,7 @@ watch(
   }
 );
 
-// 组件挂载 
+// 组件挂载
 onMounted(async () => {
   if (!props.isPlainTextMode) {
     await nextTick();

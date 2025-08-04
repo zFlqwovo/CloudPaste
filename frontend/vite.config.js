@@ -456,7 +456,6 @@ export default defineConfig(({ command, mode }) => {
     },
     optimizeDeps: {
       include: ["vue-i18n", "chart.js", "qrcode"],
-      // 移除vditor排除配置，因为现在从本地dist目录加载
     },
     build: {
       minify: "terser",

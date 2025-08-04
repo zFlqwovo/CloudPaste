@@ -106,10 +106,10 @@ export function useCodeHighlight() {
       console.log("通过 Vditor 方式加载 highlight.js");
 
       // 加载 highlight.js 主文件
-      await loadScript("/dist/js/highlight.js/highlight.min.js");
+      await loadScript("/assets/vditor/js/highlight.js/highlight.min.js");
 
       // 加载第三方语言包
-      await loadScript("/dist/js/highlight.js/third-languages.js");
+      await loadScript("/assets/vditor/js/highlight.js/third-languages.js");
 
       // 等待 hljs 全局变量可用
       await waitForGlobal("hljs", 5000);
