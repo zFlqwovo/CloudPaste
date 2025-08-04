@@ -31,6 +31,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check vditor files before build
+        run: |
+          echo "检查构建前的vditor文件..."
+          echo "=== 检查 public/assets/vditor 目录 ==="
+          ls -la public/assets/ || echo "public/assets目录不存在"
+          echo ""
+          echo "=== 检查 node_modules/vditor ==="
+          ls -la node_modules/vditor/dist/ || echo "node_modules/vditor不存在"
+          echo ""
+          echo "=== 检查 package.json 中的 vditor 依赖 ==="
+          grep -A 2 -B 2 "vditor" package.json || echo "package.json中没有vditor依赖"
+
+      - name: Copy vditor files from node_modules
+        run: |
+          echo "从 node_modules 复制 vditor 文件到 public 目录..."
+          mkdir -p public/assets/vditor
+          cp -r node_modules/vditor/dist/* public/assets/vditor/
+          echo "复制完成，验证文件："
+          ls -la public/assets/vditor/
+
       - name: Check if deploy button trigger
         id: check-deploy-button
         run: |
