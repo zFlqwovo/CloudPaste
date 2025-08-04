@@ -1,0 +1,21 @@
+# 静态资源文件 - 不重定向，返回404如果不存在
+/assets/*  /assets/:splat  404
+/icons/*   /icons/:splat   404
+/*.js      /:splat         404
+/*.css     /:splat         404
+/*.png     /:splat         404
+/*.jpg     /:splat         404
+/*.jpeg    /:splat         404
+/*.gif     /:splat         404
+/*.svg     /:splat         404
+/*.ico     /:splat         404
+/*.woff    /:splat         404
+/*.woff2   /:splat         404
+/*.ttf     /:splat         404
+/*.eot     /:splat         404
+/*.json    /:splat         404
+/*.xml     /:splat         404
+/*.txt     /:splat         404
+
+# SPA路由 - 所有其他请求重定向到index.html
+/*  /index.html  200

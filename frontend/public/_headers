@@ -1,0 +1,93 @@
+# JavaScript文件的正确MIME类型
+/*.js
+  Content-Type: application/javascript
+
+# CSS文件的正确MIME类型
+/*.css
+  Content-Type: text/css
+
+# vditor相关的JavaScript文件
+/assets/vditor/dist/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/*/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/*/*/*.js
+  Content-Type: application/javascript
+
+# vditor特定依赖文件的MIME类型
+/assets/vditor/dist/js/highlight.js/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/katex/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/mermaid/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/echarts/*.js
+  Content-Type: application/javascript
+
+/assets/vditor/dist/js/mathjax/*.js
+  Content-Type: application/javascript
+
+# vditor相关的CSS文件
+/assets/vditor/dist/*.css
+  Content-Type: text/css
+
+/assets/vditor/dist/css/*.css
+  Content-Type: text/css
+
+/assets/vditor/dist/js/highlight.js/styles/*.css
+  Content-Type: text/css
+
+/assets/vditor/dist/js/katex/*.css
+  Content-Type: text/css
+
+# 其他静态资源的MIME类型
+/*.png
+  Content-Type: image/png
+
+/*.jpg
+  Content-Type: image/jpeg
+
+/*.jpeg
+  Content-Type: image/jpeg
+
+/*.gif
+  Content-Type: image/gif
+
+/*.svg
+  Content-Type: image/svg+xml
+
+/*.ico
+  Content-Type: image/x-icon
+
+/*.woff
+  Content-Type: font/woff
+
+/*.woff2
+  Content-Type: font/woff2
+
+/*.ttf
+  Content-Type: font/ttf
+
+/*.eot
+  Content-Type: application/vnd.ms-fontobject
+
+/*.json
+  Content-Type: application/json
+
+# 缓存控制
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 安全头
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
