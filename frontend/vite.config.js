@@ -9,7 +9,7 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   // 统一版本管理
-  const APP_VERSION = "0.7.5";
+  const APP_VERSION = "0.7.4.1";
   const isDev = command === "serve";
 
   // 打印环境变量，帮助调试
@@ -366,7 +366,7 @@ export default defineConfig(({ command, mode }) => {
             },
           ],
         },
-        includeAssets: ["favicon.ico", "apple-touch-icon.png", "robots.txt"],
+        includeAssets: ["favicon.ico", "apple-touch-icon.png", "robots.txt", "dist/**/*"],
         manifest: {
           name: "CloudPaste",
           short_name: "CloudPaste",
@@ -456,7 +456,7 @@ export default defineConfig(({ command, mode }) => {
     },
     optimizeDeps: {
       include: ["vue-i18n", "chart.js", "qrcode"],
-      // 移除vditor排除配置，因为现在从assets加载
+      // 移除vditor排除配置，因为现在从本地dist目录加载
     },
     build: {
       minify: "terser",
