@@ -46,15 +46,16 @@ jobs:
       - name: Copy vditor files from node_modules
         run: |
           echo "从 node_modules 复制 vditor 文件到 public 目录..."
-          mkdir -p public/assets/vditor
-          cp -r node_modules/vditor/dist/* public/assets/vditor/
+          echo "vditor会自动在CDN路径后添加/dist，所以需要创建正确的目录结构"
+          mkdir -p public/assets/vditor/dist
+          cp -r node_modules/vditor/dist/* public/assets/vditor/dist/
           echo "复制完成，验证文件："
-          ls -la public/assets/vditor/
-          echo "验证关键JS文件："
-          ls -la public/assets/vditor/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
-          ls -la public/assets/vditor/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
-          ls -la public/assets/vditor/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
-          ls -la public/assets/vditor/js/katex/katex.min.js || echo "katex.min.js不存在"
+          ls -la public/assets/vditor/dist/
+          echo "验证关键JS文件（vditor期望的路径）："
+          ls -la public/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
+          ls -la public/assets/vditor/dist/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
+          ls -la public/assets/vditor/dist/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
+          ls -la public/assets/vditor/dist/js/katex/katex.min.js || echo "katex.min.js不存在"
 
       - name: Check if deploy button trigger
         id: check-deploy-button
@@ -86,11 +87,14 @@ jobs:
           echo "检查 dist/assets/vditor/ 的完整结构："
           find dist/assets/vditor/ -type f -name "*.js" | head -10 || echo "没有找到JS文件"
           echo ""
-          echo "=== 检查正确的路径（基于Cloudflare实际结构） ==="
-          ls -la dist/assets/vditor/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
-          ls -la dist/assets/vditor/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
-          ls -la dist/assets/vditor/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
-          ls -la dist/assets/vditor/js/katex/katex.min.js || echo "katex.min.js不存在"
+          echo "=== 检查vditor期望的路径（CDN + /dist） ==="
+          ls -la dist/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/katex/katex.min.js || echo "katex.min.js不存在"
+          echo "=== 检查vditor主文件 ==="
+          ls -la dist/assets/vditor/dist/index.min.js || echo "index.min.js不存在"
+          ls -la dist/assets/vditor/dist/index.css || echo "index.css不存在"
           echo ""
           echo "=== 检查 highlight.js 目录 ==="
           ls -la dist/assets/vditor/js/highlight.js/ || echo "highlight.js目录不存在"
