@@ -1,31 +1,5 @@
 {
   "version": 1,
-  "include": ["/*"],
-  "exclude": [
-    "/assets/*",
-    "/vditor/*",
-    "/icons/*",
-    "/dist/*",
-    "/*.css",
-    "/*.js",
-    "/*.ico",
-    "/*.png",
-    "/*.jpg",
-    "/*.jpeg",
-    "/*.gif",
-    "/*.svg",
-    "/*.webp",
-    "/*.woff",
-    "/*.woff2",
-    "/*.ttf",
-    "/*.eot",
-    "/*.json",
-    "/*.xml",
-    "/*.txt",
-    "/manifest.json",
-    "/robots.txt",
-    "/favicon.ico",
-    "/sw.js",
-    "/sw-background-sync.js"
-  ]
+  "include": ["/config.js"],
+  "exclude": ["/*"]
 }
