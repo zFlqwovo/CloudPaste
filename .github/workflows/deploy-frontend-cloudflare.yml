@@ -61,7 +61,18 @@ jobs:
         run: |
           echo "验证构建输出..."
           ls -la dist/
-          echo "构建完成 ✅"
+          echo ""
+          echo "检查vditor关键文件..."
+          ls -la dist/assets/vditor/dist/index.min.js || echo "❌ index.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/icons/ant.js || echo "❌ ant.js不存在"
+          ls -la dist/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "❌ highlight.min.js不存在"
+          echo ""
+          if [ -f "dist/assets/vditor/dist/index.min.js" ] && [ -f "dist/assets/vditor/dist/js/icons/ant.js" ]; then
+            echo "✅ vditor文件验证成功"
+          else
+            echo "❌ vditor关键文件缺失，构建失败"
+            exit 1
+          fi
 
       - name: Check if Pages project exists
         id: check-project
