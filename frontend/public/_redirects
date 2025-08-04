@@ -10,20 +10,7 @@
 /sw-background-sync.js  /sw-background-sync.js  200
 /config.js    /config.js    200
 
-
-# 图片和字体文件
-*.png   /:splat  200
-*.jpg   /:splat  200
-*.jpeg  /:splat  200
-*.gif   /:splat  200
-*.svg   /:splat  200
-*.ico   /:splat  200
-*.woff  /:splat  200
-*.woff2 /:splat  200
-*.ttf   /:splat  200
-*.eot   /:splat  200
-
-# API请求不重定向（如果有的话）
+# API请求不重定向
 /api/*  /api/:splat  200
 
 # SPA路由 - 所有其他请求重定向到index.html
