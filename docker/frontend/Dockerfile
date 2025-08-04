@@ -15,6 +15,13 @@ RUN npm install --cache /tmp/npm-cache
 # 复制前端源代码
 COPY frontend/ ./
 
+# 复制vditor静态资源文件（从node_modules到public目录）
+RUN echo "从 node_modules 复制 vditor 文件到 public 目录..." && \
+    mkdir -p public/assets/vditor/dist && \
+    cp -r node_modules/vditor/dist/* public/assets/vditor/dist/ && \
+    echo "vditor文件复制完成" && \
+    ls -la public/assets/vditor/dist/
+
 # 设置API地址环境变量 - 使用通用占位符，实际值将在运行时由entrypoint.sh设置
 ARG VITE_BACKEND_URL=http://localhost:8787
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
