@@ -244,7 +244,7 @@ const renderContentInternal = async (content) => {
               current: props.darkMode ? "dark" : "light", // 根据darkMode设置主题
               path: "/assets/vditor/dist/css/content-theme",
             },
-            cdn: "/assets/vditor/dist",
+            cdn: "/assets/vditor",
             hljs: {
               lineNumber: true, // 代码块显示行号
               style: props.darkMode ? "vs2015" : "github", // 代码高亮样式

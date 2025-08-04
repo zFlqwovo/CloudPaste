@@ -152,7 +152,7 @@ const initEditor = async () => {
       width: "100%",
       mode: defaultMode,
       theme: editorTheme,
-      cdn: "/assets/vditor/dist",
+      cdn: "/assets/vditor",
       resize: {
         enable: true,
         position: "bottom",
