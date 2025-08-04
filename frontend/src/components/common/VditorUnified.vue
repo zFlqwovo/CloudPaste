@@ -172,13 +172,13 @@ const initEditor = async () => {
         mode: "both",
         theme: {
           current: contentTheme,
-          path: "/assets/vditor/css/content-theme",
+          path: "/assets/vditor/dist/css/content-theme",
         },
         hljs: {
           lineNumber: true,
           style: props.darkMode ? "vs2015" : "github",
-          js: "/assets/vditor/js/highlight.js/third-languages.js",
-          css: (style) => `/assets/vditor/js/highlight.js/styles/${style}.min.css`,
+          js: "/assets/vditor/dist/js/highlight.js/third-languages.js",
+          css: (style) => `/assets/vditor/dist/js/highlight.js/styles/${style}.min.css`,
         },
         actions: ["desktop", "tablet", "mobile", "mp-wechat", "zhihu"],
         markdown: {

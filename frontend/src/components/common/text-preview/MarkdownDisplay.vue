@@ -181,6 +181,7 @@ const renderMarkdown = async () => {
         mode: "dark-light", // 支持明暗主题
         theme: {
           current: props.darkMode ? "dark" : "light", // 根据darkMode设置主题
+          path: "/assets/vditor/dist/css/content-theme",
         },
         cdn: "/assets/vditor",
         hljs: {
