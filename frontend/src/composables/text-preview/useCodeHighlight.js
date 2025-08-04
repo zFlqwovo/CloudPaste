@@ -355,8 +355,8 @@ export function useCodeHighlight() {
 
       // 检查主题文件是否存在的路径列表
       const possiblePaths = [
-        `/dist/js/highlight.js/styles/${theme}.min.css`,
-        `/dist/js/highlight.js/styles/${theme}.css`,
+        `/assets/vditor/dist/js/highlight.js/styles/${theme}.min.css`,
+        `/assets/vditor/dist/js/highlight.js/styles/${theme}.css`,
         `/assets/highlight.js/styles/${theme}.min.css`,
         `/assets/highlight.js/styles/${theme}.css`,
       ];
