@@ -10,10 +10,6 @@
 /sw-background-sync.js  /sw-background-sync.js  200
 /config.js    /config.js    200
 
-# JavaScript和CSS文件
-*.js    /:splat  200
-*.css   /:splat  200
-*.map   /:splat  200
 
 # 图片和字体文件
 *.png   /:splat  200
