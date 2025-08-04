@@ -46,15 +46,15 @@ jobs:
       - name: Copy vditor files from node_modules
         run: |
           echo "从 node_modules 复制 vditor 文件到 public 目录..."
-          mkdir -p public/assets/vditor/dist
-          cp -r node_modules/vditor/dist/* public/assets/vditor/dist/
+          mkdir -p public/assets/vditor
+          cp -r node_modules/vditor/dist/* public/assets/vditor/
           echo "复制完成，验证文件："
-          ls -la public/assets/vditor/dist/
+          ls -la public/assets/vditor/
           echo "验证关键JS文件："
-          ls -la public/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
-          ls -la public/assets/vditor/dist/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
-          ls -la public/assets/vditor/dist/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
-          ls -la public/assets/vditor/dist/js/katex/katex.min.js || echo "katex.min.js不存在"
+          ls -la public/assets/vditor/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
+          ls -la public/assets/vditor/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
+          ls -la public/assets/vditor/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
+          ls -la public/assets/vditor/js/katex/katex.min.js || echo "katex.min.js不存在"
 
       - name: Check if deploy button trigger
         id: check-deploy-button
@@ -82,17 +82,24 @@ jobs:
           echo "=== 检查 _headers 和 _redirects 文件 ==="
           ls -la dist/_headers dist/_redirects || echo "配置文件不存在"
           echo ""
-          echo "=== 检查 vditor 文件 ==="
-          ls -la dist/assets/vditor/ || echo "vditor目录不存在"
+          echo "=== 详细检查 vditor 目录结构 ==="
+          echo "检查 dist/assets/vditor/ 的完整结构："
+          find dist/assets/vditor/ -type f -name "*.js" | head -10 || echo "没有找到JS文件"
           echo ""
-          echo "=== 检查关键的vditor JS文件 ==="
-          ls -la dist/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
-          ls -la dist/assets/vditor/dist/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
-          ls -la dist/assets/vditor/dist/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
-          ls -la dist/assets/vditor/dist/js/katex/katex.min.js || echo "katex.min.js不存在"
+          echo "=== 检查正确的路径（基于Cloudflare实际结构） ==="
+          ls -la dist/assets/vditor/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
+          ls -la dist/assets/vditor/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
+          ls -la dist/assets/vditor/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
+          ls -la dist/assets/vditor/js/katex/katex.min.js || echo "katex.min.js不存在"
           echo ""
-          echo "=== _headers 文件内容 ==="
-          head -20 dist/_headers || echo "_headers文件读取失败"
+          echo "=== 检查 highlight.js 目录 ==="
+          ls -la dist/assets/vditor/js/highlight.js/ || echo "highlight.js目录不存在"
+          echo ""
+          echo "=== 检查所有可能的关键文件 ==="
+          find dist/assets/vditor/ -name "highlight.min.js" || echo "找不到highlight.min.js"
+          find dist/assets/vditor/ -name "mermaid.min.js" || echo "找不到mermaid.min.js"
+          find dist/assets/vditor/ -name "echarts.min.js" || echo "找不到echarts.min.js"
+          find dist/assets/vditor/ -name "katex.min.js" || echo "找不到katex.min.js"
 
       - name: Check if Pages project exists
         id: check-project
