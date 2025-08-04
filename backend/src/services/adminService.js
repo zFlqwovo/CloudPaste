@@ -62,6 +62,24 @@ export async function login(db, username, password) {
     throw new HTTPException(ApiStatus.UNAUTHORIZED, { message: "用户名或密码错误" });
   }
 
+  // ===== token管理：限制并发session数量 =====
+  const MAX_TOKENS_PER_USER = 5; // 每个用户最多5个token
+
+  // 获取该用户当前的有效token
+  const existingTokens = await adminRepository.getValidTokensForAdmin(admin.id);
+
+  // 如果即将超过限制，删除最旧的token
+  if (existingTokens.length >= MAX_TOKENS_PER_USER) {
+    const tokensToDelete = existingTokens.slice(0, existingTokens.length - MAX_TOKENS_PER_USER + 1);
+
+    for (const tokenToDelete of tokensToDelete) {
+      await adminRepository.deleteToken(tokenToDelete.token);
+    }
+
+    console.log(`已清理 ${tokensToDelete.length} 个旧token，当前用户: ${admin.username}`);
+  }
+  // ===== token管理结束 =====
+
   // 更新最后登录时间
   await adminRepository.updateLastLogin(admin.id);
 
