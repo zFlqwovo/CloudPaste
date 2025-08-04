@@ -199,7 +199,7 @@
 
       <!-- 预览内容 -->
       <div
-        class="preview-content border rounded-lg overflow-hidden transition-all duration-300"
+        class="preview-content border rounded-lg overflow-hidden transition-all duration-300 flex flex-col"
         :class="[darkMode ? 'border-gray-700' : 'border-gray-200', isContentFullscreen ? 'preview-content-fullscreen' : '']"
         :style="
           isContentFullscreen
@@ -296,12 +296,14 @@
           </div>
         </div>
         <!-- 加载指示器 -->
-        <div v-if="isLoading" class="flex flex-col items-center justify-center p-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2" :class="darkMode ? 'border-primary-500' : 'border-primary-600'"></div>
+        <div v-if="isLoading" class="flex-1 flex items-center justify-center">
+          <div class="flex flex-col items-center justify-center p-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2" :class="darkMode ? 'border-primary-500' : 'border-primary-600'"></div>
+          </div>
         </div>
 
         <!-- 图片预览 -->
-        <div v-else-if="isImage" class="image-preview flex justify-center items-center p-4">
+        <div v-else-if="isImage" class="flex-1 flex justify-center items-center p-4">
           <img
             v-if="authenticatedPreviewUrl"
             :src="authenticatedPreviewUrl"
@@ -329,7 +331,7 @@
         </div>
 
         <!-- 音频预览 -->
-        <div v-else-if="isAudio">
+        <div v-else-if="isAudio" class="flex-1 flex items-center justify-center">
           <AudioPreview
             :file="file"
             :audio-url="authenticatedPreviewUrl"
@@ -478,45 +480,49 @@
         </div>
 
         <!-- 其他文件类型或错误状态 -->
-        <div v-else-if="loadError" class="generic-preview text-center py-12">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-20 w-20 mx-auto mb-4"
-            :class="darkMode ? 'text-red-400' : 'text-red-500'"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.5"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <p class="text-lg font-medium mb-2" :class="darkMode ? 'text-red-300' : 'text-red-700'">{{ t("mount.filePreview.previewError") }}</p>
-          <p class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("mount.filePreview.retryLoad") }}</p>
+        <div v-else-if="loadError" class="flex-1 flex items-center justify-center">
+          <div class="generic-preview text-center py-12">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-20 w-20 mx-auto mb-4"
+              :class="darkMode ? 'text-red-400' : 'text-red-500'"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <p class="text-lg font-medium mb-2" :class="darkMode ? 'text-red-300' : 'text-red-700'">{{ t("mount.filePreview.previewError") }}</p>
+            <p class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("mount.filePreview.retryLoad") }}</p>
+          </div>
         </div>
 
         <!-- 不支持预览的文件类型 -->
-        <div v-else class="generic-preview text-center py-12">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-20 w-20 mx-auto mb-4"
-            :class="darkMode ? 'text-gray-500' : 'text-gray-400'"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.5"
-              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-            />
-          </svg>
-          <p class="text-lg font-medium mb-2" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">{{ t("mount.filePreview.cannotPreview") }}</p>
-          <p class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("mount.filePreview.downloadToView") }}</p>
+        <div v-else class="flex-1 flex items-center justify-center">
+          <div class="generic-preview text-center py-12">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-20 w-20 mx-auto mb-4"
+              :class="darkMode ? 'text-gray-500' : 'text-gray-400'"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+              />
+            </svg>
+            <p class="text-lg font-medium mb-2" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">{{ t("mount.filePreview.cannotPreview") }}</p>
+            <p class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("mount.filePreview.downloadToView") }}</p>
+          </div>
         </div>
       </div>
     </div>

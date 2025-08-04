@@ -45,7 +45,6 @@ export default defineConfig(({ command, mode }) => {
           cleanupOutdatedCaches: true,
           navigateFallback: "index.html",
           navigateFallbackAllowlist: [/^\/$/, /^\/upload$/, /^\/admin/, /^\/paste\/.+/, /^\/file\/.+/, /^\/mount-explorer/],
-          navigateFallbackDenylist: [/^\/assets\//, /\.js$/, /\.css$/, /\.png$/, /\.jpg$/, /\.jpeg$/, /\.gif$/, /\.svg$/, /\.ico$/, /\.woff$/, /\.woff2$/, /\.ttf$/],
 
           // 集成自定义Service Worker代码以支持Background Sync API
           importScripts: ["/sw-background-sync.js"],
@@ -87,12 +86,12 @@ export default defineConfig(({ command, mode }) => {
             // 第三方CDN资源 - CacheFirst（外部资源稳定）
             {
               urlPattern: ({ url }) =>
-                  url.origin !== self.location.origin &&
-                  (url.hostname.includes("cdn") ||
-                      url.hostname.includes("googleapis") ||
-                      url.hostname.includes("gstatic") ||
-                      url.hostname.includes("jsdelivr") ||
-                      url.hostname.includes("unpkg")),
+                url.origin !== self.location.origin &&
+                (url.hostname.includes("cdn") ||
+                  url.hostname.includes("googleapis") ||
+                  url.hostname.includes("gstatic") ||
+                  url.hostname.includes("jsdelivr") ||
+                  url.hostname.includes("unpkg")),
               handler: "CacheFirst",
               options: {
                 cacheName: "external-cdn-resources",
@@ -109,7 +108,7 @@ export default defineConfig(({ command, mode }) => {
             // 图廊图片 - NetworkFirst
             {
               urlPattern: ({ request, url }) =>
-                  request.destination === "image" && (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                request.destination === "image" && (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "gallery-images",
@@ -127,8 +126,8 @@ export default defineConfig(({ command, mode }) => {
             // 用户媒体文件 - NetworkFirst（大文件适度缓存）
             {
               urlPattern: ({ request, url }) =>
-                  (request.destination === "video" || request.destination === "audio" || /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/i.test(url.pathname)) &&
-                  (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                (request.destination === "video" || request.destination === "audio" || /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/i.test(url.pathname)) &&
+                (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "user-media",
@@ -147,8 +146,8 @@ export default defineConfig(({ command, mode }) => {
             // 用户文档文件 - NetworkFirst（文档快速更新）
             {
               urlPattern: ({ url }) =>
-                  /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|md)$/i.test(url.pathname) &&
-                  (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|md)$/i.test(url.pathname) &&
+                (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "user-documents",
@@ -459,7 +458,6 @@ export default defineConfig(({ command, mode }) => {
       include: ["vue-i18n", "chart.js", "qrcode"],
       // 移除vditor排除配置，因为现在从本地dist目录加载
     },
-    publicDir: "public",
     build: {
       minify: "terser",
       terserOptions: {
@@ -468,7 +466,6 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       chunkSizeWarningLimit: 1000,
-      copyPublicDir: true,
       rollupOptions: {
         output: {
           manualChunks: {

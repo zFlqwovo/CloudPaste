@@ -30,9 +30,9 @@ const loadVditor = async () => {
   if (!VditorClass) {
     await loadVditorCSS();
 
-    // 从本地assets/vditor目录加载Vditor
+    // 从本地vditor目录加载Vditor
     const script = document.createElement("script");
-    script.src = "/assets/vditor/dist/index.min.js";
+    script.src = "/dist/index.min.js";
 
     return new Promise((resolve, reject) => {
       script.onload = () => {
@@ -50,7 +50,7 @@ const loadVditorCSS = async () => {
   if (!vditorCSSLoaded) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/assets/vditor/dist/index.css";
+    link.href = "/dist/index.css";
     document.head.appendChild(link);
     vditorCSSLoaded = true;
   }
@@ -152,7 +152,7 @@ const initEditor = async () => {
       width: "100%",
       mode: defaultMode,
       theme: editorTheme,
-      cdn: "/assets/vditor",
+      cdn: "",
       resize: {
         enable: true,
         position: "bottom",
@@ -172,11 +172,13 @@ const initEditor = async () => {
         mode: "both",
         theme: {
           current: contentTheme,
-          path: "/assets/vditor/dist/css/content-theme",
+          path: "/dist/css/content-theme",
         },
         hljs: {
           lineNumber: true,
           style: props.darkMode ? "vs2015" : "github",
+          js: "/dist/js/highlight.js/third-languages.js",
+          css: (style) => `/dist/js/highlight.js/styles/${style}.min.css`,
         },
         actions: ["desktop", "tablet", "mobile", "mp-wechat", "zhihu"],
         markdown: {
