@@ -31,12 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup vditor assets
-        run: |
-          echo "设置vditor静态资源..."
-          mkdir -p public/assets/vditor/dist
-          cp -r node_modules/vditor/dist/* public/assets/vditor/dist/
-
       - name: Check if deploy button trigger
         id: check-deploy-button
         run: |
@@ -56,23 +50,6 @@ jobs:
         run: |
           mkdir -p dist/functions
           cp -r functions/* dist/functions/ || echo "No functions directory found"
-
-      - name: Verify build output
-        run: |
-          echo "验证构建输出..."
-          ls -la dist/
-          echo ""
-          echo "检查vditor关键文件..."
-          ls -la dist/assets/vditor/dist/index.min.js || echo "❌ index.min.js不存在"
-          ls -la dist/assets/vditor/dist/js/icons/ant.js || echo "❌ ant.js不存在"
-          ls -la dist/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "❌ highlight.min.js不存在"
-          echo ""
-          if [ -f "dist/assets/vditor/dist/index.min.js" ] && [ -f "dist/assets/vditor/dist/js/icons/ant.js" ]; then
-            echo "✅ vditor文件验证成功"
-          else
-            echo "❌ vditor关键文件缺失，构建失败"
-            exit 1
-          fi
 
       - name: Check if Pages project exists
         id: check-project

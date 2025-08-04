@@ -3,7 +3,7 @@ node_modules
 
 # Wrangler specific
 .wrangler/
-dist
+
 # Logs
 logs
 *.log

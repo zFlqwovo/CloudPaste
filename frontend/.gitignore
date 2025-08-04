@@ -4,7 +4,7 @@ dev-dist
 
 # Wrangler specific
 .wrangler/
-dist
+
 # Logs
 logs
 *.log
