@@ -51,6 +51,24 @@ jobs:
           mkdir -p dist/functions
           cp -r functions/* dist/functions/ || echo "No functions directory found"
 
+      - name: Verify build output
+        run: |
+          echo "检查构建输出..."
+          echo "=== 检查 _headers 和 _redirects 文件 ==="
+          ls -la dist/_headers dist/_redirects || echo "配置文件不存在"
+          echo ""
+          echo "=== 检查 vditor 文件 ==="
+          ls -la dist/assets/vditor/ || echo "vditor目录不存在"
+          echo ""
+          echo "=== 检查关键的vditor JS文件 ==="
+          ls -la dist/assets/vditor/dist/js/highlight.js/highlight.min.js || echo "highlight.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/mermaid/mermaid.min.js || echo "mermaid.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/echarts/echarts.min.js || echo "echarts.min.js不存在"
+          ls -la dist/assets/vditor/dist/js/katex/katex.min.js || echo "katex.min.js不存在"
+          echo ""
+          echo "=== _headers 文件内容 ==="
+          head -20 dist/_headers || echo "_headers文件读取失败"
+
       - name: Check if Pages project exists
         id: check-project
         env:
