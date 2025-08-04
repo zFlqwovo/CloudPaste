@@ -459,6 +459,7 @@ export default defineConfig(({ command, mode }) => {
       include: ["vue-i18n", "chart.js", "qrcode"],
       // 移除vditor排除配置，因为现在从本地dist目录加载
     },
+    publicDir: "public",
     build: {
       minify: "terser",
       terserOptions: {
@@ -467,6 +468,7 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       chunkSizeWarningLimit: 1000,
+      copyPublicDir: true,
       rollupOptions: {
         output: {
           manualChunks: {
