@@ -182,7 +182,7 @@ const renderMarkdown = async () => {
         theme: {
           current: props.darkMode ? "dark" : "light", // 根据darkMode设置主题
         },
-        cdn: "",
+        cdn: "/assets/vditor",
         hljs: {
           lineNumber: true, // 代码块显示行号
           style: props.darkMode ? "vs2015" : "github", // 代码高亮样式

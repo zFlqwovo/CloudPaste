@@ -130,18 +130,18 @@ const restoreScrollPosition = () => {
 
 // 监听暗色模式变化，当主题改变时重新渲染内容
 watch(
-  () => props.darkMode,
-  () => {
-    if (props.content) {
-      // 在重新渲染前保存滚动位置
-      saveScrollPosition();
+    () => props.darkMode,
+    () => {
+      if (props.content) {
+        // 在重新渲染前保存滚动位置
+        saveScrollPosition();
 
-      // 暗色模式变化时重新渲染
-      nextTick(() => {
-        renderContent(props.content);
-      });
+        // 暗色模式变化时重新渲染
+        nextTick(() => {
+          renderContent(props.content);
+        });
+      }
     }
-  }
 );
 
 // 缓存上次渲染的内容，避免重复渲染
@@ -154,32 +154,32 @@ let codeBlocksCache = null;
 
 // 监听内容变化，当内容改变时重新渲染
 watch(
-  () => props.content,
-  (newContent, oldContent) => {
-    // 避免重复渲染相同内容
-    if (newContent && newContent !== lastRenderedContent && newContent !== oldContent) {
-      lastRenderedContent = newContent;
-      contentRendered.value = false;
-      nextTick(() => {
-        renderContent(newContent);
-      });
+    () => props.content,
+    (newContent, oldContent) => {
+      // 避免重复渲染相同内容
+      if (newContent && newContent !== lastRenderedContent && newContent !== oldContent) {
+        lastRenderedContent = newContent;
+        contentRendered.value = false;
+        nextTick(() => {
+          renderContent(newContent);
+        });
+      }
     }
-  }
 );
 
 // 监听纯文本模式变化
 watch(
-  () => props.isPlainTextMode,
-  (newMode) => {
-    // 如果从纯文本模式切换到Markdown模式，需要重新渲染
-    if (!newMode && props.content) {
-      contentRendered.value = false;
-      nextTick(() => {
-        renderContent(props.content);
-      });
+    () => props.isPlainTextMode,
+    (newMode) => {
+      // 如果从纯文本模式切换到Markdown模式，需要重新渲染
+      if (!newMode && props.content) {
+        contentRendered.value = false;
+        nextTick(() => {
+          renderContent(props.content);
+        });
+      }
+      debugLog(props.enableDebug, props.isDev, `显示模式切换: ${newMode ? "纯文本模式" : "Markdown渲染模式"}`);
     }
-    debugLog(props.enableDebug, props.isDev, `显示模式切换: ${newMode ? "纯文本模式" : "Markdown渲染模式"}`);
-  }
 );
 
 // 渲染内容的方法，处理DOM可用性和兼容性问题
@@ -243,7 +243,7 @@ const renderContentInternal = async (content) => {
             theme: {
               current: props.darkMode ? "dark" : "light", // 根据darkMode设置主题
             },
-            cdn: "",
+            cdn: "/assets/vditor",
             hljs: {
               lineNumber: true, // 代码块显示行号
               style: props.darkMode ? "vs2015" : "github", // 代码高亮样式
@@ -601,7 +601,7 @@ const setupCodeBlockCollapse = () => {
     const collapseHint = document.createElement("span");
     collapseHint.className = "code-block-collapse-hint";
     collapseHint.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>';
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>';
 
     // 将左侧信息（语言和行数）添加到summary
     const leftContainer = document.createElement("div");
@@ -619,7 +619,7 @@ const setupCodeBlockCollapse = () => {
       const previewButton = document.createElement("button");
       previewButton.className = "code-block-preview-button";
       previewButton.innerHTML =
-        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>';
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>';
       previewButton.title = "预览 HTML";
 
       // 添加点击事件
@@ -639,7 +639,7 @@ const setupCodeBlockCollapse = () => {
       const previewButton = document.createElement("button");
       previewButton.className = "code-block-preview-button";
       previewButton.innerHTML =
-        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>';
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>';
       previewButton.title = "预览 SVG";
 
       // 添加点击事件
@@ -786,14 +786,14 @@ const openSvgInExternalBrowser = (svgContent) => {
 
       <!-- 后备内容显示 - 当预览元素为空或渲染失败时显示原始Markdown -->
       <div
-        v-if="props.content && !isContentRendered() && previewElement && contentRendered === false"
-        class="mt-4 p-3 border rounded"
-        :class="props.darkMode ? 'border-yellow-600 bg-yellow-900/20' : 'border-yellow-500 bg-yellow-50'"
+          v-if="props.content && !isContentRendered() && previewElement && contentRendered === false"
+          class="mt-4 p-3 border rounded"
+          :class="props.darkMode ? 'border-yellow-600 bg-yellow-900/20' : 'border-yellow-500 bg-yellow-50'"
       >
         <p class="text-sm mb-2" :class="props.darkMode ? 'text-yellow-300' : 'text-yellow-700'">Markdown 渲染失败，显示原始内容：</p>
         <pre class="whitespace-pre-wrap overflow-auto max-h-[600px] p-3 rounded" :class="props.darkMode ? 'text-gray-200 bg-gray-800' : 'text-gray-800 bg-gray-100'">{{
-          props.content
-        }}</pre>
+            props.content
+          }}</pre>
       </div>
     </div>
 
@@ -802,22 +802,22 @@ const openSvgInExternalBrowser = (svgContent) => {
 
     <!-- HTML 预览弹窗组件 -->
     <HtmlPreviewModal
-      :show="showHtmlPreview"
-      :html-content="previewHtmlContent"
-      :dark-mode="props.darkMode"
-      :content-type="'html'"
-      @close="showHtmlPreview = false"
-      @open-external="openHtmlInExternalBrowser"
+        :show="showHtmlPreview"
+        :html-content="previewHtmlContent"
+        :dark-mode="props.darkMode"
+        :content-type="'html'"
+        @close="showHtmlPreview = false"
+        @open-external="openHtmlInExternalBrowser"
     />
 
     <!-- SVG 预览弹窗组件 -->
     <HtmlPreviewModal
-      :show="showSvgPreview"
-      :html-content="previewSvgContent"
-      :dark-mode="props.darkMode"
-      :content-type="'svg'"
-      @close="showSvgPreview = false"
-      @open-external="openSvgInExternalBrowser"
+        :show="showSvgPreview"
+        :html-content="previewSvgContent"
+        :dark-mode="props.darkMode"
+        :content-type="'svg'"
+        @close="showSvgPreview = false"
+        @open-external="openSvgInExternalBrowser"
     />
   </div>
 </template>
