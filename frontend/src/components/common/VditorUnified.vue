@@ -32,7 +32,7 @@ const loadVditor = async () => {
 
     // 从本地assets/vditor目录加载Vditor
     const script = document.createElement("script");
-    script.src = "/assets/vditor/index.min.js";
+    script.src = "/assets/vditor/dist/index.min.js";
 
     return new Promise((resolve, reject) => {
       script.onload = () => {
@@ -50,7 +50,7 @@ const loadVditorCSS = async () => {
   if (!vditorCSSLoaded) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/assets/vditor/index.css";
+    link.href = "/assets/vditor/dist/index.css";
     document.head.appendChild(link);
     vditorCSSLoaded = true;
   }
@@ -177,8 +177,6 @@ const initEditor = async () => {
         hljs: {
           lineNumber: true,
           style: props.darkMode ? "vs2015" : "github",
-          js: "/assets/vditor/dist/js/highlight.js/third-languages.js",
-          css: (style) => `/assets/vditor/dist/js/highlight.js/styles/${style}.min.css`,
         },
         actions: ["desktop", "tablet", "mobile", "mp-wechat", "zhihu"],
         markdown: {
