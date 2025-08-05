@@ -199,13 +199,10 @@
 
       <!-- 预览内容 -->
       <div
+        ref="previewContentRef"
         class="preview-content border rounded-lg overflow-hidden transition-all duration-300 flex flex-col"
-        :class="[darkMode ? 'border-gray-700' : 'border-gray-200', isContentFullscreen ? 'preview-content-fullscreen' : '']"
-        :style="
-          isContentFullscreen
-            ? 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; max-height: 100vh; min-height: 100vh; border-radius: 0;'
-            : 'max-height: 600px; min-height: 400px'
-        "
+        :class="[darkMode ? 'border-gray-700' : 'border-gray-200']"
+        style="max-height: 600px; min-height: 400px"
       >
         <!-- 全屏模式下的工具栏 -->
         <div v-if="isContentFullscreen && isText" class="fullscreen-toolbar p-3 border-b" :class="darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'">
@@ -715,6 +712,7 @@ const availableEncodings = computed(() => {
 
 // 内容区域全屏状态管理
 const isContentFullscreen = ref(false);
+const previewContentRef = ref(null);
 
 // 动态计算文本预览的最大高度
 const dynamicMaxHeight = computed(() => {
@@ -727,11 +725,15 @@ const dynamicMaxHeight = computed(() => {
   }
 });
 
-// 内容区域全屏切换功能
+// 简洁的全屏切换实现
 const toggleFullscreen = () => {
-  isContentFullscreen.value = !isContentFullscreen.value;
-  console.log("内容区域全屏状态:", isContentFullscreen.value);
-  console.log("动态最大高度:", dynamicMaxHeight.value);
+  if (!document.fullscreenElement) {
+    // 进入全屏
+    previewContentRef.value?.requestFullscreen();
+  } else {
+    // 退出全屏
+    document.exitFullscreen();
+  }
 };
 
 // 保存文件功能
@@ -828,12 +830,17 @@ watch(
 // 组件生命周期
 onMounted(() => {
   console.log("FilePreview组件已挂载");
+
+  // 监听全屏变化
+  document.addEventListener("fullscreenchange", () => {
+    isContentFullscreen.value = !!document.fullscreenElement;
+  });
 });
 
 onBeforeUnmount(() => {
   // 退出全屏状态（如果处于全屏中）
-  if (isContentFullscreen.value) {
-    isContentFullscreen.value = false;
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(console.error);
   }
 });
 </script>
@@ -858,6 +865,8 @@ onBeforeUnmount(() => {
   background-color: white;
   padding: 0;
   overflow: auto;
+  border: none !important;
+  border-radius: 0 !important;
 }
 
 :deep(.dark :fullscreen) {
@@ -865,7 +874,7 @@ onBeforeUnmount(() => {
 }
 
 :deep(:fullscreen iframe) {
-  height: calc(100vh - 45px);
+  height: calc(100vh - 60px);
   width: 100%;
   border: none;
 }
@@ -876,6 +885,33 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 20;
   width: 100%;
+}
+
+/* 全屏模式下的工具栏样式 */
+:deep(:fullscreen .fullscreen-toolbar) {
+  position: sticky;
+  top: 0;
+  z-index: 21;
+  background-color: inherit;
+}
+
+/* 全屏模式下的文本容器 */
+:deep(:fullscreen .fullscreen-text-container) {
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* 全屏模式下工具栏的暗色主题适配 */
+:deep(:fullscreen .fullscreen-toolbar.bg-gray-800) {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+:deep(:fullscreen .fullscreen-toolbar.bg-white) {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
 }
 
 /* 全屏按钮悬停效果增强 */

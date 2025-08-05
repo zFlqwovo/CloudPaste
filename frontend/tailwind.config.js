@@ -38,6 +38,19 @@ export default {
           900: "#4c1d95",
           950: "#2e1065",
         },
+        // 支持自定义CSS变量的颜色系统
+        "custom-bg": {
+          50: "var(--custom-bg-light, rgb(249 250 251))",
+          900: "var(--custom-bg-dark, rgb(17 24 39))",
+        },
+        "custom-surface": {
+          DEFAULT: "var(--custom-surface-light, rgb(255 255 255))",
+          dark: "var(--custom-surface-dark, rgb(31 41 55))",
+        },
+        "custom-text": {
+          DEFAULT: "var(--custom-text-light, rgb(17 24 39))",
+          dark: "var(--custom-text-dark, rgb(243 244 246))",
+        },
       },
 
       gridTemplateColumns: {
