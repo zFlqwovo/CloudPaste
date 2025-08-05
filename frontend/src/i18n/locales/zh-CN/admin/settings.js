@@ -147,4 +147,34 @@ export default {
     resetConfirm: "确定要重置为默认设置吗？这将覆盖当前的所有配置。",
     saveSuccess: "预览设置保存成功",
   },
+
+  // 站点设置页面
+  site: {
+    title: "站点设置",
+    description: "配置站点相关功能，包括公告栏等",
+    announcement: {
+      enableLabel: "启用公告栏",
+      enableHint: "开启后将在首页显示公告栏",
+      contentLabel: "公告内容",
+      contentHint: "支持 Markdown 格式，可以使用粗体、斜体、链接等",
+      contentPlaceholder: "请输入公告内容，支持 Markdown 格式...",
+    },
+    buttons: {
+      updateSettings: "更新设置",
+      updating: "更新中...",
+      reset: "重置",
+    },
+    messages: {
+      updateSuccess: "站点设置更新成功",
+      updateFailed: "更新站点设置失败",
+      confirmReset: "确定要重置所有站点设置吗？",
+    },
+  },
+};
+
+// 公告弹窗
+export const announcement = {
+  title: "网站公告",
+  dontShowAgain: "不再显示此公告",
+  gotIt: "我知道了",
 };

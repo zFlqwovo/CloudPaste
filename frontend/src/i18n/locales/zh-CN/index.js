@@ -20,4 +20,9 @@ export default {
   ...search,
   ...pwa,
   ...gallery,
+  announcement: {
+    title: "公告栏",
+    dontShowAgain: "不再显示",
+    gotIt: "我知道了",
+  },
 };

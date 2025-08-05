@@ -1311,6 +1311,63 @@ async function migrateDatabase(db, currentVersion, targetVersion) {
           console.log("文件命名策略设置迁移失败，请手动检查system_settings表");
         }
         break;
+
+      case 16:
+        // 版本16：添加站点设置分组和公告栏设置
+        try {
+          console.log("开始添加站点设置分组和公告栏设置...");
+
+          // 站点设置项列表
+          const siteSettings = [
+            {
+              key: "site_announcement_enabled",
+              value: "false",
+              description: "是否在首页显示公告栏",
+              type: "bool",
+              group_id: 4, // SETTING_GROUPS.SITE
+              sort_order: 1,
+              flags: 0, // SETTING_FLAGS.PUBLIC
+            },
+            {
+              key: "site_announcement_content",
+              value: "",
+              description: "公告内容，支持 Markdown 格式",
+              type: "textarea",
+              group_id: 4, // SETTING_GROUPS.SITE
+              sort_order: 2,
+              flags: 0, // SETTING_FLAGS.PUBLIC
+            },
+          ];
+
+          // 插入站点设置
+          for (const setting of siteSettings) {
+            try {
+              // 检查设置是否已存在
+              const existingSetting = await db.prepare(`SELECT key FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = ?`).bind(setting.key).first();
+
+              if (!existingSetting) {
+                await db
+                  .prepare(
+                    `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
+                     VALUES (?, ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)`
+                  )
+                  .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
+                  .run();
+                console.log(`成功添加站点设置: ${setting.key}`);
+              } else {
+                console.log(`站点设置 ${setting.key} 已存在，跳过添加`);
+              }
+            } catch (settingError) {
+              console.error(`添加站点设置 ${setting.key} 失败:`, settingError);
+            }
+          }
+
+          console.log("站点设置添加完成");
+        } catch (error) {
+          console.error(`版本16迁移失败:`, error);
+          console.log("站点设置迁移失败，请手动检查system_settings表");
+        }
+        break;
     }
 
     // 记录迁移历史
@@ -1488,7 +1545,7 @@ export async function checkAndInitDatabase(db) {
     }
 
     // 如果要添加新表或修改现有表，请递增目标版本，修改后启动时自动更新数据库
-    const targetVersion = 15; // 目标schema版本,每次修改表结构时递增
+    const targetVersion = 16; // 目标schema版本,每次修改表结构时递增
 
     if (currentVersion < targetVersion) {
       console.log(`需要更新数据库结构，当前版本:${currentVersion}，目标版本:${targetVersion}`);

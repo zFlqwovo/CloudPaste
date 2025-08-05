@@ -17,6 +17,9 @@
       </div>
     </div>
 
+    <!-- 🎯 公告弹窗 - 主流设计 -->
+    <AnnouncementModal :content="siteSettings.site_announcement_content" :enabled="siteSettings.site_announcement_enabled" :dark-mode="darkMode" />
+
     <!-- 权限管理组件 -->
     <PermissionManager :dark-mode="darkMode" @permission-change="handlePermissionChange" @navigate-to-admin="navigateToAdmin" />
 
@@ -87,6 +90,7 @@ import EditorForm from "../components/markdown-editor/EditorForm.vue";
 import ShareLinkBox from "../components/markdown-editor/ShareLinkBox.vue";
 import QRCodeModal from "../components/markdown-editor/QRCodeModal.vue";
 import CopyFormatMenu from "../components/markdown-editor/CopyFormatMenu.vue";
+import AnnouncementModal from "../components/admin/AnnouncementModal.vue";
 
 const { t } = useI18n();
 
@@ -120,6 +124,12 @@ const showQRCodeModal = ref(false);
 // 复制格式菜单状态
 const copyFormatMenuVisible = ref(false);
 const copyFormatMenuPosition = ref({ x: 0, y: 0 });
+
+// 站点设置状态
+const siteSettings = ref({
+  site_announcement_enabled: false,
+  site_announcement_content: "",
+});
 
 // 组件事件处理函数
 const handlePermissionChange = (permission) => {
@@ -375,7 +385,7 @@ const autoSaveDebounce = () => {
 };
 
 // 组件挂载
-onMounted(() => {
+onMounted(async () => {
   // 恢复保存的内容
   try {
     const savedContent = localStorage.getItem("cloudpaste-content");
@@ -384,6 +394,23 @@ onMounted(() => {
     }
   } catch (e) {
     console.warn(t("markdown.messages.restoreContentFailed"), e);
+  }
+
+  // 获取站点设置
+  try {
+    const response = await api.system.getSettingsByGroup(4, false);
+    if (response && response.success && response.data) {
+      response.data.forEach((setting) => {
+        if (setting.key === "site_announcement_enabled") {
+          siteSettings.value.site_announcement_enabled = setting.value === "true";
+        } else if (setting.key === "site_announcement_content") {
+          siteSettings.value.site_announcement_content = setting.value || "";
+        }
+      });
+    }
+  } catch (error) {
+    console.error("获取站点设置失败:", error);
+    // 获取站点设置失败不影响页面正常使用
   }
 });
 
@@ -403,7 +430,6 @@ onUnmounted(() => {
   box-sizing: border-box; /* 确保内边距不增加元素实际宽度 */
 }
 
-
 /* 移动端优化 */
 @media (max-width: 640px) {
   .editor-container {
@@ -412,8 +438,6 @@ onUnmounted(() => {
     width: 100%;
     overflow-x: hidden;
   }
-
-
 
   .form-input,
   .form-label {
@@ -523,6 +547,4 @@ onUnmounted(() => {
 #copyFormatMenu div {
   transition: background-color 0.15s ease-in-out;
 }
-
-
 </style>

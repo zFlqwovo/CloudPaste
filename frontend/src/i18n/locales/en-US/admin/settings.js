@@ -149,4 +149,27 @@ export default {
     resetConfirm: "Are you sure you want to reset to default settings? This will overwrite all current configurations.",
     saveSuccess: "Preview settings saved successfully",
   },
+
+  // Site settings page
+  site: {
+    title: "Site Settings",
+    description: "Configure site-related features, including announcement banner",
+    announcement: {
+      enableLabel: "Enable Announcement Banner",
+      enableHint: "When enabled, the announcement banner will be displayed on the homepage",
+      contentLabel: "Announcement Content",
+      contentHint: "Supports Markdown format, you can use bold, italic, links, etc.",
+      contentPlaceholder: "Please enter announcement content, Markdown format supported...",
+    },
+    buttons: {
+      updateSettings: "Update Settings",
+      updating: "Updating...",
+      reset: "Reset",
+    },
+    messages: {
+      updateSuccess: "Site settings updated successfully",
+      updateFailed: "Failed to update site settings",
+      confirmReset: "Are you sure you want to reset all site settings?",
+    },
+  },
 };

@@ -11,6 +11,7 @@ export const SETTING_GROUPS = {
   GLOBAL: 1, // 全局设置
   PREVIEW: 2, // 预览设置
   WEBDAV: 3, // WebDAV设置
+  SITE: 4, // 站点设置
   SYSTEM: 99, // 系统内部设置（不在前端显示）
 };
 
@@ -45,6 +46,7 @@ export const SETTING_GROUP_NAMES = {
   [SETTING_GROUPS.GLOBAL]: "全局设置",
   [SETTING_GROUPS.PREVIEW]: "预览设置",
   [SETTING_GROUPS.WEBDAV]: "WebDAV设置",
+  [SETTING_GROUPS.SITE]: "站点设置",
   [SETTING_GROUPS.SYSTEM]: "系统设置",
 };
 
@@ -193,6 +195,29 @@ export const DEFAULT_SETTINGS = {
     sort_order: 1,
     flag: SETTING_FLAGS.PUBLIC,
     default_value: "multipart",
+  },
+
+  // 站点设置组
+  site_announcement_enabled: {
+    key: "site_announcement_enabled",
+    type: SETTING_TYPES.BOOL,
+    group_id: SETTING_GROUPS.SITE,
+    help: "是否在首页显示公告栏",
+    options: null,
+    sort_order: 1,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "false",
+  },
+
+  site_announcement_content: {
+    key: "site_announcement_content",
+    type: SETTING_TYPES.TEXTAREA,
+    group_id: SETTING_GROUPS.SITE,
+    help: "公告内容，支持 Markdown 格式",
+    options: null,
+    sort_order: 2,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "",
   },
 
   // 系统内部设置（不在前端显示）

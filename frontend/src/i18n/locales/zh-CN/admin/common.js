@@ -45,6 +45,7 @@ export default {
     accountManagement: "账号管理",
     accountSettings: "账号设置",
     webdavSettings: "WebDAV设置",
+    siteSettings: "站点设置",
     settings: "系统设置",
     logout: "退出登录",
     logoutAuth: "退出认证",

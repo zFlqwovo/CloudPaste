@@ -163,6 +163,15 @@ const routes = [
                   adminOnly: true, // 只有管理员可访问
                 },
               },
+              {
+                path: "site",
+                name: "AdminSiteSettings",
+                component: createOfflineAwareImport(() => import("../views/admin/settings/SiteSettingsView.vue"), "站点设置"),
+                meta: {
+                  title: "站点设置 - CloudPaste",
+                  adminOnly: true, // 只有管理员可访问
+                },
+              },
             ],
           },
         ],

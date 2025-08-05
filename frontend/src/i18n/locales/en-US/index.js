@@ -20,4 +20,9 @@ export default {
   ...search,
   ...pwa,
   ...gallery,
+  announcement: {
+    title: "Announcement",
+    dontShowAgain: "Don't show again",
+    gotIt: "Got it",
+  },
 };

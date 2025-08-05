@@ -97,9 +97,9 @@ export class AdminRepository extends BaseRepository {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const recentActive = await this.queryFirst(
-        `SELECT COUNT(*) as count FROM ${DbTables.ADMINS}
+      `SELECT COUNT(*) as count FROM ${DbTables.ADMINS}
        WHERE updated_at IS NOT NULL AND updated_at >= ?`,
-        [thirtyDaysAgo.toISOString()]
+      [thirtyDaysAgo.toISOString()]
     );
 
     return {
@@ -139,10 +139,10 @@ export class AdminRepository extends BaseRepository {
     if (!token) return null;
 
     return await this.queryFirst(
-        `SELECT admin_id, expires_at, created_at
+      `SELECT admin_id, expires_at, created_at
        FROM ${DbTables.ADMIN_TOKENS}
        WHERE token = ?`,
-        [token]
+      [token]
     );
   }
 
@@ -189,9 +189,9 @@ export class AdminRepository extends BaseRepository {
     const expiresAtISO = expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt;
 
     return await this.execute(
-        `INSERT INTO ${DbTables.ADMIN_TOKENS} (token, admin_id, expires_at, created_at)
+      `INSERT INTO ${DbTables.ADMIN_TOKENS} (token, admin_id, expires_at, created_at)
        VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-        [token, adminId, expiresAtISO]
+      [token, adminId, expiresAtISO]
     );
   }
 
@@ -235,9 +235,9 @@ export class AdminRepository extends BaseRepository {
    */
   async cleanupTokensForAdmin(adminId, currentTime = new Date()) {
     const result = await this.execute(
-        `DELETE FROM ${DbTables.ADMIN_TOKENS}
+      `DELETE FROM ${DbTables.ADMIN_TOKENS}
        WHERE admin_id = ? AND expires_at < ?`,
-        [adminId, currentTime.toISOString()]
+      [adminId, currentTime.toISOString()]
     );
 
     return {

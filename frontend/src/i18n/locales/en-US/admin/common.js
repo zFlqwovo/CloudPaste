@@ -45,6 +45,7 @@ export default {
     accountManagement: "Account Management",
     accountSettings: "Account Settings",
     webdavSettings: "WebDAV Settings",
+    siteSettings: "Site Settings",
     settings: "System Settings",
     logout: "Logout",
     logoutAuth: "Logout Auth",
