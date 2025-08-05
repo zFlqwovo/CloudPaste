@@ -22,6 +22,8 @@ const siteSettings = ref({
   site_footer_markdown: "© 2025 CloudPaste. 保留所有权利。",
   site_announcement_enabled: false,
   site_announcement_content: "",
+  site_custom_head: "",
+  site_custom_body: "",
 });
 
 // 设置更新状态
@@ -49,6 +51,10 @@ onMounted(async () => {
           siteSettings.value.site_announcement_enabled = setting.value === "true";
         } else if (setting.key === "site_announcement_content") {
           siteSettings.value.site_announcement_content = setting.value || "";
+        } else if (setting.key === "site_custom_head") {
+          siteSettings.value.site_custom_head = setting.value || "";
+        } else if (setting.key === "site_custom_body") {
+          siteSettings.value.site_custom_body = setting.value || "";
         }
       });
     } else {
@@ -76,6 +82,8 @@ const handleUpdateSiteSettings = async (event) => {
       site_footer_markdown: siteSettings.value.site_footer_markdown || "",
       site_announcement_enabled: siteSettings.value.site_announcement_enabled.toString(),
       site_announcement_content: siteSettings.value.site_announcement_content,
+      site_custom_head: siteSettings.value.site_custom_head || "",
+      site_custom_body: siteSettings.value.site_custom_body || "",
     };
 
     // 使用分组批量更新API
@@ -91,6 +99,8 @@ const handleUpdateSiteSettings = async (event) => {
         siteConfigStore.updateSiteTitle(siteSettings.value.site_title);
         siteConfigStore.updateSiteFavicon(siteSettings.value.site_favicon_url);
         siteConfigStore.updateSiteFooter(siteSettings.value.site_footer_markdown);
+        siteConfigStore.updateCustomHead(siteSettings.value.site_custom_head);
+        siteConfigStore.updateCustomBody(siteSettings.value.site_custom_body);
       } catch (storeError) {
         console.warn("更新站点配置Store失败:", storeError);
       }
@@ -293,6 +303,46 @@ const handleClearAnnouncementContent = () => {
               :placeholder="t('admin.site.announcement.contentPlaceholder')"
               @clear-content="handleClearAnnouncementContent"
             />
+          </div>
+
+          <!-- 自定义头部 -->
+          <div>
+            <label for="site_custom_head" class="block text-sm font-medium mb-2">
+              {{ t("admin.site.customHead") }}
+            </label>
+            <textarea
+              id="site_custom_head"
+              v-model="siteSettings.site_custom_head"
+              rows="8"
+              :placeholder="t('admin.site.customHeadPlaceholder')"
+              :class="[
+                'w-full px-3 py-2 border rounded-md font-mono text-sm',
+                darkMode ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500',
+              ]"
+            ></textarea>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ t("admin.site.customHeadHelp") }}
+            </p>
+          </div>
+
+          <!-- 自定义body -->
+          <div>
+            <label for="site_custom_body" class="block text-sm font-medium mb-2">
+              {{ t("admin.site.customBody") }}
+            </label>
+            <textarea
+              id="site_custom_body"
+              v-model="siteSettings.site_custom_body"
+              rows="8"
+              :placeholder="t('admin.site.customBodyPlaceholder')"
+              :class="[
+                'w-full px-3 py-2 border rounded-md font-mono text-sm',
+                darkMode ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500',
+              ]"
+            ></textarea>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ t("admin.site.customBodyHelp") }}
+            </p>
           </div>
 
           <!-- 操作按钮 -->

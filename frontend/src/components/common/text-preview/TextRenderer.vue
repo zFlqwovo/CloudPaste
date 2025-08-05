@@ -129,7 +129,7 @@ const textStats = computed(() => {
   }
 
   // 一次遍历计算所有统计信息，避免重复分割字符串
-  let lineCount = 1; 
+  let lineCount = 1;
   const characterCount = props.content.length;
 
   // 只在需要行数时才进行字符串遍历
@@ -141,7 +141,6 @@ const textStats = computed(() => {
 
   return { lineCount, characterCount };
 });
-
 
 const lineCount = computed(() => textStats.value.lineCount);
 const characterCount = computed(() => textStats.value.characterCount);

@@ -178,6 +178,12 @@ export default {
       contentHint: "支持 Markdown 格式，可以使用粗体、斜体、链接等",
       contentPlaceholder: "请输入公告内容，支持 Markdown 格式...",
     },
+    customHead: "自定义头部",
+    customHeadPlaceholder: "<!-- 在此输入自定义头部内容 -->",
+    customHeadHelp: "在此处设置的任何内容都会自动放置在网页头部的开头",
+    customBody: "自定义body",
+    customBodyPlaceholder: "<!-- 在此输入自定义body内容 -->",
+    customBodyHelp: "在此处设置的任何内容都会自动放置在网页正文的末尾",
     buttons: {
       updateSettings: "更新设置",
       updating: "更新中...",

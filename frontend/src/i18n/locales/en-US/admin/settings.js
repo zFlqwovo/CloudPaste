@@ -180,6 +180,12 @@ export default {
       contentHint: "Supports Markdown format, you can use bold, italic, links, etc.",
       contentPlaceholder: "Please enter announcement content, Markdown format supported...",
     },
+    customHead: "Custom Head",
+    customHeadPlaceholder: "<!-- Enter your custom head content here -->",
+    customHeadHelp: "Any content set here will be automatically placed at the beginning of the webpage head",
+    customBody: "Custom Body",
+    customBodyPlaceholder: "<!-- Enter your custom body content here -->",
+    customBodyHelp: "Any content set here will be automatically placed at the end of the webpage body",
     buttons: {
       updateSettings: "Update Settings",
       updating: "Updating...",

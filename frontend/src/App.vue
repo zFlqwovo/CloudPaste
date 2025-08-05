@@ -45,6 +45,11 @@ const isDev = import.meta.env.DEV;
 
 // 计算是否显示页脚
 const shouldShowFooter = computed(() => {
+  // 管理面板页面不显示页脚
+  if (activePage.value === "admin") {
+    return false;
+  }
+
   const footerMarkdown = siteConfigStore.siteFooterMarkdown;
   return footerMarkdown && footerMarkdown.trim();
 });
@@ -89,8 +94,12 @@ const updateTheme = () => {
   // 更新 DOM 类
   if (isDarkMode.value) {
     document.documentElement.classList.add("dark");
+    document.body.classList.add("bg-gray-900", "text-gray-100");
+    document.body.classList.remove("bg-white", "text-gray-900");
   } else {
     document.documentElement.classList.remove("dark");
+    document.body.classList.add("bg-white", "text-gray-900");
+    document.body.classList.remove("bg-gray-900", "text-gray-100");
   }
 
   // 保存主题模式到本地存储
@@ -108,12 +117,7 @@ onMounted(() => {
   darkModeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
   // 为媒体查询添加监听器
-  if (darkModeMediaQuery.addEventListener) {
-    darkModeMediaQuery.addEventListener("change", darkModeHandler);
-  } else {
-    // 兼容旧版浏览器
-    darkModeMediaQuery.addListener(darkModeHandler);
-  }
+  darkModeMediaQuery.addEventListener("change", darkModeHandler);
 
   // 初始化主题
   updateTheme();
@@ -453,19 +457,6 @@ main {
   a {
     -webkit-tap-highlight-color: transparent;
   }
-}
-
-/* 主题色适配 - 需要添加到 tailwind.config.js 中的 primary 色 */
-:root {
-  --color-primary-500: #3b82f6; /* 蓝色作为默认主题色 */
-}
-
-.dark {
-  --color-primary-500: #60a5fa; /* 深色模式下使用较亮的蓝色 */
-}
-
-.border-primary-500 {
-  border-color: var(--color-primary-500);
 }
 
 /* 禁用移动端点击时的蓝色高亮 */

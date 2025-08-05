@@ -18,7 +18,7 @@ export default {
           200: "#bae6fd",
           300: "#7dd3fc",
           400: "#38bdf8",
-          500: "var(--color-primary-500, #0ea5e9)",
+          500: "#3b82f6",
           600: "#0284c7",
           700: "#0369a1",
           800: "#075985",
@@ -39,10 +39,7 @@ export default {
           950: "#2e1065",
         },
       },
-      spacing: {
-        128: "32rem",
-        144: "36rem",
-      },
+
       gridTemplateColumns: {
         "file-list": "2fr 0.8fr 1fr 0.8fr 0.8fr 1.5fr 0.8fr",
         "search-result": "2fr 1fr 1fr 1.5fr auto",

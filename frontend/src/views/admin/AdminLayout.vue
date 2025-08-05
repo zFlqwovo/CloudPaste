@@ -11,8 +11,8 @@
     <!-- 移动端顶部栏 -->
     <AdminHeader :dark-mode="darkMode" @toggle-mobile-sidebar="toggleMobileSidebar" />
 
-    <!-- 主内容区域 - 为侧边栏留出空间 -->
-    <main class="md:ml-64 overflow-y-auto focus:outline-none h-[calc(100vh-4rem)] md:h-full">
+    <!-- 主内容区域 - 为侧边栏和header留出空间，使用固定定位遮住自定义页脚 -->
+    <main class="fixed md:left-64 left-0 top-32 md:top-16 right-0 bottom-0 overflow-y-auto focus:outline-none z-40" :class="darkMode ? 'bg-gray-900' : 'bg-gray-100'">
       <!-- 内容区域 -->
       <div class="mx-auto w-full px-2 sm:px-4 md:px-6 lg:px-8 mt-2 md:mt-4 pb-4" style="max-width: 1280px">
         <div class="rounded-lg flex-1 flex flex-col" :class="darkMode ? 'bg-gray-800' : 'bg-white border border-gray-200'">
@@ -59,18 +59,4 @@ const handleLogout = () => {
 };
 </script>
 
-<style scoped>
-.admin-layout {
-  background-color: var(--bg-color);
-}
 
-.admin-main {
-  transition: margin-left 0.3s ease-in-out;
-}
-
-@media (max-width: 768px) {
-  .admin-main {
-    margin-left: 0;
-  }
-}
-</style>

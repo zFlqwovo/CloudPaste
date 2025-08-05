@@ -103,8 +103,6 @@ const {
 // 为了兼容性，保留 fileData 计算属性
 const fileData = computed(() => currentFileData.value);
 
-
-
 const handleEncodingChange = async (newEncoding) => {
   currentEncoding.value = newEncoding;
   console.log("文本编码切换:", newEncoding);

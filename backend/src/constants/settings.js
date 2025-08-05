@@ -253,6 +253,28 @@ export const DEFAULT_SETTINGS = {
     default_value: "© 2025 CloudPaste. 保留所有权利。",
   },
 
+  site_custom_head: {
+    key: "site_custom_head",
+    type: SETTING_TYPES.TEXTAREA,
+    group_id: SETTING_GROUPS.SITE,
+    help: "在此处设置的任何内容都会自动放置在网页头部的开头",
+    options: null,
+    sort_order: 6,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "",
+  },
+
+  site_custom_body: {
+    key: "site_custom_body",
+    type: SETTING_TYPES.TEXTAREA,
+    group_id: SETTING_GROUPS.SITE,
+    help: "在此处设置的任何内容都会自动放置在网页正文的末尾",
+    options: null,
+    sort_order: 7,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "",
+  },
+
   // 系统内部设置（不在前端显示）
   db_initialized: {
     key: "db_initialized",
@@ -305,6 +327,13 @@ export function validateSettingValue(key, value, type) {
     case SETTING_TYPES.SELECT:
       if (key === "webdav_upload_mode") {
         return ["direct", "multipart"].includes(value);
+      }
+      return true;
+
+    case SETTING_TYPES.TEXTAREA:
+      // 自定义头部和body的长度限制
+      if (key === "site_custom_head" || key === "site_custom_body") {
+        return value.length <= 100000; // 100KB限制
       }
       return true;
 
