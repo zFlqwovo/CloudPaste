@@ -150,7 +150,34 @@ const getEditorConfig = () => {
   const enableOutline = !isMobile && !props.miniMode;
 
   // Mini 模式的简化工具栏
-  const miniToolbar = ["bold", "italic", "strike", "|", "list", "ordered-list", "|", "link", "quote", "line", "|", "undo", "redo", "|", "fullscreen", "edit-mode"];
+  const miniToolbar = [
+    "bold",
+    "italic",
+    "strike",
+    "|",
+    "list",
+    "ordered-list",
+    "|",
+    "link",
+    "quote",
+    "line",
+    "|",
+    "undo",
+    "redo",
+    {
+      name: "clear-content-mini",
+      icon: '<svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"></path></svg>',
+      tip: t("markdown.toolbar.clearContent"),
+      click() {
+        if (confirm(t("markdown.messages.confirmClearContent"))) {
+          emit("clear-content");
+        }
+      },
+    },
+    "|",
+    "fullscreen",
+    "edit-mode",
+  ];
 
   // 完整工具栏
   const fullToolbar = [

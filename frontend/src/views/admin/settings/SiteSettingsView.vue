@@ -17,6 +17,9 @@ const props = defineProps({
 
 // 站点设置
 const siteSettings = ref({
+  site_title: "CloudPaste",
+  site_favicon_url: "",
+  site_footer_markdown: "© 2025 CloudPaste. 保留所有权利。",
   site_announcement_enabled: false,
   site_announcement_content: "",
 });
@@ -35,7 +38,14 @@ onMounted(async () => {
     const response = await api.system.getSettingsByGroup(4, true);
     if (response && response.success && response.data) {
       response.data.forEach((setting) => {
-        if (setting.key === "site_announcement_enabled") {
+        if (setting.key === "site_title") {
+          siteSettings.value.site_title = setting.value || "CloudPaste";
+        } else if (setting.key === "site_favicon_url") {
+          siteSettings.value.site_favicon_url = setting.value || "";
+        } else if (setting.key === "site_footer_markdown") {
+          // 直接使用API返回的值，包括空字符串（用户主动清空的状态）
+          siteSettings.value.site_footer_markdown = setting.value;
+        } else if (setting.key === "site_announcement_enabled") {
           siteSettings.value.site_announcement_enabled = setting.value === "true";
         } else if (setting.key === "site_announcement_content") {
           siteSettings.value.site_announcement_content = setting.value || "";
@@ -61,6 +71,9 @@ const handleUpdateSiteSettings = async (event) => {
   try {
     // 准备更新数据
     const updateData = {
+      site_title: siteSettings.value.site_title || "CloudPaste",
+      site_favicon_url: siteSettings.value.site_favicon_url || "",
+      site_footer_markdown: siteSettings.value.site_footer_markdown || "",
       site_announcement_enabled: siteSettings.value.site_announcement_enabled.toString(),
       site_announcement_content: siteSettings.value.site_announcement_content,
     };
@@ -70,6 +83,18 @@ const handleUpdateSiteSettings = async (event) => {
 
     if (response && response.success) {
       settingsStatus.value.success = true;
+
+      // 更新站点配置Store缓存
+      try {
+        const { useSiteConfigStore } = await import("@/stores/siteConfigStore.js");
+        const siteConfigStore = useSiteConfigStore();
+        siteConfigStore.updateSiteTitle(siteSettings.value.site_title);
+        siteConfigStore.updateSiteFavicon(siteSettings.value.site_favicon_url);
+        siteConfigStore.updateSiteFooter(siteSettings.value.site_footer_markdown);
+      } catch (storeError) {
+        console.warn("更新站点配置Store失败:", storeError);
+      }
+
       setTimeout(() => {
         settingsStatus.value.success = false;
       }, 3000);
@@ -87,9 +112,21 @@ const handleUpdateSiteSettings = async (event) => {
 // 重置设置
 const resetSettings = () => {
   if (confirm(t("admin.site.messages.confirmReset"))) {
+    // 重置所有站点设置到默认值
+    siteSettings.value.site_title = "CloudPaste";
+    siteSettings.value.site_favicon_url = "";
+    siteSettings.value.site_footer_markdown = "© 2025 CloudPaste. 保留所有权利。";
     siteSettings.value.site_announcement_enabled = false;
     siteSettings.value.site_announcement_content = "";
+
+    console.log("站点设置已重置为默认值");
   }
+};
+
+// 清空公告内容
+const handleClearAnnouncementContent = () => {
+  siteSettings.value.site_announcement_content = "";
+  console.log("公告内容已清空");
 };
 </script>
 
@@ -138,10 +175,88 @@ const resetSettings = () => {
     <div class="space-y-6">
       <!-- 站点设置组 -->
       <div class="setting-group bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
-        <h2 class="text-lg font-medium mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{{ t("announcement.title") }}</h2>
+        <h2 class="text-lg font-medium mb-4 pb-2 border-b border-gray-200 dark:border-gray-700" :class="darkMode ? 'text-white' : 'text-gray-800'">
+          {{ t("admin.site.title") }}
+        </h2>
 
         <!-- 站点设置表单 -->
         <form @submit="handleUpdateSiteSettings" class="space-y-6">
+          <!-- 站点标题设置 -->
+          <div class="setting-item">
+            <label for="siteTitle" class="block text-sm font-medium mb-2" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+              {{ t("admin.site.siteTitle.label") }}
+            </label>
+            <input
+              type="text"
+              id="siteTitle"
+              v-model="siteSettings.site_title"
+              :placeholder="t('admin.site.siteTitle.placeholder')"
+              class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              :class="darkMode ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'"
+              maxlength="100"
+              required
+            />
+            <p class="text-xs mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              {{ t("admin.site.siteTitle.hint") }}
+            </p>
+          </div>
+
+          <!-- 站点图标设置 -->
+          <div class="setting-item">
+            <label for="siteFavicon" class="block text-sm font-medium mb-2" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+              {{ t("admin.site.favicon.label") }}
+            </label>
+            <div class="flex items-center space-x-3">
+              <!-- 当前图标预览 -->
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 border rounded flex items-center justify-center" :class="darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50'">
+                  <img
+                    v-if="siteSettings.site_favicon_url"
+                    :src="siteSettings.site_favicon_url"
+                    alt="站点图标预览"
+                    class="w-6 h-6 object-contain"
+                    @error="$event.target.style.display = 'none'"
+                  />
+                  <svg v-else class="w-4 h-4" :class="darkMode ? 'text-gray-400' : 'text-gray-500'" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+              <!-- URL输入框 -->
+              <div class="flex-1">
+                <input
+                  type="url"
+                  id="siteFavicon"
+                  v-model="siteSettings.site_favicon_url"
+                  :placeholder="t('admin.site.favicon.placeholder')"
+                  class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'"
+                />
+              </div>
+            </div>
+            <p class="text-xs mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              {{ t("admin.site.favicon.hint") }}
+            </p>
+          </div>
+
+          <!-- 页脚内容设置 -->
+          <div class="setting-item">
+            <label for="siteFooter" class="block text-sm font-medium mb-2" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+              {{ t("admin.site.footer.label") }}
+            </label>
+            <textarea
+              id="siteFooter"
+              v-model="siteSettings.site_footer_markdown"
+              :placeholder="t('admin.site.footer.placeholder')"
+              rows="3"
+              class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors resize-vertical"
+              :class="darkMode ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'"
+            />
+            <p class="text-xs mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              {{ t("admin.site.footer.hint") }}
+            </p>
+          </div>
+
           <!-- 公告栏开关 -->
           <div class="setting-item flex items-start justify-between">
             <div class="flex-1">
@@ -176,6 +291,7 @@ const resetSettings = () => {
               :dark-mode="darkMode"
               :mini-mode="true"
               :placeholder="t('admin.site.announcement.contentPlaceholder')"
+              @clear-content="handleClearAnnouncementContent"
             />
           </div>
 

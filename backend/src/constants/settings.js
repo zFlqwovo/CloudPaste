@@ -198,13 +198,35 @@ export const DEFAULT_SETTINGS = {
   },
 
   // 站点设置组
+  site_title: {
+    key: "site_title",
+    type: SETTING_TYPES.TEXT,
+    group_id: SETTING_GROUPS.SITE,
+    help: "站点标题，显示在浏览器标签页和页面标题中",
+    options: null,
+    sort_order: 1,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "CloudPaste",
+  },
+
+  site_favicon_url: {
+    key: "site_favicon_url",
+    type: SETTING_TYPES.TEXT,
+    group_id: SETTING_GROUPS.SITE,
+    help: "站点图标URL，支持https链接或base64格式，留空使用默认图标",
+    options: null,
+    sort_order: 2,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "",
+  },
+
   site_announcement_enabled: {
     key: "site_announcement_enabled",
     type: SETTING_TYPES.BOOL,
     group_id: SETTING_GROUPS.SITE,
     help: "是否在首页显示公告栏",
     options: null,
-    sort_order: 1,
+    sort_order: 3,
     flag: SETTING_FLAGS.PUBLIC,
     default_value: "false",
   },
@@ -215,9 +237,20 @@ export const DEFAULT_SETTINGS = {
     group_id: SETTING_GROUPS.SITE,
     help: "公告内容，支持 Markdown 格式",
     options: null,
-    sort_order: 2,
+    sort_order: 4,
     flag: SETTING_FLAGS.PUBLIC,
     default_value: "",
+  },
+
+  site_footer_markdown: {
+    key: "site_footer_markdown",
+    type: SETTING_TYPES.TEXTAREA,
+    group_id: SETTING_GROUPS.SITE,
+    help: "页脚内容，支持 Markdown 格式，留空则不显示页脚",
+    options: null,
+    sort_order: 5,
+    flag: SETTING_FLAGS.PUBLIC,
+    default_value: "© 2025 CloudPaste. 保留所有权利。",
   },
 
   // 系统内部设置（不在前端显示）

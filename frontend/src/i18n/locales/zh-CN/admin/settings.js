@@ -151,7 +151,26 @@ export default {
   // 站点设置页面
   site: {
     title: "站点设置",
-    description: "配置站点相关功能，包括公告栏等",
+    description: "配置站点相关功能",
+    groups: {
+      basic: "基本设置",
+      announcement: "公告设置",
+    },
+    siteTitle: {
+      label: "站点标题",
+      hint: "显示在浏览器标签页和页面标题中",
+      placeholder: "请输入站点标题",
+    },
+    favicon: {
+      label: "站点图标",
+      hint: "支持 http://、https:// 链接或 data: base64 格式，留空使用默认图标",
+      placeholder: "https://example.com/favicon.svg",
+    },
+    footer: {
+      label: "页脚内容",
+      hint: "支持 Markdown 格式，可以使用链接、粗体等语法，留空则不显示页脚",
+      placeholder: "© 2025 CloudPaste. 保留所有权利。",
+    },
     announcement: {
       enableLabel: "启用公告栏",
       enableHint: "开启后将在首页显示公告栏",

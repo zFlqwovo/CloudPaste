@@ -416,10 +416,20 @@ router.onError((error) => {
 
 // 路由后置守卫 - 处理页面标题和调试信息
 router.afterEach(async (to, from) => {
-  // 动态设置页面标题，支持国际化
+  // 动态设置页面标题，支持国际化和站点配置
   let title = "CloudPaste";
+  let siteTitle = "CloudPaste";
 
   try {
+    // 动态导入站点配置Store
+    const { useSiteConfigStore } = await import("../stores/siteConfigStore.js");
+    const siteConfigStore = useSiteConfigStore();
+
+    // 获取站点标题（如果store已初始化）
+    if (siteConfigStore.isInitialized) {
+      siteTitle = siteConfigStore.siteTitle || "CloudPaste";
+    }
+
     // 动态导入 i18n 实例
     const { default: i18n } = await import("../i18n/index.js");
     const { t } = i18n.global;
@@ -427,59 +437,65 @@ router.afterEach(async (to, from) => {
     // 根据路由名称设置对应的国际化标题
     switch (to.name) {
       case "Home":
-        title = t("pageTitle.home");
+        title = `${siteTitle} - ${t("pageTitle.homeSubtitle")}`;
         break;
       case "Upload":
-        title = t("pageTitle.upload");
+        title = `${t("pageTitle.uploadSubtitle")} - ${siteTitle}`;
         break;
       case "AdminDashboard":
-        title = `${t("pageTitle.adminModules.dashboard")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.dashboard")} - ${siteTitle}`;
         break;
       case "AdminTextManagement":
-        title = `${t("pageTitle.adminModules.textManagement")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.textManagement")} - ${siteTitle}`;
         break;
       case "AdminFileManagement":
-        title = `${t("pageTitle.adminModules.fileManagement")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.fileManagement")} - ${siteTitle}`;
         break;
       case "AdminStorageConfig":
-        title = `${t("pageTitle.adminModules.storageConfig")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.storageConfig")} - ${siteTitle}`;
         break;
       case "AdminMountManagement":
-        title = `${t("pageTitle.adminModules.mountManagement")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.mountManagement")} - ${siteTitle}`;
         break;
       case "AdminKeyManagement":
-        title = `${t("pageTitle.adminModules.keyManagement")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.keyManagement")} - ${siteTitle}`;
         break;
       case "AdminGlobalSettings":
-        title = `${t("pageTitle.adminModules.globalSettings")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.globalSettings")} - ${siteTitle}`;
+        break;
+      case "AdminPreviewSettings":
+        title = `${t("pageTitle.adminModules.previewSettings")} - ${siteTitle}`;
         break;
       case "AdminAccountSettings":
-        title = `${t("pageTitle.adminModules.accountSettings")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.accountSettings")} - ${siteTitle}`;
         break;
       case "AdminAccountManagement":
-        title = `${t("pageTitle.adminModules.accountSettings")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.accountSettings")} - ${siteTitle}`;
         break;
       case "AdminWebDAVSettings":
-        title = `${t("pageTitle.adminModules.webdavSettings")} - CloudPaste`;
+        title = `${t("pageTitle.adminModules.webdavSettings")} - ${siteTitle}`;
+        break;
+      case "AdminSiteSettings":
+        title = `${t("pageTitle.adminModules.siteSettings")} - ${siteTitle}`;
         break;
       case "PasteView":
-        title = t("pageTitle.pasteView");
+        title = `${t("pageTitle.pasteViewSubtitle")} - ${siteTitle}`;
         break;
       case "FileView":
-        title = t("pageTitle.fileView");
+        title = `${t("pageTitle.fileViewSubtitle")} - ${siteTitle}`;
         break;
       case "MountExplorer":
       case "MountExplorerPath":
-        title = t("pageTitle.mountExplorer");
+        title = `${t("pageTitle.mountExplorerSubtitle")} - ${siteTitle}`;
         break;
       case "NotFound":
-        title = t("pageTitle.notFound");
+        title = `${t("pageTitle.notFoundSubtitle")} - ${siteTitle}`;
         break;
       default:
-        title = to.meta?.title || "CloudPaste";
+        title = to.meta?.title || siteTitle;
     }
   } catch (error) {
-    console.warn("无法加载国际化标题，使用默认标题:", error);
+    console.warn("无法加载国际化标题或站点配置，使用默认标题:", error);
     title = to.meta?.title || "CloudPaste";
   }
 

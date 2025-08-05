@@ -57,13 +57,14 @@ export default {
     title: "CloudPaste",
   },
   pageTitle: {
-    home: "CloudPaste - 在线剪贴板",
-    upload: "文件上传 - CloudPaste",
-    admin: "管理面板 - CloudPaste",
-    pasteView: "查看分享 - CloudPaste",
-    fileView: "文件预览 - CloudPaste",
-    mountExplorer: "挂载浏览 - CloudPaste",
-    notFound: "页面未找到 - CloudPaste",
+    // 主页面子标题（用于动态组合）
+    homeSubtitle: "在线剪贴板",
+    uploadSubtitle: "文件上传",
+    pasteViewSubtitle: "查看分享",
+    fileViewSubtitle: "文件预览",
+    mountExplorerSubtitle: "挂载浏览",
+    notFoundSubtitle: "页面未找到",
+    // 管理模块标题
     adminModules: {
       dashboard: "仪表板",
       textManagement: "文本管理",
@@ -76,6 +77,7 @@ export default {
       previewSettings: "预览设置",
       accountSettings: "账号管理",
       webdavSettings: "WebDAV设置",
+      siteSettings: "站点设置",
     },
   },
   nav: {
@@ -90,9 +92,6 @@ export default {
     light: "浅色模式",
     dark: "深色模式",
     auto: "自动模式",
-  },
-  footer: {
-    copyright: "© {year} CloudPaste. 保留所有权利。",
   },
   textPreview: {
     loadingHighlight: "正在加载代码高亮...",

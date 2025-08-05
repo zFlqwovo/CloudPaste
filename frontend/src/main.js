@@ -5,7 +5,7 @@ import App from "./App.vue";
 import api, { getEnvironmentInfo } from "./api";
 import i18n from "./i18n";
 import router from "./router";
-import MasonryWall from "@yeger/vue-masonry-wall"; 
+import MasonryWall from "@yeger/vue-masonry-wall";
 
 // 导入vue3-context-menu
 import "@imengyu/vue3-context-menu/lib/vue3-context-menu.css";
@@ -90,8 +90,9 @@ app.use(ContextMenu);
 // 注册自定义指令
 app.directive("context-menu", contextMenuDirective);
 
-// 导入并初始化认证Store
+// 导入并初始化认证Store和站点配置Store
 import { useAuthStore } from "./stores/authStore.js";
+import { useSiteConfigStore } from "./stores/siteConfigStore.js";
 
 // 导入路由工具函数
 import { routerUtils } from "./router";
@@ -131,13 +132,15 @@ if (savedLang && i18n.global.locale.value !== savedLang) {
 // 挂载应用
 app.mount("#app");
 
-// 初始化认证Store（在应用挂载后）
+// 初始化认证Store和站点配置Store（在应用挂载后）
 const authStore = useAuthStore();
-authStore
-  .initialize()
+const siteConfigStore = useSiteConfigStore();
+
+// 并行初始化两个Store
+Promise.all([authStore.initialize(), siteConfigStore.initialize()])
   .then(() => {
-    console.log("认证Store初始化完成");
+    console.log("认证Store和站点配置Store初始化完成");
   })
   .catch((error) => {
-    console.error("认证Store初始化失败:", error);
+    console.error("Store初始化失败:", error);
   });

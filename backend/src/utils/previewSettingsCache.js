@@ -1,6 +1,6 @@
 /**
  * 预览设置缓存工具
- * 基于alist风格的高性能文件类型检测缓存机制
+ * 文件类型检测缓存机制
  */
 
 import { RepositoryFactory } from "../repositories/index.js";

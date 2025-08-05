@@ -153,7 +153,26 @@ export default {
   // Site settings page
   site: {
     title: "Site Settings",
-    description: "Configure site-related features, including announcement banner",
+    description: "Configure site-related features",
+    groups: {
+      basic: "Basic Settings",
+      announcement: "Announcement Settings",
+    },
+    siteTitle: {
+      label: "Site Title",
+      hint: "Displayed in browser tabs and page titles",
+      placeholder: "Enter site title",
+    },
+    favicon: {
+      label: "Site Icon",
+      hint: "Supports http://, https:// links or data: base64 format, leave empty for default icon",
+      placeholder: "https://example.com/favicon.svg",
+    },
+    footer: {
+      label: "Footer Content",
+      hint: "Supports Markdown format, you can use links, bold text, etc. Leave empty to hide footer",
+      placeholder: "© 2025 CloudPaste. All rights reserved.",
+    },
     announcement: {
       enableLabel: "Enable Announcement Banner",
       enableHint: "When enabled, the announcement banner will be displayed on the homepage",
