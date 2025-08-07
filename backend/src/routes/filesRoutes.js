@@ -271,10 +271,12 @@ app.get("/api/files", unifiedAuth, async (c) => {
       // 管理员：获取查询参数
       const limit = parseInt(c.req.query("limit") || "30");
       const offset = parseInt(c.req.query("offset") || "0");
+      const search = c.req.query("search"); 
       const createdBy = c.req.query("created_by");
 
       // 构建查询选项
       const options = { limit, offset };
+      if (search) options.search = search;
       if (createdBy) options.createdBy = createdBy;
 
       // 使用管理员服务获取文件列表
@@ -283,9 +285,14 @@ app.get("/api/files", unifiedAuth, async (c) => {
       // API密钥用户：获取查询参数
       const limit = parseInt(c.req.query("limit") || "30");
       const offset = parseInt(c.req.query("offset") || "0");
+      const search = c.req.query("search"); 
+
+      // 构建查询选项
+      const options = { limit, offset };
+      if (search) options.search = search;
 
       // 使用用户服务获取文件列表
-      result = await getUserFileList(db, userId, { limit, offset });
+      result = await getUserFileList(db, userId, options);
     }
 
     const response = {

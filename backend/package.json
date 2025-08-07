@@ -1,8 +1,8 @@
 {
   "name": "cloudpaste-api",
-  "version": "0.7.6.1",
+  "version": "0.7.7",
   "description": "CloudPaste API基于Cloudflare Workers和D1数据库",
-  "main": "worker.js",
+  "main": "workers.js",
   "scripts": {
     "dev": "wrangler dev --local",
     "deploy": "wrangler publish",

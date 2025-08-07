@@ -264,24 +264,24 @@ app.get("/api/pastes", authGateway.requireText(), async (c) => {
     let result;
 
     if (userType === "admin") {
-      // 管理员：获取查询参数
-      const page = parseInt(c.req.query("page") || "1");
+      // 管理员：获取查询参数，支持page和offset两种分页方式
       const limit = parseInt(c.req.query("limit") || "10");
+      const page = parseInt(c.req.query("page") || "1");
+      const offset = parseInt(c.req.query("offset") || (page - 1) * limit);
+      const search = c.req.query("search");
       const createdBy = c.req.query("created_by");
 
-      // 构建查询选项
-      const options = { page, limit };
-      if (createdBy) options.createdBy = createdBy;
-
-      // 使用管理员服务获取文本列表
-      result = await getAllPastes(db, page, limit, createdBy);
+      // 使用管理员服务获取文本列表，传递offset参数
+      result = await getAllPastes(db, page, limit, createdBy, search, offset);
     } else {
       // API密钥用户：获取查询参数
       const limit = parseInt(c.req.query("limit") || "30");
       const offset = parseInt(c.req.query("offset") || "0");
+      const search = c.req.query("search");
 
+      // 构建查询选项
       // 使用用户服务获取文本列表
-      result = await getUserPastes(db, userId, limit, offset);
+      result = await getUserPastes(db, userId, limit, offset, search);
     }
 
     const response = {

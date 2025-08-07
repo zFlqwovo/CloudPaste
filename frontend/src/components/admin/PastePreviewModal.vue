@@ -16,10 +16,14 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  copiedTexts: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 // 定义组件要触发的事件
-const emit = defineEmits(["close", "view-paste"]);
+const emit = defineEmits(["close", "view-paste", "copy-link"]);
 
 // 导入统一的时间处理工具
 import { formatDateTime, formatRelativeTime as formatRelativeTimeUtil, formatExpiry as formatExpiryUtil } from "@/utils/timeUtils.js";
@@ -98,25 +102,6 @@ const isExpired = (paste) => {
 };
 
 /**
- * 复制文本分享链接到剪贴板
- * @param {string} slug - 文本分享的唯一标识
- */
-const copyLink = (slug) => {
-  if (!slug) return;
-
-  const link = `${window.location.origin}/paste/${slug}`;
-  navigator.clipboard
-    .writeText(link)
-    .then(() => {
-      alert("链接已复制到剪贴板");
-    })
-    .catch((err) => {
-      console.error("复制失败:", err);
-      alert("复制失败，请手动复制");
-    });
-};
-
-/**
  * 关闭预览弹窗
  * 触发close事件通知父组件
  */
@@ -180,7 +165,7 @@ const viewPaste = (slug) => {
                 <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">链接后缀:</p>
                 <div class="flex items-center space-x-2">
                   <p class="font-medium text-primary-600 dark:text-primary-400 truncate">{{ paste?.slug }}</p>
-                  <button @click="copyLink(paste?.slug)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0">
+                  <button @click="emit('copy-link', paste?.slug)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0 relative">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         stroke-linecap="round"
@@ -189,6 +174,13 @@ const viewPaste = (slug) => {
                         d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                       />
                     </svg>
+                    <!-- 复制成功提示 -->
+                    <span
+                      v-if="props.copiedTexts[paste?.id]"
+                      class="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap"
+                    >
+                      已复制
+                    </span>
                   </button>
                 </div>
               </div>

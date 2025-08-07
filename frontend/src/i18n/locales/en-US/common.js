@@ -14,6 +14,8 @@ export default {
       nextPage: "Next",
       pageInfo: "{current}/{total}",
       showingRange: "Showing {start} to {end} of {total} results",
+      searchResults: 'Search "{term}": {start} to {end} of {total} results',
+      pageSize: "Per page",
       firstPage: "First Page",
       lastPage: "Last Page",
       ariaLabel: "Pagination Navigation",

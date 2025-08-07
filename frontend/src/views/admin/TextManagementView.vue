@@ -1,9 +1,6 @@
 <script setup>
-import { ref, onMounted, reactive, computed } from "vue";
-import { api } from "@/api";
-import QRCode from "qrcode";
-import { copyToClipboard } from "@/utils/clipboard";
-import { useAuthStore } from "@/stores/authStore.js";
+import { onMounted, ref } from "vue";
+import { usePasteManagement } from "@/composables/admin-management";
 
 // 导入子组件
 import PasteTable from "@/components/admin/PasteTable.vue";
@@ -11,6 +8,8 @@ import PasteCardList from "@/components/admin/PasteCardList.vue";
 import PastePreviewModal from "@/components/admin/PastePreviewModal.vue";
 import PasteEditModal from "@/components/admin/PasteEditModal.vue";
 import CommonPagination from "@/components/common/CommonPagination.vue";
+import QRCodeModal from "@/components/admin/QRCodeModal.vue";
+import GlobalSearchBox from "@/components/common/GlobalSearchBox.vue";
 
 /**
  * 组件接收的属性定义
@@ -23,220 +22,169 @@ const props = defineProps({
   },
 });
 
-/**
- * 状态变量定义
- * loading: 数据加载状态
- * error: 错误信息
- * successMessage: 成功消息提示
- * pastes: 文本分享数据列表
- * pagination: 分页信息对象
- */
-const loading = ref(false);
-const error = ref("");
-const successMessage = ref(""); // 用于显示操作成功的消息
-const pastes = ref([]);
-const pagination = reactive({
-  page: 1,
-  limit: 10,
-  total: 0,
-  totalPages: 0,
-});
+// 使用文本管理composable
+const {
+  // 状态
+  loading,
+  error,
+  successMessage,
+  selectedItems: selectedPastes,
+  lastRefreshTime,
+  pagination,
+  pageSizeOptions,
+  pastes,
+  previewPaste,
+  editingPaste,
+  showPreview,
+  showEdit,
+  showQRCodeModal,
+  qrCodeDataURL,
+  qrCodeSlug,
+  copiedTexts,
+  copiedRawTexts,
 
-// 使用认证Store
-const authStore = useAuthStore();
+  // 权限状态
+  isAdmin,
+  isApiKeyUser,
+  isAuthorized,
 
-// 从Store获取权限状态的计算属性
-const isAdmin = computed(() => authStore.isAdmin);
-const isApiKeyUser = computed(() => authStore.authType === "apikey" && authStore.hasTextPermission);
+  // 方法
+  loadPastes,
+  searchPastes,
+  handleOffsetChange,
+  changePageSize,
+  deletePaste,
+  batchDeletePastes,
+  clearExpiredPastes,
+  openPreview,
+  closePreview,
+  openEditModal,
+  closeEditModal,
+  submitEdit,
+  copyLink,
+  copyRawLink,
+  goToViewPage,
+  showQRCode,
+  toggleSelectItem,
+  toggleSelectAll,
+  clearSelection,
+} = usePasteManagement();
 
-// 计算得到综合的权限状态
-const isAuthorized = computed(() => {
-  return isAdmin.value || isApiKeyUser.value;
-});
+// 别名映射，用于模板中的方法调用
+const goToPage = handleOffsetChange;
+const deleteSelectedPastes = batchDeletePastes;
 
-// 选中项管理
-const selectedPastes = ref([]);
+// 全局搜索状态
+const globalSearchValue = ref("");
 
-/**
- * 选中/取消选中所有项
- * 如果当前已全选，则取消全选；否则全选
- */
-const toggleSelectAll = () => {
-  if (selectedPastes.value.length === pastes.value.length) {
-    selectedPastes.value = [];
-  } else {
-    selectedPastes.value = pastes.value.map((paste) => paste.id);
-  }
-};
+// 搜索状态
+const isSearchMode = ref(false);
+const searchResults = ref([]);
+const searchLoading = ref(false);
 
-/**
- * 切换单个项的选中状态
- * @param {string|number} id - 文本分享的ID
- */
-const toggleSelectItem = (id) => {
-  const index = selectedPastes.value.indexOf(id);
-  if (index === -1) {
-    selectedPastes.value.push(id);
-  } else {
-    selectedPastes.value.splice(index, 1);
-  }
-};
+// 搜索处理函数 - 使用服务端搜索
+const handleGlobalSearch = async (searchValue) => {
+  globalSearchValue.value = searchValue;
 
-// 预览弹窗相关状态
-const showPreview = ref(false);
-const previewPaste = ref(null);
-
-// 修改弹窗相关状态
-const showEdit = ref(false);
-const editingPaste = ref(null);
-
-// 最后刷新时间记录
-const lastRefreshTime = ref("");
-
-// 添加二维码相关状态变量
-const showQRCodeModal = ref(false);
-const qrCodeDataURL = ref("");
-const qrCodeSlug = ref("");
-
-// 添加响应式对象跟踪文本复制状态
-const copiedTexts = reactive({});
-
-// 添加响应式对象跟踪原始文本直链复制状态
-const copiedRawTexts = reactive({});
-
-// 导入统一的时间处理工具
-import { formatCurrentTime } from "@/utils/timeUtils.js";
-
-/**
- * 更新最后刷新时间
- * 记录数据的最后刷新时间点
- */
-const updateLastRefreshTime = () => {
-  lastRefreshTime.value = formatCurrentTime();
-};
-
-// 权限检查逻辑已移至认证Store
-
-/**
- * 加载文本分享数据
- * 从API获取文本分享列表数据，支持分页
- */
-const loadPastes = async () => {
-  // 如果需要重新验证，则进行验证
-  if (authStore.needsRevalidation) {
-    console.log("TextManagement: 需要重新验证认证状态");
-    await authStore.validateAuth();
-  }
-
-  // 检查权限状态
-  if (!isAuthorized.value) {
-    error.value = "无权限访问管理功能";
+  if (!searchValue || searchValue.trim().length < 2) {
+    // 清除搜索，立即回到正常分页模式
+    isSearchMode.value = false;
+    searchResults.value = [];
+    // 立即重新加载原始数据
+    await loadPastes();
+    console.log("搜索已清除，恢复到原始列表");
     return;
   }
 
-  loading.value = true;
-  error.value = "";
-  successMessage.value = ""; // 清空成功消息
-
   try {
-    let result;
+    searchLoading.value = true;
+    isSearchMode.value = true;
 
-    if (isAdmin.value) {
-      // 管理员使用统一API
-      result = await api.paste.getPastes(pagination.page, pagination.limit);
+    // 重置分页到第一页进行搜索（offset模式，第一页是offset=0）
+    const result = await searchPastes(searchValue.trim(), 0);
 
-      // 根据API文档，统一接口返回的是一个数据数组和分页信息
-      if (Array.isArray(result.data)) {
-        // 如果返回的是一个数组，直接使用
-        pastes.value = result.data;
-      } else if (result.data && Array.isArray(result.data.pastes)) {
-        // 如果返回包含pastes属性的对象，使用该属性
-        pastes.value = result.data.pastes;
-      } else {
-        // 兜底，防止数据格式不一致
-        pastes.value = result.data || [];
-      }
-
-      // 更新分页信息
+    if (result && result.results) {
+      // 搜索模式下，直接更新主要的pastes状态和分页信息
+      pastes.value = result.results;
+      // 更新分页信息 - 改为offset模式
       if (result.pagination) {
         pagination.total = result.pagination.total;
-        pagination.totalPages = result.pagination.totalPages || Math.ceil(result.pagination.total / pagination.limit);
-      } else if (result.data && result.data.pagination) {
-        pagination.total = result.data.pagination.total;
-        pagination.totalPages = result.data.pagination.totalPages || Math.ceil(result.data.pagination.total / pagination.limit);
+        pagination.offset = result.pagination.offset || 0;
+        pagination.hasMore = result.pagination.hasMore !== undefined ? result.pagination.hasMore : pagination.offset + pagination.limit < pagination.total;
       }
-    } else if (isApiKeyUser.value) {
-      // API密钥用户使用统一API
-      const offset = (pagination.page - 1) * pagination.limit;
-      result = await api.paste.getPastes(1, pagination.limit, offset);
-
-      console.log("API密钥用户获取文本列表响应:", result);
-
-      // 更新数据
-      if (Array.isArray(result.data)) {
-        // 如果数据直接是数组，直接使用
-        pastes.value = result.data;
-      } else {
-        // 兜底处理
-        pastes.value = result.data?.pastes || [];
-      }
-
-      // 添加created_by字段，
-      // 从认证Store获取API密钥信息
-      const apiKey = authStore.apiKey;
-      if (apiKey && pastes.value.length > 0) {
-        // 为每条数据添加created_by字段，值为apikey:xxx格式
-        pastes.value = pastes.value.map((paste) => {
-          // 如果后端已经返回了created_by字段，则不覆盖，显示的是UUID
-          if (!paste.created_by) {
-            return {
-              ...paste,
-              created_by: `apikey:${apiKey.substring(0, 5)}`, // 使用API密钥前5位
-            };
-          }
-          return paste;
-        });
-      }
-
-      // 计算总数和总页数
-      // 如果结果中有总数信息
-      const total = result.pagination?.total || pastes.value.length;
-      pagination.total = total;
-      // 计算总页数
-      pagination.totalPages = Math.ceil(total / pagination.limit);
+      console.log(`文本搜索完成: "${searchValue}", 找到 ${result.pagination?.total || result.results.length} 个结果`);
+    } else {
+      pastes.value = [];
+      pagination.total = 0;
+      pagination.offset = 0;
+      pagination.hasMore = false;
     }
-
-    // 打印数据，用于调试
-    console.log("加载的文本数据:", pastes.value);
-    console.log("分页信息:", pagination);
-
-    // 更新最后刷新时间
-    updateLastRefreshTime();
-  } catch (err) {
-    console.error("加载分享失败:", err);
-    error.value = err.message || "加载失败，请重试";
+  } catch (error) {
+    console.error("文本搜索失败:", error);
     pastes.value = [];
+    pagination.total = 0;
+    pagination.offset = 0;
+    pagination.hasMore = false;
   } finally {
-    loading.value = false;
+    searchLoading.value = false;
   }
 };
 
-/**
- * 跳转到指定页
- * @param {number} page - 目标页码
- */
-const goToPage = (page) => {
-  if (page >= 1 && page <= pagination.totalPages) {
-    pagination.page = page;
+const clearGlobalSearch = async () => {
+  globalSearchValue.value = "";
+  isSearchMode.value = false;
+  searchResults.value = [];
+
+  // 立即重新加载正常的文本列表
+  try {
+    await loadPastes();
+    console.log("清除文本搜索，已恢复到原始列表");
+  } catch (error) {
+    console.error("清除搜索后重新加载失败:", error);
+  }
+};
+
+// 处理分页变化（支持搜索模式）- 改为offset模式
+const handleOffsetChangeWithSearch = async (newOffset) => {
+  if (isSearchMode.value && globalSearchValue.value) {
+    // 搜索模式下的分页
+    try {
+      searchLoading.value = true;
+      const result = await searchPastes(globalSearchValue.value, newOffset);
+
+      if (result && result.results) {
+        pastes.value = result.results;
+        // 更新分页信息
+        if (result.pagination) {
+          pagination.total = result.pagination.total;
+          pagination.offset = result.pagination.offset || newOffset;
+          pagination.hasMore = result.pagination.hasMore !== undefined ? result.pagination.hasMore : pagination.offset + pagination.limit < pagination.total;
+        }
+      }
+    } catch (error) {
+      console.error("搜索分页失败:", error);
+    } finally {
+      searchLoading.value = false;
+    }
+  } else {
+    // 正常模式下的分页
+    handleOffsetChange(newOffset);
+  }
+};
+
+// 处理每页数量变化
+const handlePageSizeChange = (newPageSize) => {
+  changePageSize(newPageSize);
+  // 如果在搜索模式，重新搜索
+  if (isSearchMode.value && globalSearchValue.value) {
+    handleGlobalSearch(globalSearchValue.value);
+  } else {
+    // 否则重新加载文本列表
     loadPastes();
   }
 };
 
-/**
- * 格式化创建者信息
- * @param {Object} paste - 文本分享对象
- * @returns {string} 格式化后的创建者信息
- */
+// 格式化创建者信息的工具函数
 const formatCreator = (paste) => {
   if (!paste.created_by) {
     return "系统";
@@ -245,437 +193,23 @@ const formatCreator = (paste) => {
   // 处理API密钥创建者
   if (paste.created_by.startsWith("apikey:")) {
     const keyPart = paste.created_by.substring(7); // 移除"apikey:"前缀
-    return `密钥：${keyPart.substring(0, 5)}...`;
+    return `API密钥 (${keyPart})`;
   }
 
-  // 处理管理员创建者
-  if (paste.created_by === "admin") {
-    return "管理员";
-  }
-
-  // 如果是UUID格式，视为管理员创建的内容
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paste.created_by)) {
-    return "管理员";
+  // 处理UUID格式的创建者
+  if (paste.created_by.length === 36 && paste.created_by.includes("-")) {
+    return `用户 (${paste.created_by.substring(0, 8)})`;
   }
 
   return paste.created_by;
 };
 
-/**
- * 删除单个分享项
- * @param {string|number} id - 要删除的分享ID
- */
-const deletePaste = async (id) => {
-  if (!confirm("确定要删除此分享吗？此操作不可恢复。")) {
-    return;
-  }
-
-  try {
-    // 清空之前的消息
-    error.value = "";
-    successMessage.value = "";
-
-    if (isAdmin.value) {
-      // 管理员使用批量删除API删除单个文本
-      await api.admin.batchDeletePastes([id]);
-    } else if (isApiKeyUser.value) {
-      // API密钥用户使用批量删除API删除单个文本
-      await api.paste.batchDeletePastes([id]);
-    } else {
-      throw new Error("无权限执行此操作");
-    }
-
-    // 重新加载数据
-    loadPastes();
-
-    // 显示成功消息
-    successMessage.value = "删除成功";
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 3000);
-  } catch (err) {
-    console.error("删除失败:", err);
-    error.value = err.message || "删除失败，请重试";
-  }
-};
-
-/**
- * 批量删除选中的分享项
- * 删除所有已选中的分享项
- */
-const deleteSelectedPastes = async () => {
-  if (selectedPastes.value.length === 0) {
-    alert("请先选择需要删除的项");
-    return;
-  }
-
-  const selectedCount = selectedPastes.value.length;
-
-  if (!confirm(`确定要删除选中的 ${selectedCount} 项分享吗？此操作不可恢复。`)) {
-    return;
-  }
-
-  try {
-    // 清空之前的消息
-    error.value = "";
-    successMessage.value = "";
-
-    if (isAdmin.value) {
-      // 管理员使用批量删除API
-      await api.admin.batchDeletePastes(selectedPastes.value);
-    } else if (isApiKeyUser.value) {
-      // API密钥用户使用批量删除API
-      await api.paste.batchDeletePastes(selectedPastes.value);
-    } else {
-      throw new Error("无权限执行此操作");
-    }
-
-    // 清空选中列表
-    selectedPastes.value = [];
-    // 重新加载数据
-    loadPastes();
-
-    // 显示成功消息
-    successMessage.value = `成功删除${selectedCount}个分享`;
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 3000);
-  } catch (err) {
-    console.error("批量删除失败:", err);
-    error.value = err.message || "批量删除失败，请重试";
-  }
-};
-
-/**
- * 清理所有过期的文本分享（仅管理员可用）
- * 删除系统中所有已过期的分享项
- */
-const clearExpiredPastes = async () => {
-  if (!isAdmin.value) {
-    error.value = "只有管理员才能清理过期文本";
-    return;
-  }
-
-  if (!confirm("确定要立即清理所有过期的文本分享吗？此操作不可恢复。")) {
-    return;
-  }
-
-  try {
-    // 清空之前的消息
-    error.value = "";
-    successMessage.value = "";
-
-    // 使用统一API清理过期文本
-    const result = await api.paste.clearExpiredPastes();
-
-    // 显示成功消息
-    successMessage.value = result.message || "清理完成";
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 3000);
-
-    // 重新加载数据
-    loadPastes();
-  } catch (err) {
-    console.error("清理过期内容失败:", err);
-    error.value = err.message || "清理过期内容失败，请重试";
-  }
-};
-
-/**
- * 前往查看页面
- * 在新窗口打开分享链接
- * @param {string} slug - 文本分享的唯一标识
- */
-const goToViewPage = (slug) => {
-  if (slug) {
-    // 在新窗口打开查看页面
-    window.open(`/paste/${slug}`, "_blank");
-  }
-};
-
-/**
- * 复制链接到剪贴板
- * @param {string} slug - 文本分享的唯一标识
- */
-const copyLink = async (slug) => {
-  const link = `${window.location.origin}/paste/${slug}`;
-  try {
-    const success = await copyToClipboard(link);
-
-    if (success) {
-      // 找到对应的paste对象
-      const paste = pastes.value.find((p) => p.slug === slug);
-      // 确保paste和paste.id都存在
-      if (paste && paste.id) {
-        // 为特定文本设置复制成功状态
-        copiedTexts[paste.id] = true;
-
-        // 3秒后清除状态
-        setTimeout(() => {
-          // 再次检查以确保对象和ID仍然存在
-          if (copiedTexts && paste && paste.id) {
-            copiedTexts[paste.id] = false;
-          }
-        }, 2000);
-      } else {
-        console.log("复制成功，但无法找到对应的paste对象或ID");
-      }
-    } else {
-      throw new Error("复制失败");
-    }
-  } catch (err) {
-    console.error("复制失败:", err);
-    alert("复制失败，请手动复制");
-  }
-};
-
-/**
- * 复制原始文本直链到剪贴板
- * @param {Object} paste - 文本分享对象
- */
-const copyRawLink = async (paste) => {
-  if (!paste || !paste.slug) {
-    alert("该文本没有有效的原始直链");
-    return;
-  }
-
-  try {
-    let pasteWithPassword = paste;
-
-    // 如果paste对象有加密但没有明文密码，先获取完整信息
-    if (paste.has_password && !paste.plain_password) {
-      let result;
-      if (isAdmin.value) {
-        // 管理员获取分享内容
-        result = await api.admin.getPasteById(paste.id);
-      } else if (isApiKeyUser.value) {
-        // API密钥用户获取分享内容
-        result = await api.user.paste.getPasteById(paste.id);
-      } else {
-        throw new Error("无权限执行此操作");
-      }
-      pasteWithPassword = result.data;
-    }
-
-    // 构建原始文本链接URL，使用paste.plain_password（如果存在）
-    const finalLink = api.paste.getRawPasteUrl(pasteWithPassword.slug, pasteWithPassword.plain_password);
-
-    const success = await copyToClipboard(finalLink);
-
-    if (success) {
-      // 确保paste和paste.id都存在
-      if (paste && paste.id) {
-        // 为特定文本设置复制成功状态
-        copiedRawTexts[paste.id] = true;
-
-        // 3秒后清除状态
-        setTimeout(() => {
-          // 再次检查以确保对象和ID仍然存在
-          if (copiedRawTexts && paste && paste.id) {
-            copiedRawTexts[paste.id] = false;
-          }
-        }, 2000);
-      } else {
-        console.log("复制原始链接成功，但无法找到对应的paste对象或ID");
-      }
-    } else {
-      throw new Error("复制失败");
-    }
-  } catch (err) {
-    console.error("获取文本详情或复制原始链接失败:", err);
-    alert("复制原始链接失败，请手动复制");
-  }
-};
-
-/**
- * 打开预览弹窗
- * @param {Object} paste - 要预览的文本分享对象
- */
-const openPreview = async (paste) => {
-  try {
-    // 根据用户权限获取完整的分享内容
-    let fullPaste;
-
-    if (isAdmin.value) {
-      // 管理员获取分享内容
-      const result = await api.admin.getPasteById(paste.id);
-      fullPaste = result.data;
-    } else if (isApiKeyUser.value) {
-      // API密钥用户获取分享内容
-      const result = await api.user.paste.getPasteById(paste.id);
-      fullPaste = result.data;
-    } else {
-      throw new Error("无权限执行此操作");
-    }
-
-    // 设置预览状态
-    previewPaste.value = fullPaste;
-    showPreview.value = true;
-  } catch (err) {
-    console.error("获取分享详情失败:", err);
-    error.value = err.message || "获取分享详情失败，请重试";
-  }
-};
-
-/**
- * 关闭预览弹窗
- * 隐藏预览弹窗并清空预览数据
- */
-const closePreview = () => {
-  showPreview.value = false;
-  setTimeout(() => {
-    previewPaste.value = null;
-  }, 300);
-};
-
-/**
- * 打开编辑弹窗
- * @param {Object} paste - 要编辑的文本分享对象
- */
-const openEditModal = async (paste) => {
-  // 清空之前的消息
-  error.value = "";
-  successMessage.value = "";
-
-  try {
-    // 根据用户权限获取完整的分享内容
-    let fullPaste;
-
-    if (isAdmin.value) {
-      // 管理员获取分享内容
-      const result = await api.admin.getPasteById(paste.id);
-      fullPaste = result.data;
-    } else if (isApiKeyUser.value) {
-      // API密钥用户获取分享内容
-      const result = await api.user.paste.getPasteById(paste.id);
-      fullPaste = result.data;
-    } else {
-      throw new Error("无权限执行此操作");
-    }
-
-    // 设置编辑状态
-    editingPaste.value = fullPaste;
-    showEdit.value = true;
-  } catch (err) {
-    console.error("获取分享详情失败:", err);
-    error.value = err.message || "获取分享详情失败，请重试";
-  }
-};
-
-/**
- * 提交分享编辑
- * @param {Object} editedPaste - 编辑后的文本分享对象
- */
-const submitEdit = async (editedPaste) => {
-  // 清空之前的消息
-  error.value = "";
-  successMessage.value = "";
-
-  try {
-    // 确保我们有slug
-    if (!editedPaste.data || !editedPaste.data.slug) {
-      throw new Error("更新失败：缺少必要的文本标识信息");
-    }
-
-    // 使用统一API更新分享（自动根据认证信息处理权限）
-    const result = await api.paste.updatePaste(editedPaste.data.slug, editedPaste.data);
-
-    // 关闭编辑弹窗
-    showEdit.value = false;
-    // 重新加载数据
-    loadPastes();
-
-    // 显示成功消息
-    successMessage.value = "分享更新成功";
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 5000); // 由于包含链接信息，延长显示时间
-  } catch (err) {
-    console.error("更新分享失败:", err);
-    error.value = err.message || "更新分享失败，请重试";
-  }
-};
-
-/**
- * 显示二维码弹窗
- * @param {string} slug - 文本分享的唯一标识
- */
-const showQRCode = async (slug) => {
-  if (!slug) return;
-
-  qrCodeSlug.value = slug;
-  showQRCodeModal.value = true;
-  qrCodeDataURL.value = ""; // 重置二维码图片
-
-  try {
-    // 生成分享链接
-    const link = `${window.location.origin}/paste/${slug}`;
-
-    // 使用 qrcode 库生成二维码
-    const dataURL = await QRCode.toDataURL(link, {
-      width: 240,
-      margin: 1,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
-    });
-    qrCodeDataURL.value = dataURL;
-  } catch (error) {
-    console.error("生成二维码时出错:", error);
-    error.value = "生成二维码失败";
-  }
-};
-
-/**
- * 关闭二维码弹窗
- */
-const closeQRCodeModal = () => {
-  showQRCodeModal.value = false;
-  setTimeout(() => {
-    qrCodeDataURL.value = "";
-    qrCodeSlug.value = "";
-  }, 300);
-};
-
-/**
- * 下载二维码图片
- */
-const downloadQRCode = () => {
-  if (!qrCodeDataURL.value) return;
-
-  // 创建一个临时链接元素来下载图片
-  const link = document.createElement("a");
-  link.href = qrCodeDataURL.value;
-  link.download = `cloudpaste-qrcode-${qrCodeSlug.value}-${new Date().getTime()}.png`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-/**
- * 关闭编辑弹窗
- * 隐藏编辑弹窗并清空编辑数据
- */
-const closeEditModal = () => {
-  showEdit.value = false;
-  setTimeout(() => {
-    editingPaste.value = null;
-  }, 300);
-};
-
-/**
- * 组件挂载时的初始化
- * 加载数据
- */
+// 组件挂载时加载数据
 onMounted(() => {
   console.log("TextManagement组件挂载");
   console.log("TextManagement权限状态检查", {
     isAdmin: isAdmin.value,
     isApiKeyUser: isApiKeyUser.value,
-    authType: authStore.authType,
-    hasTextPermission: authStore.hasTextPermission,
   });
 
   // 加载分享列表
@@ -716,6 +250,20 @@ onMounted(() => {
           <span class="hidden xs:inline">{{ loading ? "刷新中..." : "刷新" }}</span>
           <span class="xs:hidden">{{ loading ? "..." : "刷" }}</span>
         </button>
+      </div>
+
+      <!-- 搜索框 -->
+      <div class="w-full">
+        <GlobalSearchBox
+          v-model="globalSearchValue"
+          placeholder="搜索文本分享（支持链接、备注、内容）"
+          :show-hint="true"
+          search-hint="服务端搜索，支持模糊匹配"
+          size="md"
+          :debounce-ms="300"
+          @search="handleGlobalSearch"
+          @clear="clearGlobalSearch"
+        />
       </div>
 
       <!-- 其他操作按钮行 -->
@@ -798,7 +346,7 @@ onMounted(() => {
             :dark-mode="darkMode"
             :pastes="pastes"
             :selectedPastes="selectedPastes"
-            :loading="loading"
+            :loading="loading || searchLoading"
             :copiedTexts="copiedTexts"
             :copiedRawTexts="copiedRawTexts"
             @toggle-select-all="toggleSelectAll"
@@ -835,44 +383,35 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 分页组件 -->
+    <!-- 分页组件（搜索和正常模式统一显示） -->
     <div class="mt-2 mb-4 sm:mt-4 sm:mb-0">
-      <CommonPagination :dark-mode="darkMode" :pagination="pagination" mode="page" @page-changed="goToPage" />
+      <CommonPagination
+        :dark-mode="darkMode"
+        :pagination="pagination"
+        :page-size-options="pageSizeOptions"
+        :search-mode="isSearchMode"
+        :search-term="globalSearchValue"
+        mode="offset"
+        @offset-changed="handleOffsetChangeWithSearch"
+        @limit-changed="handlePageSizeChange"
+      />
     </div>
 
     <!-- 预览弹窗组件 -->
-    <PastePreviewModal :dark-mode="darkMode" :show-preview="showPreview" :paste="previewPaste" @close="closePreview" @view-paste="goToViewPage" />
+    <PastePreviewModal
+      :dark-mode="darkMode"
+      :show-preview="showPreview"
+      :paste="previewPaste"
+      :copied-texts="copiedTexts"
+      @close="closePreview"
+      @view-paste="goToViewPage"
+      @copy-link="copyLink"
+    />
 
     <!-- 修改弹窗组件 -->
     <PasteEditModal :dark-mode="darkMode" :show-edit="showEdit" :paste="editingPaste" @close="closeEditModal" @save="submitEdit" />
 
     <!-- 二维码弹窗组件 -->
-    <div v-if="showQRCodeModal" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black opacity-50" @click="closeQRCodeModal"></div>
-      <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg max-w-md w-full relative z-10">
-        <button @click="closeQRCodeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">分享二维码</h3>
-
-        <div class="flex flex-col items-center">
-          <div v-if="qrCodeDataURL" class="bg-white p-4 rounded-lg mb-4">
-            <img :src="qrCodeDataURL" alt="分享二维码" class="w-48 h-48" />
-          </div>
-          <div v-else class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 w-48 h-48 flex items-center justify-center">
-            <span class="text-gray-500 dark:text-gray-400">生成中...</span>
-          </div>
-
-          <div class="text-sm text-gray-600 dark:text-gray-300 mb-4 text-center max-w-xs">扫描上方二维码可以访问分享内容</div>
-
-          <button @click="downloadQRCode" class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors" :disabled="!qrCodeDataURL">
-            下载二维码
-          </button>
-        </div>
-      </div>
-    </div>
+    <QRCodeModal v-if="showQRCodeModal" :qr-code-url="qrCodeDataURL" :file-slug="qrCodeSlug" :dark-mode="darkMode" @close="showQRCodeModal = false" />
   </div>
 </template>

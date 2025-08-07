@@ -447,8 +447,10 @@ export class PasteRepository extends BaseRepository {
    * @returns {Promise<Object>} 包含结果和分页信息的对象
    */
   async findAllForAdmin(options = {}) {
-    const { page = 1, limit = 10, createdBy = null } = options;
-    const offset = (page - 1) * limit;
+    const { page = 1, limit = 10, offset = null, createdBy = null, search = null } = options;
+
+    // 支持两种分页模式：page模式和offset模式
+    const actualOffset = offset !== null ? offset : (page - 1) * limit;
 
     // 构建查询条件
     let whereClause = "";
@@ -456,11 +458,27 @@ export class PasteRepository extends BaseRepository {
     const queryParams = [];
     const countParams = [];
 
+    const conditions = [];
+
+    // 添加搜索条件 - 搜索链接标识、备注、内容
+    if (search && search.trim()) {
+      const searchPattern = `%${search.trim()}%`;
+      conditions.push("(slug LIKE ? OR remark LIKE ? OR SUBSTR(content, 1, 200) LIKE ?)");
+      queryParams.push(searchPattern, searchPattern, searchPattern);
+      countParams.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    // 添加创建者筛选
     if (createdBy) {
-      whereClause = " WHERE created_by = ?";
-      countWhereClause = " WHERE created_by = ?";
+      conditions.push("created_by = ?");
       queryParams.push(createdBy);
       countParams.push(createdBy);
+    }
+
+    // 构建WHERE子句
+    if (conditions.length > 0) {
+      whereClause = " WHERE " + conditions.join(" AND ");
+      countWhereClause = " WHERE " + conditions.join(" AND ");
     }
 
     // 获取总数
@@ -490,7 +508,7 @@ export class PasteRepository extends BaseRepository {
       LIMIT ? OFFSET ?
     `;
 
-    queryParams.push(limit, offset);
+    queryParams.push(limit, actualOffset);
     const queryResult = await this.query(querySql, queryParams);
     const results = queryResult.results || [];
 
@@ -498,8 +516,11 @@ export class PasteRepository extends BaseRepository {
       results,
       pagination: {
         total,
-        page,
         limit,
+        offset: actualOffset,
+        hasMore: actualOffset + limit < total,
+        // 保持向后兼容
+        page: Math.floor(actualOffset / limit) + 1,
         totalPages: Math.ceil(total / limit),
       },
     };
@@ -512,23 +533,38 @@ export class PasteRepository extends BaseRepository {
    * @returns {Promise<Object>} 包含结果和分页信息的对象
    */
   async findByCreatorWithPagination(createdBy, options = {}) {
-    const { limit = 30, offset = 0 } = options;
+    const { limit = 30, offset = 0, search = null } = options;
+
+    // 构建查询条件
+    let whereClause = "WHERE created_by = ?";
+    let params = [createdBy];
+
+    // 添加搜索条件 - 搜索链接标识、备注、内容
+    if (search && search.trim()) {
+      const searchPattern = `%${search.trim()}%`;
+      whereClause += " AND (slug LIKE ? OR remark LIKE ? OR content LIKE ?)";
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
 
     // 查询数据
     const querySql = `
       SELECT id, slug, content, remark, password IS NOT NULL as has_password,
       expires_at, max_views, views, created_at, updated_at, created_by
       FROM ${DbTables.PASTES}
-      WHERE created_by = ?
+      ${whereClause}
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
     `;
 
-    const queryResult = await this.query(querySql, [createdBy, limit, offset]);
+    params.push(limit, offset);
+    const queryResult = await this.query(querySql, params);
     const results = queryResult.results || [];
 
-    // 获取总数
-    const total = await this.count(DbTables.PASTES, { created_by: createdBy });
+    // 获取总数（包含搜索条件）
+    const countSql = `SELECT COUNT(*) as total FROM ${DbTables.PASTES} ${whereClause}`;
+    const countParams = params.slice(0, -2); // 移除limit和offset参数
+    const countResult = await this.queryFirst(countSql, countParams);
+    const total = countResult?.total || 0;
 
     return {
       results,

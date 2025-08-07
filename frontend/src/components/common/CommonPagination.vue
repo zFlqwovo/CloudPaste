@@ -21,9 +21,25 @@ const props = defineProps({
     default: "page", // 'page' 或 'offset'
     validator: (value) => ["page", "offset"].includes(value),
   },
+  showPageSizeSelector: {
+    type: Boolean,
+    default: true,
+  },
+  pageSizeOptions: {
+    type: Array,
+    default: () => [10, 20, 30, 50, 100],
+  },
+  searchMode: {
+    type: Boolean,
+    default: false,
+  },
+  searchTerm: {
+    type: String,
+    default: "",
+  },
 });
 
-const emit = defineEmits(["page-changed", "offset-changed"]);
+const emit = defineEmits(["page-changed", "offset-changed", "limit-changed"]);
 
 // 计算当前显示范围
 const displayRange = computed(() => {
@@ -80,6 +96,12 @@ const handlePageChange = (targetPage) => {
     emit("offset-changed", newOffset);
   }
 };
+
+// 处理每页数量变化
+const handlePageSizeChange = (event) => {
+  const newSize = parseInt(event.target.value);
+  emit("limit-changed", newSize);
+};
 </script>
 
 <template>
@@ -124,17 +146,39 @@ const handlePageChange = (targetPage) => {
 
     <!-- 桌面端完整分页控件 -->
     <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-      <!-- 显示范围信息 -->
-      <div>
-        <p class="text-xs md:text-sm text-gray-700 dark:text-gray-300">
-          {{
-            t("common.pagination.showingRange", {
-              start: displayRange.start,
-              end: displayRange.end,
-              total: pagination.total,
-            })
-          }}
-        </p>
+      <!-- 左侧：显示范围信息和每页数量选择器 -->
+      <div class="flex items-center space-x-4">
+        <!-- 显示范围信息 -->
+        <div>
+          <p class="text-xs md:text-sm text-gray-700 dark:text-gray-300">
+            <span v-if="searchMode && searchTerm">
+              {{ t("common.pagination.searchResults", { term: searchTerm, start: displayRange.start, end: displayRange.end, total: pagination.total }) }}
+            </span>
+            <span v-else>
+              {{
+                t("common.pagination.showingRange", {
+                  start: displayRange.start,
+                  end: displayRange.end,
+                  total: pagination.total,
+                })
+              }}
+            </span>
+          </p>
+        </div>
+
+        <!-- 每页数量选择器 -->
+        <div v-if="showPageSizeSelector" class="flex items-center space-x-2">
+          <span class="text-xs md:text-sm text-gray-700 dark:text-gray-300">{{ t("common.pagination.pageSize") }}</span>
+          <select
+            :value="pagination.limit"
+            @change="handlePageSizeChange"
+            class="px-2 py-1 text-xs md:text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">
+              {{ size }}
+            </option>
+          </select>
+        </div>
       </div>
 
       <!-- 分页按钮组 -->

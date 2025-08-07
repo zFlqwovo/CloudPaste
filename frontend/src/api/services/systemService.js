@@ -108,7 +108,7 @@ export function updateGroupSettings(groupId, settings, validateType = true) {
  * @returns {Promise<Object>} 清理结果
  */
 export function clearExpiredPastes() {
-  return post("/admin/pastes/clear-expired", { clearExpired: true });
+  return post("/pastes/clear-expired", { clearExpired: true });
 }
 
 /**

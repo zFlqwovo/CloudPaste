@@ -109,10 +109,10 @@
             <!-- 左侧按钮组 -->
             <div class="flex space-x-2">
               <!-- 下载文件按钮 - 使用永久链接 -->
-              <button @click="downloadFile" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium">下载文件</button>
+              <button @click="emit('download-file', file)" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium">下载文件</button>
 
               <!-- 预览按钮 - 使用永久链接 -->
-              <button @click="previewFile" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium">预览</button>
+              <button @click="emit('preview-file', file)" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium">预览</button>
             </div>
 
             <button
@@ -131,8 +131,6 @@
 
 <script setup>
 import { defineProps, defineEmits, computed } from "vue";
-import { api } from "@/api";
-import { FileType } from "@/utils/fileTypes.js";
 
 const props = defineProps({
   file: {
@@ -145,79 +143,12 @@ const props = defineProps({
   },
 });
 
-defineEmits(["close"]);
+const emit = defineEmits(["close", "preview-file", "download-file"]);
 
 // 获取当前网站基础URL
 const baseUrl = computed(() => {
   return window.location.origin;
 });
-
-/**
- * 辅助函数：获取文件密码
- * 从多个可能的来源获取密码
- */
-const getFilePassword = () => {
-  // 优先使用文件信息中存储的明文密码
-  if (props.file.plain_password) {
-    return props.file.plain_password;
-  }
-
-  // 其次检查当前密码字段
-  if (props.file.currentPassword) {
-    return props.file.currentPassword;
-  }
-
-  // 尝试从URL获取密码参数
-  const currentUrl = new URL(window.location.href);
-  const passwordParam = currentUrl.searchParams.get("password");
-  if (passwordParam) {
-    return passwordParam;
-  }
-
-  // 最后尝试从会话存储中获取密码
-  try {
-    if (props.file.slug) {
-      const sessionPassword = sessionStorage.getItem(`file_password_${props.file.slug}`);
-      if (sessionPassword) {
-        return sessionPassword;
-      }
-    }
-  } catch (err) {
-    console.error("从会话存储获取密码出错:", err);
-  }
-
-  return null;
-};
-
-// 检查是否为Office文件 - 使用标准的文件类型判断
-const isOfficeFile = computed(() => {
-  return props.file.type === FileType.OFFICE;
-});
-
-/**
- * 获取Office文件预览URL
- * @returns {Promise<string|null>} Office预览URL或null
- */
-const getOfficePreviewUrl = async () => {
-  if (!props.file.slug) return null;
-
-  try {
-    // 获取文件密码
-    const filePassword = getFilePassword();
-
-    console.log("正在请求Office预览URL:", props.file.slug);
-
-    // 使用统一的预览服务
-    return await api.fileView.getOfficePreviewUrl(props.file.slug, {
-      password: filePassword,
-      provider: "microsoft",
-    });
-  } catch (error) {
-    console.error("获取Office预览URL出错:", error);
-    alert(`预览失败: ${error.message}`);
-    return null;
-  }
-};
 
 // 导入统一的工具函数
 import { formatFileSize, getRemainingViews as getRemainingViewsUtil } from "@/utils/fileUtils.js";
@@ -232,132 +163,6 @@ import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
  */
 const formatDateTime = (dateString) => {
   return formatDateTimeWithSeconds(dateString);
-};
-
-/**
- * 获取文件的永久下载链接
- */
-const getPermanentDownloadUrl = computed(() => {
-  if (!props.file.slug) return "";
-
-  // 获取文件密码
-  const filePassword = getFilePassword();
-
-  // 检查文件是否有urls对象和代理URL
-  if (props.file.urls && props.file.urls.proxyDownloadUrl) {
-    // 使用后端返回的代理URL，始终采用worker代理，不受use_proxy影响
-    let url = props.file.urls.proxyDownloadUrl;
-
-    // 如果有密码保护且URL中没有密码参数，则添加密码
-    if (props.file.has_password && filePassword && !url.includes("password=")) {
-      url += url.includes("?") ? `&password=${encodeURIComponent(filePassword)}` : `?password=${encodeURIComponent(filePassword)}`;
-    }
-
-    return url;
-  }
-
-  // 使用统一的文件分享API构建下载URL
-  return api.fileView.buildDownloadUrl(props.file.slug, props.file.has_password ? filePassword : null);
-});
-
-/**
- * 获取文件的永久预览链接
- */
-const getPermanentViewUrl = computed(() => {
-  if (!props.file.slug) return "";
-
-  // 获取文件密码
-  const filePassword = getFilePassword();
-
-  // 检查文件是否有urls对象和代理URL
-  if (props.file.urls && props.file.urls.proxyPreviewUrl) {
-    // 使用后端返回的代理URL，始终采用worker代理，不受use_proxy影响
-    let url = props.file.urls.proxyPreviewUrl;
-
-    // 如果有密码保护且URL中没有密码参数，则添加密码
-    if (props.file.has_password && filePassword && !url.includes("password=")) {
-      url += url.includes("?") ? `&password=${encodeURIComponent(filePassword)}` : `?password=${encodeURIComponent(filePassword)}`;
-    }
-
-    return url;
-  }
-
-  // 使用统一的文件分享API构建预览URL
-  return api.fileView.buildPreviewUrl(props.file.slug, props.file.has_password ? filePassword : null);
-});
-
-/**
- * 预览文件
- * 在新窗口中打开预览链接
- */
-const previewFile = async () => {
-  if (!props.file.slug) {
-    alert("无法预览：文件没有设置短链接");
-    return;
-  }
-
-  try {
-    // 检查是否为Office文件
-    if (isOfficeFile.value) {
-      console.log("检测到Office文件，使用专用预览", {
-        filename: props.file.filename,
-        mimetype: props.file.mimetype,
-      });
-
-      // 获取Office预览URL
-      const officePreviewUrl = await getOfficePreviewUrl();
-      if (officePreviewUrl) {
-        window.open(officePreviewUrl, "_blank");
-      }
-      return;
-    }
-
-    // 非Office文件使用普通预览方式
-    window.open(getPermanentViewUrl.value, "_blank");
-  } catch (err) {
-    console.error("预览文件失败:", err);
-    alert("预览文件失败，请稍后重试");
-  }
-};
-
-/**
- * 下载文件
- * 通过创建隐藏的a元素并模拟点击下载文件
- */
-const downloadFile = () => {
-  try {
-    // 检查是否有永久下载链接
-    if (!props.file.slug) {
-      alert("无法下载：文件没有设置短链接");
-      return;
-    }
-
-    // 提取文件名，用于下载时的文件命名
-    const fileName = props.file.filename || "下载文件";
-
-    // 创建一个隐藏的a标签
-    const link = document.createElement("a");
-    link.href = getPermanentDownloadUrl.value;
-    link.download = fileName; // 设置下载文件名
-    link.setAttribute("target", "_blank"); // 在新窗口打开
-    document.body.appendChild(link);
-
-    // 模拟点击下载
-    link.click();
-
-    // 移除临时创建的元素
-    setTimeout(() => {
-      document.body.removeChild(link);
-    }, 100);
-  } catch (err) {
-    console.error("下载文件失败:", err);
-    // 如果直接下载失败，尝试在新窗口打开下载链接
-    if (props.file.slug) {
-      window.open(getPermanentDownloadUrl.value, "_blank");
-    } else {
-      window.open(props.file.s3_url, "_blank");
-    }
-  }
 };
 
 /**

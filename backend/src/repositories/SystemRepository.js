@@ -117,36 +117,32 @@ export class SystemRepository extends BaseRepository {
 
   /**
    * 清理过期数据
+   * 使用各个Repository的专门方法，避免重复SQL逻辑
    * @returns {Promise<Object>} 清理结果
    */
   async cleanupExpiredData() {
-    const now = new Date().toISOString();
+    const now = new Date();
     let totalCleaned = 0;
 
-    // 清理过期的文本分享
-    const expiredPastes = await this.execute(
-      `DELETE FROM ${DbTables.PASTES}
-       WHERE expires_at IS NOT NULL AND expires_at < ?`,
-      [now]
-    );
-    const pastesCount = expiredPastes.meta?.changes || 0;
+    // 使用PasteRepository的专门方法清理过期文本分享
+    const PasteRepository = require("./PasteRepository");
+    const pasteRepo = new PasteRepository(this.db);
+
+    const expiredPastesResult = await pasteRepo.deleteExpired(now);
+    const pastesCount = expiredPastesResult.deletedCount;
     totalCleaned += pastesCount;
 
-    // 清理过期的API密钥
-    const expiredApiKeys = await this.execute(
-      `DELETE FROM ${DbTables.API_KEYS}
-       WHERE expires_at IS NOT NULL AND expires_at < ?`,
-      [now]
-    );
-    const apiKeysCount = expiredApiKeys.meta?.changes || 0;
+    // 使用ApiKeyRepository的专门方法清理过期API密钥
+    const ApiKeyRepository = require("./ApiKeyRepository");
+    const apiKeyRepo = new ApiKeyRepository(this.db);
+
+    const expiredApiKeysResult = await apiKeyRepo.deleteExpired(now);
+    const apiKeysCount = expiredApiKeysResult.deletedCount;
     totalCleaned += apiKeysCount;
 
-    // 清理超过最大查看次数的文本分享
-    const overLimitPastes = await this.execute(
-      `DELETE FROM ${DbTables.PASTES}
-       WHERE max_views IS NOT NULL AND max_views > 0 AND views >= max_views`
-    );
-    const overLimitCount = overLimitPastes.meta?.changes || 0;
+    // 使用PasteRepository的专门方法清理超限文本分享
+    const overLimitResult = await pasteRepo.deleteOverViewLimit();
+    const overLimitCount = overLimitResult.deletedCount;
     totalCleaned += overLimitCount;
 
     return {
@@ -202,7 +198,7 @@ export class SystemRepository extends BaseRepository {
     return await this.updateGroupSettings(1, settings, { validateType: true });
   }
 
-  // ==================== 新增：分组和类型化设置管理方法 ====================
+  // ==================== 分组和类型化设置管理方法 ====================
 
   /**
    * 按分组获取设置项
@@ -357,6 +353,8 @@ export class SystemRepository extends BaseRepository {
       [SETTING_GROUPS.GLOBAL]: "全局设置",
       [SETTING_GROUPS.WEBDAV]: "WebDAV设置",
       [SETTING_GROUPS.SYSTEM]: "系统设置",
+      [SETTING_GROUPS.PREVIEW]: "预览设置",
+      [SETTING_GROUPS.SITE]: "站点设置",
     };
     return groupNames[groupId] || `未知分组(${groupId})`;
   }

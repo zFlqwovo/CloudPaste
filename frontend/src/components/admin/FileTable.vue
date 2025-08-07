@@ -1,225 +1,19 @@
 <template>
-  <div class="w-full">
-    <!-- 桌面端表格组件 - 中等及以上设备显示 -->
-    <div class="hidden md:block flex-1 overflow-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
-        <thead class="bg-gray-50 dark:bg-gray-700">
-          <tr>
-            <!-- 全选复选框列 -->
-            <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-10">
-              <div class="flex items-center">
-                <input
-                  type="checkbox"
-                  :checked="files.length > 0 && selectedFiles.length === files.length"
-                  @change="$emit('toggle-select-all')"
-                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
-                />
-              </div>
-            </th>
-            <!-- 各列标题 -->
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">文件名</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">MIME类型</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden sm:table-cell">大小</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden xl:table-cell">剩余次数</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">存储配置</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">创建者</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden sm:table-cell">创建时间</th>
-            <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">操作</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          <tr v-if="files.length === 0">
-            <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400" colspan="8">暂无文件数据</td>
-          </tr>
-          <tr v-for="file in files" :key="file.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-            <td class="px-2 py-4 whitespace-nowrap">
-              <div class="flex items-center">
-                <input
-                  type="checkbox"
-                  :checked="selectedFiles.includes(file.id)"
-                  @change="$emit('toggle-select', file.id)"
-                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
-                />
-              </div>
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4">
-              <div class="flex flex-col">
-                <div class="flex items-center">
-                  <!-- 文件图标 -->
-                  <div class="flex-shrink-0 mr-2 w-5 h-5">
-                    <span v-html="getFileIconClassLocal(file)"></span>
-                  </div>
-                  <!-- 文件名 -->
-                  <span class="font-medium truncate max-w-xs" :title="file.filename">{{ truncateFilename(file.filename) }}</span>
-                  <span v-if="file.has_password" class="ml-2" :title="'密码保护'">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-4 w-4"
-                      :class="darkMode ? 'text-yellow-400' : 'text-yellow-600'"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                  </span>
-                </div>
-                <span class="text-xs mt-1 truncate max-w-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
-                  {{ file.slug ? `/${file.slug}` : "无短链接" }}
-                </span>
-                <span v-if="file.remark" class="text-xs mt-1 italic truncate max-w-xs" :class="darkMode ? 'text-blue-400' : 'text-blue-600'">
-                  {{ file.remark }}
-                </span>
-              </div>
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4 whitespace-nowrap text-sm hidden md:table-cell">
-              <span class="px-2 py-1 text-xs rounded" :class="getMimeTypeClass(file)">
-                {{ getSimpleMimeType(file.mimetype, file.filename, file) }}
-              </span>
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4 whitespace-nowrap text-sm hidden sm:table-cell">
-              {{ formatFileSize(file.size) }}
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4 whitespace-nowrap text-sm hidden xl:table-cell">
-              <div class="flex flex-col">
-                <span :class="getRemainingViewsClass(file)">{{
-                  getRemainingViews(file) === "无限制" ? "无限制" : getRemainingViews(file) === "已用完" ? "已用完" : `${getRemainingViews(file)} 次`
-                }}</span>
-                <span v-if="file.views && file.max_views" class="text-xs mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
-                  已用: {{ file.views || 0 }}/{{ file.max_views }}
-                </span>
-                <span v-if="file.expires_at" class="text-xs mt-1" :class="expiresClass(file.expires_at)">
-                  {{ formatExpiry(file.expires_at) }}
-                </span>
-              </div>
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4 whitespace-nowrap text-sm hidden lg:table-cell">
-              <div class="flex flex-col">
-                <span>{{ file.storage_config_name || "默认存储" }}</span>
-                <span class="text-xs mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
-                  {{ file.storage_provider_type || "未知" }}
-                </span>
-              </div>
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4 whitespace-nowrap text-sm hidden lg:table-cell">
-              <div class="flex flex-col items-center">
-                <span
-                  v-if="file.created_by && file.created_by.startsWith('apikey:')"
-                  class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 inline-block text-center w-fit"
-                >
-                  {{ file.key_name ? `密钥：${file.key_name}` : `密钥：${file.created_by.substring(7, 12)}...` }}
-                </span>
-                <span
-                  v-else-if="file.created_by"
-                  class="px-2 py-1 text-xs rounded bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 inline-block text-center w-fit"
-                >
-                  管理员
-                </span>
-                <span v-else class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 inline-block text-center w-fit"> 未知来源 </span>
-              </div>
-            </td>
-            <td :class="darkMode ? 'text-gray-300' : 'text-gray-900'" class="px-3 py-4 whitespace-nowrap text-sm hidden sm:table-cell">
-              {{ formatDate(file.created_at) }}
-            </td>
-            <td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <div class="flex space-x-2">
-                <button @click="$emit('preview', file)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                  <span class="sr-only">预览</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                </button>
-                <button @click="$emit('edit', file)" class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
-                  <span class="sr-only">编辑</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
-                </button>
-                <button @click="$emit('generate-qr', file)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                  <span class="sr-only">二维码</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                    />
-                  </svg>
-                </button>
-                <button @click="openFileLink(file)" class="text-amber-600 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300">
-                  <span class="sr-only">跳转</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </button>
-                <button @click="copyFileLink(file)" class="text-cyan-600 hover:text-cyan-900 dark:text-cyan-400 dark:hover:text-cyan-300 relative">
-                  <span class="sr-only">复制链接</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <!-- 文件复制成功提示 -->
-                  <span v-if="copiedFiles[file.id]" class="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap">
-                    已复制
-                  </span>
-                </button>
-                <!-- 复制永久直链按钮 -->
-                <button @click="copyPermanentLink(file)" class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300 relative">
-                  <span class="sr-only">复制直链</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 015.656 0l4 4a4 4 0 01-5.656 5.656l-1.102-1.101" />
-                  </svg>
-                  <!-- 永久链接复制成功提示 -->
-                  <span
-                    v-if="copiedPermanentFiles[file.id]"
-                    class="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap"
-                  >
-                    已复制直链
-                  </span>
-                </button>
-                <button @click="$emit('delete', file.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                  <span class="sr-only">删除</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- 移动端卡片组件 - 小于中等设备显示 -->
-    <div class="md:hidden flex-1 overflow-auto">
-      <div v-if="files.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">暂无文件数据</div>
-      <div v-for="file in files" :key="file.id" class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 last:border-b-0">
+  <AdminTable
+    :data="files"
+    :columns="fileColumns"
+    :column-classes="fileColumnClasses"
+    :manual-sorting="false"
+    :selectable="true"
+    :selected-items="selectedFiles"
+    row-id-field="id"
+    empty-text="暂无文件数据"
+    :loading="loading"
+    @selection-change="handleSelectionChange"
+  >
+    <template #mobile="{ data }">
+      <!-- 移动端卡片组件 - 小于中等设备显示 -->
+      <div v-for="file in data" :key="file.id" class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 last:border-b-0">
         <!-- 卡片头部 - 复选框和文件名 -->
         <div class="p-3 border-b border-gray-200 dark:border-gray-700">
           <div class="flex items-start">
@@ -227,7 +21,7 @@
               <input
                 type="checkbox"
                 :checked="selectedFiles.includes(file.id)"
-                @change="$emit('toggle-select', file.id)"
+                @click="handleMobileSelect(file.id)"
                 class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
               />
             </div>
@@ -368,7 +162,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </button>
-          <button @click="copyFileLink(file)" class="p-2 rounded-md relative" :class="darkMode ? 'bg-gray-700 text-cyan-400' : 'bg-gray-100 text-cyan-600'">
+          <button @click="emit('copy-link', file)" class="p-2 rounded-md relative" :class="darkMode ? 'bg-gray-700 text-cyan-400' : 'bg-gray-100 text-cyan-600'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 stroke-linecap="round"
@@ -378,18 +172,18 @@
               />
             </svg>
             <!-- 移动端复制成功提示 -->
-            <span v-if="copiedFiles[file.id]" class="absolute -top-8 right-0 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap"> 已复制 </span>
+            <span v-if="props.copiedFiles[file.id]" class="absolute -top-8 right-0 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap"> 已复制 </span>
           </button>
           <!-- 移动端复制永久直链按钮 -->
-          <button @click="copyPermanentLink(file)" class="p-2 rounded-md relative" :class="darkMode ? 'bg-gray-700 text-purple-400' : 'bg-gray-100 text-purple-600'">
+          <button @click="emit('copy-permanent-link', file)" class="p-2 rounded-md relative" :class="darkMode ? 'bg-gray-700 text-purple-400' : 'bg-gray-100 text-purple-600'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 015.656 0l4 4a4 4 0 01-5.656 5.656l-1.102-1.101" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 715.656 0l4 4a4 4 0 01-5.656 5.656l-1.102-1.101" />
             </svg>
             <!-- 移动端永久链接复制成功提示 -->
-            <span v-if="copiedPermanentFiles[file.id]" class="absolute -top-8 right-0 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap"> 已复制直链 </span>
+            <span v-if="props.copiedPermanentFiles[file.id]" class="absolute -top-8 right-0 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap"> 已复制直链 </span>
           </button>
-          <button @click="$emit('delete', file.id)" class="p-2 rounded-md" :class="darkMode ? 'bg-gray-700 text-red-400' : 'bg-gray-100 text-red-600'">
+          <button @click="$emit('delete', file)" class="p-2 rounded-md" :class="darkMode ? 'bg-gray-700 text-red-400' : 'bg-gray-100 text-red-600'">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 stroke-linecap="round"
@@ -401,14 +195,19 @@
           </button>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </AdminTable>
 </template>
 
 <script setup>
-import { defineProps, defineEmits, reactive, computed } from "vue";
+import { defineProps, defineEmits, computed, h } from "vue";
+import AdminTable from "@/components/common/AdminTable.vue";
 import { getDisplayName } from "@/utils/fileTypes.js";
-import { copyToClipboard } from "@/utils/clipboard";
+
+// 导入统一的工具函数
+import { getRemainingViews as getRemainingViewsUtil, getRemainingViewsClass as getRemainingViewsClassUtil, formatFileSize } from "@/utils/fileUtils.js";
+import { getFileIcon } from "@/utils/fileTypeIcons.js";
+import { formatDateTime, formatExpiry as formatExpiryUtil, parseUTCDate } from "@/utils/timeUtils.js";
 
 const props = defineProps({
   files: {
@@ -425,49 +224,454 @@ const props = defineProps({
   },
   userType: {
     type: String,
-    default: "admin", // 默认为管理员
+    default: "admin",
+  },
+  copiedFiles: {
+    type: Object,
+    default: () => ({}),
+  },
+  copiedPermanentFiles: {
+    type: Object,
+    default: () => ({}),
+  },
+
+  loading: {
+    type: Boolean,
+    default: false,
   },
 });
 
-// 检查当前用户是否为管理员
 const isAdmin = computed(() => props.userType === "admin");
+const emit = defineEmits(["toggle-select", "toggle-select-all", "preview", "edit", "delete", "generate-qr", "copy-link", "copy-permanent-link"]);
 
-defineEmits(["toggle-select", "toggle-select-all", "preview", "edit", "delete", "generate-qr"]);
+// 定义表格列（简化配置）
+const fileColumns = computed(() => [
+  // 文件名列
+  {
+    key: "filename",
+    type: "accessor",
+    header: "文件名",
+    sortable: true,
+    render: (_, file) => {
+      return h("div", { class: "flex flex-col" }, [
+        h("div", { class: "flex items-center" }, [
+          h("div", {
+            class: "flex-shrink-0 mr-2 w-5 h-5",
+            innerHTML: getFileIconClassLocal(file),
+          }),
+          h(
+            "span",
+            {
+              class: "font-medium truncate max-w-xs",
+              title: file.filename,
+            },
+            truncateFilename(file.filename)
+          ),
+          file.has_password &&
+            h(
+              "span",
+              {
+                class: `ml-2 h-4 w-4 ${props.darkMode ? "text-yellow-400" : "text-yellow-600"}`,
+                title: "密码保护",
+              },
+              "🔒"
+            ),
+        ]),
+        h(
+          "span",
+          {
+            class: `text-xs mt-1 truncate max-w-xs ${props.darkMode ? "text-gray-400" : "text-gray-500"}`,
+          },
+          file.slug ? `/${file.slug}` : "无短链接"
+        ),
+        file.remark &&
+          h(
+            "span",
+            {
+              class: `text-xs mt-1 italic truncate max-w-xs ${props.darkMode ? "text-blue-400" : "text-blue-600"}`,
+            },
+            file.remark
+          ),
+      ]);
+    },
+  },
 
-// 使用reactive对象记录每个文件的复制状态
-const copiedFiles = reactive({});
-// 使用reactive对象记录每个文件的永久链接复制状态
-const copiedPermanentFiles = reactive({});
+  // MIME类型列
+  {
+    key: "mimetype",
+    type: "accessor",
+    header: "MIME类型",
+    sortable: true,
+    render: (_, file) => {
+      return h(
+        "span",
+        {
+          class: `px-2 py-1 text-xs rounded ${getMimeTypeClass(file)}`,
+        },
+        getSimpleMimeType(file.mimetype, file.filename, file)
+      );
+    },
+  },
 
-// 导入统一的工具函数
-import { getRemainingViews as getRemainingViewsUtil, getRemainingViewsClass as getRemainingViewsClassUtil, formatFileSize } from "@/utils/fileUtils.js";
-import { getFileIcon } from "@/utils/fileTypeIcons.js";
+  // 文件大小列
+  {
+    key: "size",
+    type: "accessor",
+    header: "大小",
+    sortable: true,
+    render: (value) => formatFileSize(value),
+  },
 
-/**
- * 计算剩余可访问次数
- * @param {Object} file - 文件对象
- * @returns {string|number} 剩余访问次数或状态描述
- */
+  // 剩余次数列
+  {
+    key: "remaining_views",
+    type: "display",
+    header: "剩余次数",
+    sortable: false,
+    render: (file) => {
+      const remaining = getRemainingViews(file);
+
+      // 确定显示文本
+      let displayText;
+      if (remaining === "无限制") {
+        displayText = "无限制";
+      } else if (remaining === "已用完") {
+        displayText = "已用完";
+      } else {
+        displayText = `${remaining} 次`;
+      }
+
+      const children = [h("span", { class: getRemainingViewsClass(file) }, displayText)];
+
+      // 只有当文件有访问次数限制时才显示已用次数
+      if (file.views && file.max_views) {
+        children.push(
+          h(
+            "span",
+            {
+              class: `text-xs mt-1 ${props.darkMode ? "text-gray-400" : "text-gray-500"}`,
+            },
+            `已用: ${file.views || 0}/${file.max_views}`
+          )
+        );
+      }
+
+      // 只有当文件有过期时间时才显示过期时间
+      if (file.expires_at) {
+        children.push(
+          h(
+            "span",
+            {
+              class: `text-xs mt-1 ${expiresClass(file.expires_at)}`,
+            },
+            formatExpiry(file.expires_at)
+          )
+        );
+      }
+
+      return h("div", { class: "flex flex-col" }, children);
+    },
+  },
+
+  // 存储配置列
+  {
+    key: "storage_config",
+    type: "display",
+    header: "存储配置",
+    sortable: false,
+    render: (file) => {
+      return h("div", { class: "flex flex-col" }, [
+        h("span", {}, file.storage_config_name || "默认存储"),
+        h(
+          "span",
+          {
+            class: `text-xs mt-1 ${props.darkMode ? "text-gray-400" : "text-gray-500"}`,
+          },
+          file.storage_provider_type || "未知"
+        ),
+      ]);
+    },
+  },
+
+  // 创建者列
+  {
+    key: "created_by",
+    type: "display",
+    header: "创建者",
+    sortable: false,
+    render: (file) => {
+      let badgeClass, text;
+
+      if (file.created_by && file.created_by.startsWith("apikey:")) {
+        badgeClass = "px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100";
+        text = file.key_name ? `密钥：${file.key_name}` : `密钥：${file.created_by.substring(7, 12)}...`;
+      } else if (file.created_by) {
+        badgeClass = "px-2 py-1 text-xs rounded bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100";
+        text = "管理员";
+      } else {
+        badgeClass = "px-2 py-1 text-xs rounded bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+        text = "未知来源";
+      }
+
+      return h("span", { class: `${badgeClass} inline-block text-center w-fit` }, text);
+    },
+  },
+
+  // 创建时间列
+  {
+    key: "created_at",
+    type: "accessor",
+    header: "创建时间",
+    sortable: true,
+    render: (value) => formatDate(value),
+  },
+
+  // 操作列
+  {
+    key: "actions",
+    type: "display",
+    header: "操作",
+    sortable: false,
+    render: (file) => {
+      const actions = [
+        {
+          title: "预览",
+          event: () => emit("preview", file),
+          color: "text-blue-600 hover:text-blue-900 dark:text-blue-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M15 12a3 3 0 11-6 0 3 3 0 016 0z" }),
+              h("path", {
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round",
+                "stroke-width": "2",
+                d: "M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
+              }),
+            ]
+          ),
+        },
+        {
+          title: "编辑",
+          event: () => emit("edit", file),
+          color: "text-green-600 hover:text-green-900 dark:text-green-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", {
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round",
+                "stroke-width": "2",
+                d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
+              }),
+            ]
+          ),
+        },
+        {
+          title: "二维码",
+          event: () => emit("generate-qr", file),
+          color: "text-indigo-600 hover:text-indigo-900 dark:text-indigo-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", {
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round",
+                "stroke-width": "2",
+                d: "M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z",
+              }),
+            ]
+          ),
+        },
+        {
+          title: "跳转",
+          event: () => openFileLink(file),
+          color: "text-amber-600 hover:text-amber-900 dark:text-amber-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", {
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round",
+                "stroke-width": "2",
+                d: "M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14",
+              }),
+            ]
+          ),
+        },
+        {
+          title: "复制链接",
+          event: () => emit("copy-link", file),
+          color: "text-cyan-600 hover:text-cyan-900 dark:text-cyan-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", {
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round",
+                "stroke-width": "2",
+                d: "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z",
+              }),
+            ]
+          ),
+        },
+        {
+          title: "复制直链",
+          event: () => emit("copy-permanent-link", file),
+          color: "text-purple-600 hover:text-purple-900 dark:text-purple-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" }),
+              h("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M10.172 13.828a4 4 0 015.656 0l4 4a4 4 0 01-5.656 5.656l-1.102-1.101" }),
+            ]
+          ),
+        },
+      ];
+
+      if (isAdmin.value) {
+        actions.push({
+          title: "删除",
+          event: () => emit("delete", file),
+          color: "text-red-600 hover:text-red-900 dark:text-red-400",
+          svg: h(
+            "svg",
+            {
+              xmlns: "http://www.w3.org/2000/svg",
+              class: "h-5 w-5",
+              fill: "none",
+              viewBox: "0 0 24 24",
+              stroke: "currentColor",
+            },
+            [
+              h("path", {
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round",
+                "stroke-width": "2",
+                d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
+              }),
+            ]
+          ),
+        });
+      }
+
+      return h(
+        "div",
+        { class: "flex space-x-2" },
+        actions.map((action) =>
+          h(
+            "button",
+            {
+              onClick: action.event,
+              class: `${action.color} relative`,
+              title: action.title,
+            },
+            [
+              h("span", { class: "sr-only" }, action.title),
+              action.svg,
+              // 添加复制反馈提示
+              action.title === "复制链接" && props.copiedFiles[file.id]
+                ? h(
+                    "span",
+                    {
+                      class: "absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap",
+                    },
+                    "已复制"
+                  )
+                : null,
+              action.title === "复制直链" && props.copiedPermanentFiles[file.id]
+                ? h(
+                    "span",
+                    {
+                      class: "absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 text-xs text-white bg-green-500 rounded whitespace-nowrap",
+                    },
+                    "已复制直链"
+                  )
+                : null,
+            ]
+          )
+        )
+      );
+    },
+  },
+]);
+
+// 列样式配置
+const fileColumnClasses = {
+  select: "w-10",
+  mimetype: "hidden md:table-cell",
+  size: "hidden sm:table-cell",
+  remaining_views: "hidden xl:table-cell",
+  storage_config: "hidden lg:table-cell",
+  created_by: "hidden lg:table-cell",
+  created_at: "hidden sm:table-cell",
+};
+
+// 处理选择变化
+const handleSelectionChange = (event) => {
+  if (event.type === "toggle-all") {
+    emit("toggle-select-all");
+  } else if (event.type === "toggle-item") {
+    emit("toggle-select", event.id);
+  }
+};
+
+// 处理移动端选择
+const handleMobileSelect = (fileId) => {
+  emit("toggle-select", fileId);
+};
+
+// 工具函数 - 从原FileTable.vue复制
 const getRemainingViews = (file) => {
-  return getRemainingViewsUtil(file); // 不传t函数，使用中文
+  return getRemainingViewsUtil(file);
 };
 
-/**
- * 获取剩余次数显示的样式类
- * @param {Object} file - 文件对象
- * @returns {string} 样式类名
- */
 const getRemainingViewsClass = (file) => {
-  return getRemainingViewsClassUtil(file, props.darkMode); // 不传t函数，使用中文
+  return getRemainingViewsClassUtil(file, props.darkMode);
 };
 
-/**
- * 简化MIME类型显示（优先显示 MIME 类型，再显示后端的 typeName）
- * @param {string} mimeType - 完整MIME类型
- * @param {string} filename - 文件名
- * @param {Object} file - 文件对象（包含后端返回的 typeName）
- * @returns {string} 简化的MIME类型
- */
 const getSimpleMimeType = (mimeType, filename, file) => {
   // 优先显示 mimeType，再显示后端的 typeName
   if (mimeType && mimeType !== "application/octet-stream") {
@@ -480,23 +684,16 @@ const getSimpleMimeType = (mimeType, filename, file) => {
   }
 
   // 最后回退：显示文件名（去掉扩展名）
-  return filename ? getDisplayName(filename) : "未知文件";
+  return filename && typeof filename === "string" ? getDisplayName(filename) : "未知文件";
 };
 
-/**
- * 根据文件类型获取样式类（基于后端返回的 type 字段）
- * @param {Object} file - 文件对象（包含后端返回的 type 字段）
- * @returns {string} 样式类名
- */
 const getMimeTypeClass = (file) => {
-  const type = file?.type;
-
-  // 根据文件类型返回不同的颜色
+  const type = file.type || 0;
   switch (type) {
-    case 1: // FOLDER
-      return props.darkMode ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-800";
-    case 2: // VIDEO
+    case 1: // VIDEO
       return props.darkMode ? "bg-purple-900/50 text-purple-300" : "bg-purple-100 text-purple-800";
+    case 2: // ARCHIVE
+      return props.darkMode ? "bg-orange-900/50 text-orange-300" : "bg-orange-100 text-orange-800";
     case 3: // AUDIO
       return props.darkMode ? "bg-green-900/50 text-green-300" : "bg-green-100 text-green-800";
     case 4: // TEXT
@@ -510,41 +707,21 @@ const getMimeTypeClass = (file) => {
   }
 };
 
-/**
- * 获取文件图标HTML（使用后端返回的type字段）
- * @param {Object} file - 文件对象（包含type字段）
- * @returns {string} SVG图标HTML字符串
- */
 const getFileIconClassLocal = (file) => {
-  // 直接使用后端返回的type字段
   const fileItem = {
     name: file.filename,
     filename: file.filename,
     isDirectory: false,
     type: file.type,
   };
-
   return getFileIcon(fileItem, props.darkMode);
 };
 
-// 导入统一的时间处理工具
-import { formatDateTime, formatExpiry as formatExpiryUtil, parseUTCDate } from "@/utils/timeUtils.js";
-
-/**
- * 格式化日期
- * @param {string} dateString - UTC 时间字符串
- * @returns {string} 格式化后的本地时间字符串
- */
 const formatDate = (dateString) => {
   if (!dateString) return "未知";
   return formatDateTime(dateString);
 };
 
-/**
- * 根据过期状态返回相应的样式类
- * @param {string} expiresAt - UTC 过期时间字符串
- * @returns {string} 样式类名
- */
 const expiresClass = (expiresAt) => {
   if (!expiresAt) return props.darkMode ? "text-gray-400" : "text-gray-500";
 
@@ -567,53 +744,17 @@ const expiresClass = (expiresAt) => {
   return props.darkMode ? "text-green-400" : "text-green-600";
 };
 
-/**
- * 格式化过期时间显示
- * @param {string} expiresAt - UTC 过期时间字符串
- * @returns {string} 格式化后的过期提示
- */
 const formatExpiry = (expiresAt) => {
   if (!expiresAt) return "";
   return formatExpiryUtil(expiresAt);
 };
 
-/**
- * 复制文件分享链接
- * @param {Object} file - 文件对象
- */
-const copyFileLink = async (file) => {
-  if (!file || !file.slug) {
-    alert("该文件没有有效的分享链接");
-    return;
-  }
-
-  try {
-    const baseUrl = window.location.origin;
-    const fileUrl = `${baseUrl}/file/${file.slug}`;
-
-    const success = await copyToClipboard(fileUrl);
-
-    if (success) {
-      // 为特定文件设置复制成功状态
-      copiedFiles[file.id] = true;
-
-      // 3秒后清除状态
-      setTimeout(() => {
-        copiedFiles[file.id] = false;
-      }, 2000);
-    } else {
-      throw new Error("复制失败");
-    }
-  } catch (err) {
-    console.error("复制链接失败:", err);
-    alert("复制链接失败，请手动复制");
-  }
+const truncateFilename = (filename) => {
+  if (!filename || typeof filename !== "string") return "";
+  if (filename.length <= 20) return filename;
+  return filename.substring(0, 20) + "...";
 };
 
-/**
- * 在新标签页中打开文件链接
- * @param {Object} file - 文件对象
- */
 const openFileLink = (file) => {
   if (!file || !file.slug) {
     alert("该文件没有有效的分享链接");
@@ -622,131 +763,6 @@ const openFileLink = (file) => {
 
   const baseUrl = window.location.origin;
   const fileUrl = `${baseUrl}/file/${file.slug}`;
-
-  // 在新标签页中打开链接
   window.open(fileUrl, "_blank");
-};
-
-/**
- * 截断文件名，只显示前20个字符
- * @param {string} filename - 完整文件名
- * @returns {string} 截断后的文件名
- */
-const truncateFilename = (filename) => {
-  if (!filename) return "";
-  if (filename.length <= 20) return filename;
-  return filename.substring(0, 20) + "...";
-};
-
-/**
- * 辅助函数：获取文件密码
- * 从多个可能的来源获取密码
- * @param {Object} file - 文件对象
- * @returns {string|null} 文件密码或null
- */
-const getFilePassword = (file) => {
-  // 优先使用文件信息中存储的明文密码
-  if (file.plain_password) {
-    return file.plain_password;
-  }
-
-  // 其次检查当前密码字段
-  if (file.currentPassword) {
-    return file.currentPassword;
-  }
-
-  // 尝试从URL获取密码参数
-  const currentUrl = new URL(window.location.href);
-  const passwordParam = currentUrl.searchParams.get("password");
-  if (passwordParam) {
-    return passwordParam;
-  }
-
-  // 最后尝试从会话存储中获取密码
-  try {
-    if (file.slug) {
-      const sessionPassword = sessionStorage.getItem(`file_password_${file.slug}`);
-      if (sessionPassword) {
-        return sessionPassword;
-      }
-    }
-  } catch (err) {
-    console.error("从会话存储获取密码出错:", err);
-  }
-
-  return null;
-};
-
-/**
- * 复制文件的永久下载链接到剪贴板
- * @param {Object} file - 文件对象
- */
-const copyPermanentLink = async (file) => {
-  if (!file || !file.slug) {
-    alert("该文件没有有效的永久链接");
-    return;
-  }
-
-  try {
-    let permanentDownloadUrl;
-    let fileWithUrls = file;
-
-    // 如果文件对象中没有urls属性或者proxyDownloadUrl，先获取完整的文件详情
-    if (!file.urls || !file.urls.proxyDownloadUrl) {
-      try {
-        // 导入API函数
-        const { api } = await import("@/api");
-
-        // 使用组件级别的isAdmin计算属性判断用户角色
-        console.log(`当前用户类型: ${props.userType}, 是否管理员: ${isAdmin.value}`);
-
-        // 调用统一的API
-        const response = await api.file.getFile(file.id);
-
-        if (response.success && response.data) {
-          fileWithUrls = response.data;
-        } else {
-          throw new Error(response.message || "获取文件详情失败");
-        }
-      } catch (error) {
-        console.error("获取文件详情失败:", error);
-        alert("无法获取文件直链，请确认您已登录并刷新页面后重试");
-        return;
-      }
-    }
-
-    // 使用后端返回的代理URL
-    if (fileWithUrls.urls && fileWithUrls.urls.proxyDownloadUrl) {
-      // 使用后端返回的完整代理URL
-      permanentDownloadUrl = fileWithUrls.urls.proxyDownloadUrl;
-
-      // 获取文件密码
-      const filePassword = getFilePassword(fileWithUrls);
-
-      // 如果文件有密码保护且URL中没有密码参数，添加密码参数
-      if (fileWithUrls.has_password && filePassword && !permanentDownloadUrl.includes("password=")) {
-        permanentDownloadUrl += permanentDownloadUrl.includes("?") ? `&password=${encodeURIComponent(filePassword)}` : `?password=${encodeURIComponent(filePassword)}`;
-      }
-
-      const success = await copyToClipboard(permanentDownloadUrl);
-
-      if (success) {
-        // 为特定文件设置复制成功状态
-        copiedPermanentFiles[file.id] = true;
-
-        // 3秒后清除状态
-        setTimeout(() => {
-          copiedPermanentFiles[file.id] = false;
-        }, 2000);
-      } else {
-        throw new Error("复制失败");
-      }
-    } else {
-      throw new Error("无法获取文件代理链接");
-    }
-  } catch (err) {
-    console.error("复制永久下载链接失败:", err);
-    alert(`复制永久下载链接失败: ${err.message || "未知错误"}`);
-  }
 };
 </script>

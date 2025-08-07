@@ -7,8 +7,9 @@
         <h2 class="text-lg font-medium text-gray-900 dark:text-white">文件管理</h2>
         <!-- 刷新按钮 - 在所有屏幕尺寸显示 -->
         <button
+          type="button"
           class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          @click="loadFiles"
+          @click.prevent="loadFiles"
           :disabled="loading"
         >
           <svg xmlns="http://www.w3.org/2000/svg" :class="['h-3 w-3 sm:h-4 sm:w-4 mr-1', loading ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -30,6 +31,20 @@
         </button>
       </div>
 
+      <!-- 搜索框 -->
+      <div class="w-full">
+        <GlobalSearchBox
+          v-model="globalSearchValue"
+          placeholder="搜索文件（支持文件名、链接、备注）"
+          :show-hint="true"
+          search-hint="服务端搜索，支持模糊匹配"
+          size="md"
+          :debounce-ms="300"
+          @search="handleGlobalSearch"
+          @clear="clearGlobalSearch"
+        />
+      </div>
+
       <!-- 统计信息和操作按钮 -->
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
         <div class="text-sm text-gray-600 dark:text-gray-400">
@@ -43,7 +58,8 @@
           >
             <span class="mr-2">仅删除记录</span>
             <button
-              @click="deleteSettingsStore.toggleDeleteMode"
+              type="button"
+              @click.prevent="deleteSettingsStore.toggleDeleteMode"
               class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               :class="deleteSettingsStore.deleteRecordOnly ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'"
             >
@@ -56,7 +72,8 @@
 
           <!-- 批量删除按钮 -->
           <button
-            @click="deleteSelectedFiles"
+            type="button"
+            @click.prevent="handleBatchDelete"
             :disabled="selectedFiles.length === 0"
             :class="[
               'inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-xs sm:text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 flex-grow sm:flex-grow-0',
@@ -114,26 +131,47 @@
           :dark-mode="darkMode"
           :selected-files="selectedFiles"
           :user-type="props.userType"
+          :copied-files="copiedFiles"
+          :copied-permanent-files="copiedPermanentFiles"
+          :loading="loading || searchLoading"
           @toggle-select="toggleSelectItem"
           @toggle-select-all="toggleSelectAll"
           @edit="openEditModal"
           @preview="openPreviewModal"
           @delete="handleFileDelete"
-          @generate-qr="generateQRCode"
+          @generate-qr="(file) => generateQRCode(file, darkMode)"
+          @copy-link="copyFileLink"
+          @copy-permanent-link="copyPermanentLink"
         />
       </div>
     </div>
 
-    <!-- 分页组件 -->
+    <!-- 分页组件（搜索和正常模式统一显示） -->
     <div class="mt-2 mb-4 sm:mt-4 sm:mb-0">
-      <CommonPagination :dark-mode="darkMode" :pagination="pagination" mode="offset" @offset-changed="handleOffsetChange" />
+      <CommonPagination
+        :dark-mode="darkMode"
+        :pagination="pagination"
+        :page-size-options="pageSizeOptions"
+        :search-mode="isSearchMode"
+        :search-term="globalSearchValue"
+        mode="offset"
+        @offset-changed="handleOffsetChangeWithSearch"
+        @limit-changed="handlePageSizeChange"
+      />
     </div>
 
     <!-- 编辑文件元数据弹窗 -->
     <FileEditModal v-if="showEdit" :file="editingFile" :dark-mode="darkMode" @close="showEdit = false" @save="updateFileMetadata" />
 
     <!-- 文件预览弹窗 -->
-    <FilePreviewModal v-if="showPreview" :file="previewFile" :dark-mode="darkMode" @close="showPreview = false" />
+    <FilePreviewModal
+      v-if="showPreview"
+      :file="previewFile"
+      :dark-mode="darkMode"
+      @close="showPreview = false"
+      @preview-file="previewFileInNewWindow"
+      @download-file="downloadFileDirectly"
+    />
 
     <!-- 二维码弹窗 -->
     <QRCodeModal v-if="showQRCodeModal" :qr-code-url="qrCodeDataURL" :file-slug="qrCodeSlug" :dark-mode="darkMode" @close="showQRCodeModal = false" />
@@ -141,10 +179,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from "vue";
-import QRCode from "qrcode";
-import { api } from "@/api";
-import { useDeleteSettingsStore } from "@/stores/deleteSettingsStore.js";
+import { onMounted, ref } from "vue";
+import { useFileManagement } from "@/composables/admin-management";
 
 // 导入子组件
 import FileTable from "@/components/admin/FileTable.vue";
@@ -152,6 +188,7 @@ import CommonPagination from "@/components/common/CommonPagination.vue";
 import FileEditModal from "@/components/file/FileEditModal.vue";
 import FilePreviewModal from "@/components/admin/FilePreviewModal.vue";
 import QRCodeModal from "@/components/admin/QRCodeModal.vue";
+import GlobalSearchBox from "@/components/common/GlobalSearchBox.vue";
 
 /**
  * 组件接收的属性定义
@@ -170,370 +207,167 @@ const props = defineProps({
   },
 });
 
-// 判断用户类型
-const isAdmin = () => props.userType === "admin";
-const isApiKeyUser = () => props.userType === "apikey";
+// 使用文件管理composable
+const {
+  // 状态
+  loading,
+  error,
+  successMessage,
+  selectedItems: selectedFiles,
+  lastRefreshTime,
+  pagination,
+  pageSizeOptions,
+  files,
+  editingFile,
+  previewFile,
+  showEdit,
+  showPreview,
+  showQRCodeModal,
+  qrCodeDataURL,
+  qrCodeSlug,
+  copiedFiles,
+  copiedPermanentFiles,
 
-// 使用统一的API函数（自动根据认证信息处理用户类型）
-const apiGetFiles = (limit, offset, options = {}) => {
-  // 管理员可以传递额外的查询选项
-  if (isAdmin()) {
-    return api.file.getFiles(limit, offset, options);
-  } else {
-    return api.file.getFiles(limit, offset);
-  }
-};
+  // 方法
+  loadFiles,
+  searchFiles,
+  handleOffsetChange,
+  changePageSize,
+  handleFileDelete,
+  handleBatchDelete,
+  openEditModal,
+  updateFileMetadata,
+  openPreviewModal,
+  generateQRCode,
+  copyFileLink,
+  copyPermanentLink,
+  getFilePassword,
+  getOfficePreviewUrl,
+  previewFileInNewWindow,
+  downloadFileDirectly,
+  getPermanentDownloadUrl,
+  getPermanentViewUrl,
+  toggleSelectItem,
+  toggleSelectAll,
+  clearSelection,
+} = useFileManagement(props.userType);
 
-const apiGetFile = (id) => api.file.getFile(id);
-
-const apiUpdateFile = (id, metadata) => api.file.updateFile(id, metadata);
-
-const apiBatchDeleteFiles = (ids) => api.file.batchDeleteFiles(ids);
-
-/**
- * 状态变量定义
- * loading: 数据加载状态
- * error: 错误信息
- * successMessage: 成功消息提示
- * files: 文件数据列表
- * pagination: 分页信息对象
- */
-const loading = ref(false);
-const error = ref("");
-const successMessage = ref("");
-const files = ref([]);
-const pagination = reactive({
-  offset: 0,
-  limit: 8,
-  total: 0,
-  hasMore: false,
-});
-
-// 选中项管理
-const selectedFiles = ref([]);
-
-// 使用全局删除设置
+// 需要在模板中使用的删除设置store
+import { useDeleteSettingsStore } from "@/stores/deleteSettingsStore.js";
 const deleteSettingsStore = useDeleteSettingsStore();
 
-/**
- * 选中/取消选中所有项
- * 如果当前已全选，则取消全选；否则全选
- */
-const toggleSelectAll = () => {
-  if (selectedFiles.value.length === files.value.length) {
-    selectedFiles.value = [];
-  } else {
-    selectedFiles.value = files.value.map((file) => file.id);
+// 全局搜索状态
+const globalSearchValue = ref("");
+
+// 搜索状态
+const isSearchMode = ref(false);
+const searchResults = ref([]);
+const searchLoading = ref(false);
+
+// 智能预加载缓存
+const preloadedData = ref([]);
+const preloadedPages = ref(new Set());
+const maxPreloadPages = 5; // 最多预加载5页数据
+
+// 搜索处理函数 - 使用服务端搜索
+const handleGlobalSearch = async (searchValue) => {
+  globalSearchValue.value = searchValue;
+
+  if (!searchValue || searchValue.trim().length < 2) {
+    // 清除搜索，立即回到正常分页模式
+    isSearchMode.value = false;
+    searchResults.value = [];
+    // 立即重新加载原始数据
+    await loadFiles();
+    console.log("搜索已清除，恢复到原始列表");
+    return;
   }
-};
-
-/**
- * 切换单个项的选中状态
- * @param {string|number} id - 文件的ID
- */
-const toggleSelectItem = (id) => {
-  const index = selectedFiles.value.indexOf(id);
-  if (index === -1) {
-    selectedFiles.value.push(id);
-  } else {
-    selectedFiles.value.splice(index, 1);
-  }
-};
-
-// 预览弹窗相关状态
-const showPreview = ref(false);
-const previewFile = ref(null);
-
-// 修改弹窗相关状态
-const showEdit = ref(false);
-const editingFile = ref(null);
-
-// 最后刷新时间记录
-const lastRefreshTime = ref("");
-
-// 添加二维码相关状态变量
-const showQRCodeModal = ref(false);
-const qrCodeDataURL = ref("");
-const qrCodeSlug = ref("");
-
-// 导入统一的时间处理工具
-import { formatCurrentTime } from "@/utils/timeUtils.js";
-
-/**
- * 更新最后刷新时间
- * 记录数据的最后刷新时间点
- */
-const updateLastRefreshTime = () => {
-  lastRefreshTime.value = formatCurrentTime();
-};
-
-// 更新分页信息
-const updatePagination = (data) => {
-  if (data?.pagination) {
-    pagination.total = data.pagination.total;
-    pagination.hasMore = data.pagination.hasMore;
-  }
-};
-
-/**
- * 处理偏移量变化
- * @param {number} newOffset - 新的偏移量
- */
-const handleOffsetChange = (newOffset) => {
-  pagination.offset = newOffset;
-  loadFiles();
-};
-
-/**
- * 加载文件列表数据
- * 从API获取文件列表数据，支持分页
- */
-const loadFiles = async () => {
-  loading.value = true;
-  error.value = "";
-  successMessage.value = "";
 
   try {
-    const response = await apiGetFiles(pagination.limit, pagination.offset);
+    searchLoading.value = true;
+    isSearchMode.value = true;
 
-    if (response.success) {
-      console.log("🔍 response.data:", response.data);
+    // 重置分页到第一页进行搜索
+    const result = await searchFiles(searchValue.trim(), 0);
 
-      // 检查response.data是否有files字段
-      if (response.data && Array.isArray(response.data.files)) {
-        files.value = response.data.files;
-      } else if (Array.isArray(response.data)) {
-        // 兼容直接返回数组的情况
-        files.value = response.data;
-      } else {
-        console.error("❌ 无效的文件列表数据格式:", response.data);
-        files.value = [];
-      }
-
+    if (result && result.files) {
+      // 搜索模式下，直接更新主要的files状态和分页信息
+      files.value = result.files;
       // 更新分页信息
-      updatePagination(response.data);
-      // 更新最后刷新时间
-      updateLastRefreshTime();
+      if (result.pagination) {
+        pagination.total = result.pagination.total;
+        pagination.offset = result.pagination.offset || 0;
+        pagination.hasMore = result.pagination.hasMore !== undefined ? result.pagination.hasMore : pagination.offset + pagination.limit < pagination.total;
+      }
+      console.log(`文件搜索完成: "${searchValue}", 找到 ${result.pagination?.total || result.files.length} 个结果`);
     } else {
-      error.value = response.message || "加载数据失败";
       files.value = [];
+      pagination.total = 0;
+      pagination.offset = 0;
+      pagination.hasMore = false;
     }
-  } catch (err) {
-    console.error("加载文件列表失败:", err);
-    error.value = err.message || "加载失败，请重试";
+  } catch (error) {
+    console.error("文件搜索失败:", error);
     files.value = [];
+    pagination.total = 0;
+    pagination.offset = 0;
+    pagination.hasMore = false;
   } finally {
-    loading.value = false;
+    searchLoading.value = false;
   }
 };
 
-/**
- * 删除单个文件
- * @param {string|number} id - 要删除的文件ID
- */
-const handleFileDelete = async (id) => {
-  if (!confirm("确定要删除此文件吗？此操作不可恢复。")) {
-    return;
-  }
+const clearGlobalSearch = async () => {
+  globalSearchValue.value = "";
+  isSearchMode.value = false;
+  searchResults.value = [];
 
+  // 立即重新加载正常的文件列表
   try {
-    // 清空之前的消息
-    error.value = "";
-    successMessage.value = "";
-
-    // 使用批量删除接口删除单个文件，传递删除模式
-    const response = await api.file.batchDeleteFiles([id], deleteSettingsStore.getDeleteMode());
-
-    if (response.success) {
-      // 检查批量删除结果
-      if (response.data && response.data.failed && response.data.failed.length > 0) {
-        // 删除失败
-        const failedItem = response.data.failed[0];
-        error.value = failedItem.error || "删除失败";
-      } else {
-        // 删除成功
-        successMessage.value = "删除成功";
-        setTimeout(() => {
-          successMessage.value = "";
-        }, 4000);
-
-        // 重新加载数据
-        loadFiles();
-      }
-    } else {
-      error.value = response.message || "删除失败";
-    }
-  } catch (err) {
-    console.error("删除失败:", err);
-    error.value = err.message || "删除失败，请重试";
+    await loadFiles();
+    console.log("清除文件搜索，已恢复到原始列表");
+  } catch (error) {
+    console.error("清除搜索后重新加载失败:", error);
   }
 };
 
-/**
- * 批量删除选中的文件
- * 删除所有已选中的文件
- */
-const deleteSelectedFiles = async () => {
-  if (selectedFiles.value.length === 0) {
-    alert("请先选择需要删除的文件");
-    return;
-  }
+// 处理分页变化（支持搜索模式）
+const handleOffsetChangeWithSearch = async (newOffset) => {
+  if (isSearchMode.value && globalSearchValue.value) {
+    // 搜索模式下的分页
+    try {
+      searchLoading.value = true;
+      const result = await searchFiles(globalSearchValue.value, newOffset);
 
-  const selectedCount = selectedFiles.value.length;
-
-  if (!confirm(`确定要删除选中的 ${selectedCount} 个文件吗？此操作不可恢复。`)) {
-    return;
-  }
-
-  try {
-    // 清空之前的消息
-    error.value = "";
-    successMessage.value = "";
-
-    // 使用批量删除接口，传递删除模式
-    const result = await api.file.batchDeleteFiles(selectedFiles.value, deleteSettingsStore.getDeleteMode());
-
-    // 检查批量删除结果
-    if (result.success && result.data) {
-      const { success: successCount, failed } = result.data;
-
-      if (failed && failed.length > 0) {
-        // 部分失败
-        const failedCount = failed.length;
-        successMessage.value = `批量删除完成：成功 ${successCount} 个，失败 ${failedCount} 个`;
-
-        // 显示失败的详细信息
-        const failedDetails = failed.map((item) => `ID: ${item.id} - ${item.error}`).join("\n");
-        console.warn("部分文件删除失败:", failedDetails);
-      } else {
-        // 全部成功
-        successMessage.value = `成功删除 ${successCount} 个文件`;
+      if (result && result.files) {
+        files.value = result.files;
+        // 更新分页信息
+        if (result.pagination) {
+          pagination.total = result.pagination.total;
+          pagination.offset = result.pagination.offset || newOffset;
+          pagination.hasMore = result.pagination.hasMore !== undefined ? result.pagination.hasMore : pagination.offset + pagination.limit < pagination.total;
+        }
       }
-    } else {
-      successMessage.value = `成功删除 ${selectedCount} 个文件`;
+    } catch (error) {
+      console.error("搜索分页失败:", error);
+    } finally {
+      searchLoading.value = false;
     }
+  } else {
+    // 正常模式下的分页
+    handleOffsetChange(newOffset);
+  }
+};
 
-    // 清空选中列表
-    selectedFiles.value = [];
-    // 重新加载数据
+// 处理每页数量变化
+const handlePageSizeChange = (newPageSize) => {
+  changePageSize(newPageSize);
+  // 如果在搜索模式，重新搜索
+  if (isSearchMode.value && globalSearchValue.value) {
+    handleGlobalSearch(globalSearchValue.value);
+  } else {
+    // 否则重新加载文件列表
     loadFiles();
-
-    // 自动隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 4000);
-  } catch (err) {
-    console.error("批量删除失败:", err);
-    error.value = err.message || "批量删除失败，请重试";
-  }
-};
-
-/**
- * 打开编辑文件元数据的弹窗
- * @param {object} file - 要编辑的文件对象
- */
-const openEditModal = async (file) => {
-  try {
-    // 加载完整的文件详情
-    const response = await apiGetFile(file.id);
-
-    if (response.success) {
-      editingFile.value = response.data;
-      showEdit.value = true;
-    } else {
-      error.value = response.message || "获取文件详情失败";
-    }
-  } catch (err) {
-    console.error("获取文件详情失败:", err);
-    error.value = err.message || "获取文件详情失败，请重试";
-  }
-};
-
-/**
- * 更新文件元数据
- * @param {object} fileData - 文件更新数据
- */
-const updateFileMetadata = async (fileData) => {
-  try {
-    // 清空之前的消息
-    error.value = "";
-    successMessage.value = "";
-
-    // 调用API更新文件元数据
-    const response = await apiUpdateFile(fileData.id, {
-      remark: fileData.remark,
-      slug: fileData.slug,
-      expires_at: fileData.expires_at,
-      max_views: fileData.max_views,
-      password: fileData.password,
-      use_proxy: fileData.use_proxy,
-    });
-
-    if (response.success) {
-      // 关闭编辑弹窗
-      showEdit.value = false;
-      // 重新加载数据
-      loadFiles();
-      // 显示成功消息
-      successMessage.value = "文件元数据更新成功";
-      setTimeout(() => {
-        successMessage.value = "";
-      }, 4000);
-    } else {
-      error.value = response.message || "更新失败";
-    }
-  } catch (err) {
-    console.error("更新文件元数据失败:", err);
-    error.value = err.message || "更新失败，请重试";
-  }
-};
-
-/**
- * 打开文件预览弹窗
- * @param {object} file - 要预览的文件对象
- */
-const openPreviewModal = async (file) => {
-  try {
-    // 加载完整的文件详情
-    const response = await apiGetFile(file.id);
-
-    if (response.success) {
-      previewFile.value = response.data;
-      showPreview.value = true;
-    } else {
-      error.value = response.message || "获取文件详情失败";
-    }
-  } catch (err) {
-    console.error("获取文件详情失败:", err);
-    error.value = err.message || "获取文件详情失败，请重试";
-  }
-};
-
-/**
- * 生成文件分享二维码
- * @param {object} file - 文件对象
- */
-const generateQRCode = async (file) => {
-  try {
-    // 构建完整的文件URL
-    const baseUrl = window.location.origin;
-    const fileUrl = `${baseUrl}/file/${file.slug}`;
-
-    // 生成二维码
-    qrCodeDataURL.value = await QRCode.toDataURL(fileUrl, {
-      width: 300,
-      margin: 2,
-      color: {
-        dark: props.darkMode ? "#ffffff" : "#000000",
-        light: props.darkMode ? "#000000" : "#ffffff",
-      },
-    });
-
-    qrCodeSlug.value = file.slug;
-    showQRCodeModal.value = true;
-  } catch (err) {
-    console.error("生成二维码失败:", err);
-    error.value = "生成二维码失败";
   }
 };
 

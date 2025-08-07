@@ -305,7 +305,7 @@ export async function verifyPastePassword(db, slug, password, incrementViews = t
   }
 
   return {
-    id: paste.id, 
+    id: paste.id,
     slug: paste.slug,
     content: paste.content,
     remark: paste.remark,
@@ -323,22 +323,26 @@ export async function verifyPastePassword(db, slug, password, incrementViews = t
 /**
  * 获取所有文本分享列表（管理员用）
  * @param {D1Database} db - D1数据库实例
- * @param {number} page - 页码
+ * @param {number} page - 页码（兼容性参数）
  * @param {number} limit - 每页条数
  * @param {string} createdBy - 创建者筛选
+ * @param {string} search - 搜索关键词
+ * @param {number} offset - 偏移量（优先使用）
  * @returns {Promise<Object>} 分页结果
  */
-export async function getAllPastes(db, page = 1, limit = 10, createdBy = null) {
+export async function getAllPastes(db, page = 1, limit = 10, createdBy = null, search = null, offset = null) {
   // 使用 Repository
   const repositoryFactory = new RepositoryFactory(db);
   const pasteRepository = repositoryFactory.getPasteRepository();
   const apiKeyRepository = repositoryFactory.getApiKeyRepository();
 
-  // 使用 PasteRepository 获取管理员列表数据
+  // 使用 PasteRepository 获取管理员列表数据，支持offset模式
   const pasteData = await pasteRepository.findAllForAdmin({
     page,
     limit,
+    offset,
     createdBy,
+    search,
   });
 
   // 处理查询结果，为API密钥创建者添加密钥名称
@@ -385,9 +389,10 @@ export async function getAllPastes(db, page = 1, limit = 10, createdBy = null) {
  * @param {string} apiKeyId - API密钥ID
  * @param {number} limit - 每页条数
  * @param {number} offset - 偏移量
+ * @param {string} search - 搜索关键词
  * @returns {Promise<Object>} 分页结果
  */
-export async function getUserPastes(db, apiKeyId, limit = 30, offset = 0) {
+export async function getUserPastes(db, apiKeyId, limit = 30, offset = 0, search = null) {
   // 使用 Repository
   const repositoryFactory = new RepositoryFactory(db);
   const pasteRepository = repositoryFactory.getPasteRepository();
@@ -398,6 +403,7 @@ export async function getUserPastes(db, apiKeyId, limit = 30, offset = 0) {
   const pasteData = await pasteRepository.findByCreatorWithPagination(createdBy, {
     limit,
     offset,
+    search,
   });
 
   // 如果有created_by字段并且以apikey:开头，查询密钥名称

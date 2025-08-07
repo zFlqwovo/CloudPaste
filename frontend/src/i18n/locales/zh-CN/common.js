@@ -17,6 +17,8 @@ export default {
       nextPage: "下一页",
       pageInfo: "{current}/{total}",
       showingRange: "显示第 {start} 至 {end} 条，共 {total} 条",
+      searchResults: '搜索 "{term}"：第 {start} 至 {end} 条，共 {total} 条',
+      pageSize: "每页显示",
       firstPage: "第一页",
       lastPage: "最后一页",
       ariaLabel: "分页导航",

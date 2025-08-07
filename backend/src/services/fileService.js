@@ -259,10 +259,27 @@ export class FileService {
    * @param {number} options.limit - 每页条数
    * @param {number} options.offset - 偏移量
    * @param {string} options.createdBy - 创建者筛选
+   * @param {string} options.search - 搜索关键词
    * @returns {Promise<Object>} 文件列表和分页信息
    */
   async getAdminFileList(options = {}) {
-    const { limit = 30, offset = 0, createdBy } = options;
+    const { limit = 30, offset = 0, createdBy, search } = options;
+
+    // 如果有搜索关键词，使用搜索方法
+    if (search && search.trim()) {
+      const searchResult = await this.fileRepository.searchWithStorageConfig(search.trim(), {
+        createdBy,
+        limit,
+        offset,
+      });
+
+      // 为搜索结果添加 type、typeName 和 key_name 字段
+      if (searchResult.files) {
+        searchResult.files = await this.processApiKeyNames(searchResult.files);
+      }
+
+      return searchResult;
+    }
 
     // 构建查询条件
     const conditions = {};
@@ -405,10 +422,27 @@ export class FileService {
    * @param {Object} options - 查询选项
    * @param {number} options.limit - 每页条数
    * @param {number} options.offset - 偏移量
+   * @param {string} options.search - 搜索关键词
    * @returns {Promise<Object>} 文件列表和分页信息
    */
   async getUserFileList(apiKeyId, options = {}) {
-    const { limit = 30, offset = 0 } = options;
+    const { limit = 30, offset = 0, search } = options;
+
+    // 如果有搜索关键词，使用搜索方法
+    if (search && search.trim()) {
+      const searchResult = await this.fileRepository.searchWithStorageConfig(search.trim(), {
+        createdBy: `apikey:${apiKeyId}`,
+        limit,
+        offset,
+      });
+
+      // 为搜索结果添加 type、typeName 和 key_name 字段
+      if (searchResult.files) {
+        searchResult.files = await this.processApiKeyNames(searchResult.files);
+      }
+
+      return searchResult;
+    }
 
     // 构建查询条件
     const conditions = {

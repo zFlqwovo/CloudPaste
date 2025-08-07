@@ -66,7 +66,7 @@ export class FileRepository extends BaseRepository {
         CASE
           WHEN f.storage_type = 'S3' THEN s.provider_type
           ELSE NULL
-        END as provider_type,
+        END as storage_provider_type,
         CASE
           WHEN f.storage_type = 'S3' THEN s.name
           ELSE NULL
@@ -118,7 +118,7 @@ export class FileRepository extends BaseRepository {
         CASE
           WHEN f.storage_type = 'S3' THEN s.provider_type
           ELSE NULL
-        END as provider_type,
+        END as storage_provider_type,
         CASE
           WHEN f.storage_type = 'S3' THEN s.name
           ELSE NULL
@@ -407,9 +407,11 @@ export class FileRepository extends BaseRepository {
         CASE
           WHEN f.storage_type = 'S3' THEN s.id
           ELSE NULL
-        END as storage_config_detail_id
+        END as storage_config_detail_id,
+        ak.name as key_name
       FROM ${DbTables.FILES} f
       LEFT JOIN ${DbTables.S3_CONFIGS} s ON f.storage_type = 'S3' AND f.storage_config_id = s.id
+      LEFT JOIN ${DbTables.API_KEYS} ak ON f.created_by LIKE 'apikey:%' AND ak.id = SUBSTR(f.created_by, 8)
     `;
 
     if (fields.length > 0) {
@@ -513,5 +515,85 @@ export class FileRepository extends BaseRepository {
    */
   async getFilePassword(fileId) {
     return await this.queryFirst(`SELECT plain_password FROM ${DbTables.FILE_PASSWORDS} WHERE file_id = ?`, [fileId]);
+  }
+
+  // ==================== 搜索方法 ====================
+
+  /**
+   * 搜索文件并关联存储配置
+   * @param {string} searchTerm - 搜索关键词
+   * @param {Object} options - 搜索选项
+   * @param {string} options.createdBy - 创建者筛选
+   * @param {number} options.limit - 每页条数
+   * @param {number} options.offset - 偏移量
+   * @returns {Promise<Object>} 搜索结果和分页信息
+   */
+  async searchWithStorageConfig(searchTerm, options = {}) {
+    const { createdBy, limit = 30, offset = 0 } = options;
+
+    // 构建搜索条件 - 搜索文件名、链接标识、备注
+    const searchPattern = `%${searchTerm}%`;
+    const searchConditions = ["f.filename LIKE ?", "f.slug LIKE ?", "f.remark LIKE ?"];
+
+    let whereClause = `(${searchConditions.join(" OR ")})`;
+    let params = [searchPattern, searchPattern, searchPattern];
+
+    // 添加创建者筛选
+    if (createdBy) {
+      whereClause += " AND f.created_by = ?";
+      params.push(createdBy);
+    }
+
+    // 查询数据
+    const sql = `
+      SELECT
+        f.id, f.filename, f.slug, f.storage_path, f.storage_config_id,
+        f.storage_type, f.file_path, f.mimetype, f.size, f.remark,
+        f.created_at, f.views, f.max_views, f.expires_at, f.etag,
+        f.password, f.created_by, f.use_proxy,
+        CASE
+          WHEN f.storage_type = 'S3' THEN s.name
+          ELSE NULL
+        END as storage_config_name,
+        CASE
+          WHEN f.storage_type = 'S3' THEN s.provider_type
+          ELSE NULL
+        END as storage_provider_type,
+        CASE
+          WHEN f.storage_type = 'S3' THEN s.id
+          ELSE NULL
+        END as storage_config_detail_id,
+        ak.name as key_name
+      FROM ${DbTables.FILES} f
+      LEFT JOIN ${DbTables.S3_CONFIGS} s ON f.storage_type = 'S3' AND f.storage_config_id = s.id
+      LEFT JOIN ${DbTables.API_KEYS} ak ON f.created_by LIKE 'apikey:%' AND ak.id = SUBSTR(f.created_by, 8)
+      WHERE ${whereClause}
+      ORDER BY f.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    params.push(limit, offset);
+    const queryResult = await this.query(sql, params);
+    const files = queryResult.results || [];
+
+    // 获取搜索结果总数
+    const countSql = `
+      SELECT COUNT(*) as total
+      FROM ${DbTables.FILES} f
+      WHERE ${whereClause}
+    `;
+    const countParams = params.slice(0, -2); // 移除limit和offset参数
+    const countResult = await this.queryFirst(countSql, countParams);
+    const total = countResult?.total || 0;
+
+    return {
+      files,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    };
   }
 }
