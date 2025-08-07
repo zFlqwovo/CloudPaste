@@ -1,5 +1,5 @@
 /**
- * 搜索缓存管理器 - 基于BaseCache的搜索结果缓存实现
+ * 搜索缓存管理器
  * 提供搜索结果的缓存功能，用于提高频繁搜索的性能
  */
 import crypto from "crypto";
@@ -9,15 +9,15 @@ class SearchCacheManager extends BaseCache {
   /**
    * 构造函数
    * @param {Object} options - 配置选项
-   * @param {number} options.maxItems - 最大缓存项数量，默认为500
+   * @param {number} options.maxItems - 最大缓存项数量，默认为200
    * @param {number} options.prunePercentage - 清理时删除的缓存项百分比，默认为20%
-   * @param {number} options.defaultTtl - 默认缓存时间（秒），默认为300秒（5分钟）
+   * @param {number} options.defaultTtl - 默认缓存时间（秒），默认为600秒（5分钟）
    */
   constructor(options = {}) {
     super({
-      maxItems: options.maxItems || 500,
+      maxItems: options.maxItems || 200, 
       prunePercentage: options.prunePercentage || 20,
-      defaultTtl: options.defaultTtl || 300,
+      defaultTtl: options.defaultTtl || 600, 
       name: "SearchCache",
       ...options,
     });
@@ -218,10 +218,9 @@ class SearchCacheManager extends BaseCache {
 
     return count;
   }
-
 }
 
-// 创建单例实例 - 复用DirectoryCache的单例模式
+// 创建单例实例
 const searchCacheManager = new SearchCacheManager();
 
 /**
@@ -265,5 +264,5 @@ export function clearSearchCache(options = {}) {
   }
 }
 
-// 导出单例实例和类 (单例用于实际应用，类用于测试和特殊场景)
+// 导出单例实例和类
 export { searchCacheManager, SearchCacheManager };

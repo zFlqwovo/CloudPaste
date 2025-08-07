@@ -5,7 +5,7 @@
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
-import { clearCache } from "../../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../../cache/index.js";
 
 /**
  * 处理MKCOL请求
@@ -66,7 +66,7 @@ export async function handleMkcol(c, path, userId, userType, db) {
       try {
         const { mount } = await mountManager.getDriverByPath(path, userId, userType);
         if (mount) {
-          await clearCache({ mountId: mount.id });
+          await clearDirectoryCache({ mountId: mount.id });
           console.log(`WebDAV MKCOL - 已清理挂载点 ${mount.id} 的缓存`);
         }
       } catch (cacheError) {

@@ -10,7 +10,7 @@ import { HTTPException } from "hono/http-exception";
 import { MountManager } from "../storage/managers/MountManager.js";
 import { FileSystem } from "../storage/fs/FileSystem.js";
 import { getMimeTypeFromFilename } from "../utils/fileUtils.js";
-import { clearCache } from "../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../cache/index.js";
 import { getS3ConfigByIdForAdmin, getPublicS3ConfigById } from "../services/s3ConfigService.js";
 import { getVirtualDirectoryListing, isVirtualPath } from "../storage/fs/utils/VirtualDirectory.js";
 import { RepositoryFactory } from "../repositories/index.js";
@@ -469,9 +469,9 @@ fsRoutes.post("/api/fs/rename", authGateway.requireMountRename(), unifiedFsAuthM
       const { mount } = await mountManager.getDriverByPath(oldPath, userIdOrInfo, userType);
       const { mount: newMount } = await mountManager.getDriverByPath(newPath, userIdOrInfo, userType);
 
-      await clearCache({ mountId: mount.id });
+      await clearDirectoryCache({ mountId: mount.id });
       if (newMount.id !== mount.id) {
-        await clearCache({ mountId: newMount.id });
+        await clearDirectoryCache({ mountId: newMount.id });
       }
       console.log(`重命名操作完成后缓存已刷新：${oldPath} -> ${newPath}`);
     } catch (cacheError) {
@@ -536,7 +536,7 @@ fsRoutes.delete("/api/fs/batch-remove", authGateway.requireMountDelete(), unifie
     // 清理缓存
     try {
       for (const mountId of mountIds) {
-        await clearCache({ mountId });
+        await clearDirectoryCache({ mountId });
       }
       console.log(`批量删除操作完成后缓存已刷新：${mountIds.size} 个挂载点`);
     } catch (cacheError) {
@@ -1036,7 +1036,7 @@ fsRoutes.post("/api/fs/presign/commit", authGateway.requireMountUpload(), unifie
 
     // 执行缓存清理
     try {
-      await clearCache({ mountId: mountId });
+      await clearDirectoryCache({ mountId: mountId });
       console.log(`预签名上传完成后缓存已刷新：挂载点=${mountId}, 文件=${fileName}`);
     } catch (cacheError) {
       console.warn(`执行缓存清理时出错: ${cacheError.message}`);
@@ -1092,7 +1092,7 @@ fsRoutes.post("/api/fs/update", authGateway.requireMountUpload(), unifiedFsAuthM
     // 清理缓存 - 需要获取mount信息
     try {
       const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
-      await clearCache({ mountId: mount.id });
+      await clearDirectoryCache({ mountId: mount.id });
       console.log(`更新文件操作完成后缓存已刷新：挂载点=${mount.id}, 路径=${path}`);
     } catch (cacheError) {
       console.warn(`执行缓存清理时出错: ${cacheError.message}`);
@@ -1176,7 +1176,7 @@ fsRoutes.post("/api/fs/batch-copy", authGateway.requireMountCopy(), unifiedFsAut
     // 清理所有相关路径的缓存
     try {
       for (const mountId of allMountIds) {
-        await clearCache({ mountId });
+        await clearDirectoryCache({ mountId });
       }
       console.log(`批量复制操作完成后缓存已刷新：源挂载点=${sourceMountIds.size}个，目标挂载点=${targetMountIds.size}个，总计=${allMountIds.size}个`);
     } catch (cacheError) {
@@ -1302,7 +1302,7 @@ fsRoutes.post("/api/fs/batch-copy-commit", authGateway.requireMountCopy(), unifi
 
     // 执行缓存清理 - 使用统一的clearCache函数
     try {
-      await clearCache({ mountId: mount.id });
+      await clearDirectoryCache({ mountId: mount.id });
       console.log(`批量复制完成后缓存已刷新：挂载点=${mount.id}, 共处理了${results.success.length}个文件`);
     } catch (cacheError) {
       console.warn(`执行缓存清理时出错: ${cacheError.message}`);

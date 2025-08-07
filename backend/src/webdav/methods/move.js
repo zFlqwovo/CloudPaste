@@ -8,7 +8,7 @@
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
-import { clearCache } from "../../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../../cache/index.js";
 import { getLockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
 import { parseDestinationPath } from "../utils/webdavUtils.js";
@@ -295,12 +295,12 @@ export async function handleMove(c, path, userId, userType, db) {
             const { mount: destMountResult } = await mountManager.getDriverByPath(destPath, userId, userType);
 
             if (sourceMountResult) {
-              await clearCache({ mountId: sourceMountResult.id });
+              await clearDirectoryCache({ mountId: sourceMountResult.id });
               console.log(`WebDAV MOVE - 已清理源挂载点 ${sourceMountResult.id} 的缓存`);
             }
 
             if (destMountResult && destMountResult.id !== sourceMountResult?.id) {
-              await clearCache({ mountId: destMountResult.id });
+              await clearDirectoryCache({ mountId: destMountResult.id });
               console.log(`WebDAV MOVE - 已清理目标挂载点 ${destMountResult.id} 的缓存`);
             }
           } catch (cacheError) {
@@ -359,12 +359,12 @@ export async function handleMove(c, path, userId, userType, db) {
         const { mount: destMountResult } = await mountManager.getDriverByPath(destPath, userId, userType);
 
         if (sourceMountResult) {
-          await clearCache({ mountId: sourceMountResult.id });
+          await clearDirectoryCache({ mountId: sourceMountResult.id });
           console.log(`WebDAV MOVE - 已清理源挂载点 ${sourceMountResult.id} 的缓存`);
         }
 
         if (destMountResult && destMountResult.id !== sourceMountResult?.id) {
-          await clearCache({ mountId: destMountResult.id });
+          await clearDirectoryCache({ mountId: destMountResult.id });
           console.log(`WebDAV MOVE - 已清理目标挂载点 ${destMountResult.id} 的缓存`);
         }
       } catch (cacheError) {

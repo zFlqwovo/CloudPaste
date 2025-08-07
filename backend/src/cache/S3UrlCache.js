@@ -1,7 +1,6 @@
 /**
  * S3预签名URL缓存管理器
- * 基于BaseCache架构，专门用于缓存S3预签名URL
- * 支持多租户、权限隔离、智能过期和自定义域名优化
+ * 用于缓存S3预签名URL
  */
 import { BaseCache } from "./BaseCache.js";
 
@@ -26,7 +25,7 @@ class S3UrlCacheManager extends BaseCache {
   }
 
   /**
-   * 生成缓存键 - 重写基类方法，支持多租户和权限隔离
+   * 生成缓存键
    * @param {string} s3ConfigId - S3配置ID
    * @param {string} storagePath - 存储路径
    * @param {boolean} forceDownload - 是否强制下载
@@ -48,7 +47,7 @@ class S3UrlCacheManager extends BaseCache {
   }
 
   /**
-   * 生成缓存键 - 兼容性方法
+   * 生成缓存键
    * @deprecated 使用 generateKey 方法
    */
   generateCacheKey(s3ConfigId, storagePath, forceDownload, userType, userId) {
@@ -131,13 +130,13 @@ class S3UrlCacheManager extends BaseCache {
 
       // S3UrlCache特殊数据结构：保持原有结构，直接存储url字段
       this.cache.set(key, {
-        url, // 特殊：存储在url字段而不是data字段
+        url, 
         expiresAt,
         lastAccessed: now,
-        s3ConfigId, // 必需：invalidateS3Config()方法依赖此字段
-        userType, // 必需：invalidateUser()方法依赖此字段
-        userId, // 必需：invalidateUser()方法依赖此字段
-        isCustomHost: isCustomHostPreview, // 只有自定义域名预览才标记为true
+        s3ConfigId, 
+        userType, 
+        userId, 
+        isCustomHost: isCustomHostPreview, 
       });
     } catch (error) {
       console.warn("S3URL缓存设置失败:", error.message);

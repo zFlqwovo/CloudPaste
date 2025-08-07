@@ -18,7 +18,7 @@ import { hashPassword } from "../utils/crypto.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { S3ProviderTypes } from "../constants/index.js";
 import { ConfiguredRetryStrategy } from "@smithy/util-retry";
-import { directoryCacheManager, clearCache } from "../utils/DirectoryCache.js";
+import { directoryCacheManager, clearDirectoryCache } from "../cache/index.js";
 import { updateParentDirectoriesModifiedTimeHelper } from "../storage/drivers/s3/utils/S3DirectoryUtils.js";
 import { RepositoryFactory } from "../repositories/index.js";
 import { FileShareService } from "../services/fileShareService.js";
@@ -86,7 +86,7 @@ app.post("/api/s3/presign", authGateway.requireFile(), async (c) => {
 
           // 清除与文件相关的缓存 - 使用统一的clearCache函数（仅对S3存储类型）
           if (existingFile.storage_type === "S3") {
-            await clearCache({ db, s3ConfigId: existingFile.storage_config_id });
+            await clearDirectoryCache({ db, s3ConfigId: existingFile.storage_config_id });
           }
         } catch (deleteError) {
           console.error(`删除旧文件记录时出错: ${deleteError.message}`);
@@ -405,9 +405,9 @@ app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => 
           // 删除关联的密码记录（如果有）
           await fileRepository.deleteFilePasswordRecord(existingFile.id);
 
-          // 清除与文件相关的缓存 - 使用统一的clearCache函数（仅对S3存储类型）
+          // 清除与文件相关的缓存 - 使用统一的clearDirectoryCache函数（仅对S3存储类型）
           if (existingFile.storage_type === "S3") {
-            await clearCache({ db, s3ConfigId: existingFile.storage_config_id });
+            await clearDirectoryCache({ db, s3ConfigId: existingFile.storage_config_id });
           }
         } catch (deleteError) {
           console.error(`删除旧文件记录时出错: ${deleteError.message}`);
@@ -627,7 +627,7 @@ app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => 
     await updateParentDirectoriesModifiedTimeHelper(s3Config, storagePath, encryptionSecret);
 
     // 清除与文件相关的缓存 - 使用统一的clearCache函数
-    await clearCache({ db, s3ConfigId });
+    await clearDirectoryCache({ db, s3ConfigId });
 
     // 生成预签名URL，使用S3配置的默认时效，传递MIME类型以确保正确的Content-Type
     // 注意：文件上传完成后生成的URL用于分享，没有特定用户上下文，禁用缓存

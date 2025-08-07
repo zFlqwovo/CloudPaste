@@ -6,7 +6,7 @@ import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { getMimeTypeFromFilename } from "../../utils/fileUtils.js";
 import { handleWebDAVError } from "../utils/errorUtils.js";
-import { clearCache } from "../../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../../cache/index.js";
 import { concatUint8Arrays } from "uint8array-extras";
 import { getLockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
@@ -441,7 +441,7 @@ export async function handlePut(c, path, userId, userType, db) {
       // 清理缓存
       const { mount } = await mountManager.getDriverByPath(path, userId, userType);
       if (mount) {
-        await clearCache({ mountId: mount.id });
+        await clearDirectoryCache({ mountId: mount.id });
       }
 
       console.log(`WebDAV PUT - 空文件上传成功: ${JSON.stringify(result)}`);
@@ -503,7 +503,7 @@ export async function handlePut(c, path, userId, userType, db) {
         // 清理缓存
         const { mount } = await mountManager.getDriverByPath(path, userId, userType);
         if (mount) {
-          await clearCache({ mountId: mount.id });
+          await clearDirectoryCache({ mountId: mount.id });
         }
 
         const uploadDuration = Math.ceil((Date.now() - requestStartTime) / 1000);
@@ -591,7 +591,7 @@ export async function handlePut(c, path, userId, userType, db) {
         // 清理缓存
         const { mount } = await mountManager.getDriverByPath(path, userId, userType);
         if (mount) {
-          await clearCache({ mountId: mount.id });
+          await clearDirectoryCache({ mountId: mount.id });
         }
 
         const uploadDuration = Math.ceil((Date.now() - requestStartTime) / 1000);

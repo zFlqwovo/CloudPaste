@@ -7,7 +7,7 @@ import { DbTables } from "../constants/index.js";
 import { ApiStatus } from "../constants/index.js";
 import { createErrorResponse } from "../utils/common.js";
 import { deleteFileFromS3 } from "../utils/s3Utils.js";
-import { clearCache } from "../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../cache/index.js";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { RepositoryFactory } from "../repositories/index.js";
 import { FileShareService } from "../services/fileShareService.js";
@@ -555,9 +555,9 @@ app.post("/api/url/cancel", authGateway.requireFile(), async (c) => {
     // 删除文件记录
     await fileRepository.deleteFile(file.id);
 
-    // 清除与文件相关的缓存 - 使用统一的clearCache函数
+    // 清除与文件相关的缓存 - 使用统一的clearDirectoryCache函数
     try {
-      await clearCache({ db, s3ConfigId: file.s3_config_id });
+      await clearDirectoryCache({ db, s3ConfigId: file.s3_config_id });
     } catch (cacheError) {
       console.warn(`清除文件缓存失败: ${cacheError.message}`);
     }

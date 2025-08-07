@@ -11,10 +11,10 @@ import crypto from "crypto";
  */
 const CACHE_CONFIG = {
   // 缓存过期时间（毫秒）
-  EXPIRATION: 5 * 60 * 1000, // 5分钟
+  EXPIRATION: 10 * 60 * 1000, // 10分钟
 
   // 最大缓存条目数
-  MAX_ENTRIES: 1000,
+  MAX_ENTRIES: 500,
 
   // 清理间隔（毫秒）
   CLEANUP_INTERVAL: 60 * 1000, // 1分钟

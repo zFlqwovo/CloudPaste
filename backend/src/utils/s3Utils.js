@@ -300,7 +300,7 @@ export async function generatePresignedUrl(s3Config, storagePath, encryptionSecr
 
   if (enableCache && userType && userId) {
     // 动态导入缓存管理器，避免循环依赖
-    const { s3UrlCacheManager } = await import("./S3UrlCache.js");
+    const { s3UrlCacheManager } = await import("../cache/S3UrlCache.js");
 
     // 尝试从缓存获取
     const cachedUrl = s3UrlCacheManager.get(s3Config.id, storagePath, forceDownload, userType, userId);
@@ -342,7 +342,7 @@ export async function generatePresignedUrl(s3Config, storagePath, encryptionSecr
 
   // 缓存生成的URL
   if (enableCache && userType && userId && generatedUrl) {
-    const { s3UrlCacheManager } = await import("./S3UrlCache.js");
+    const { s3UrlCacheManager } = await import("../cache/S3UrlCache.js");
     s3UrlCacheManager.set(s3Config.id, storagePath, forceDownload, userType, userId, generatedUrl, s3Config);
     console.log(`💾 S3URL已缓存: ${storagePath}`);
   }

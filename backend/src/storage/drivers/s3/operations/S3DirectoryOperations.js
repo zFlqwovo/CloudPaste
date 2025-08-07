@@ -7,7 +7,7 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus, FILE_TYPES, FILE_TYPE_NAMES } from "../../../../constants/index.js";
 import { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { checkDirectoryExists, updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
-import { directoryCacheManager, clearCache } from "../../../../utils/DirectoryCache.js";
+import { directoryCacheManager, clearDirectoryCache } from "../../../../cache/index.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { GetFileType, getFileTypeName } from "../../../../utils/fileTypeDetector.js";
 
@@ -284,7 +284,7 @@ export class S3DirectoryOperations {
 
         // 清除缓存，因为目录结构已变更
         if (mount && mount.id && subPath !== "/") {
-          await clearCache({ mountId: mount.id });
+          await clearDirectoryCache({ mountId: mount.id });
           console.log(`已清理挂载点 ${mount.id} 的缓存`);
         }
 

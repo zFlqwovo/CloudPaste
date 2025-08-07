@@ -804,7 +804,7 @@ export class FileSystem {
     }
 
     // 检查搜索缓存
-    const { searchCacheManager } = await import("../../utils/SearchCache.js");
+    const { searchCacheManager } = await import("../../cache/SearchCache.js");
     const cachedResult = searchCacheManager.get(query, searchParams, userType, userIdOrInfo);
     if (cachedResult) {
       console.log(`搜索缓存命中 - 查询: ${query}, 用户类型: ${userType}`);

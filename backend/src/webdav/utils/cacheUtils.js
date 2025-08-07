@@ -2,7 +2,7 @@
  * WebDAV缓存工具函数
  * 用于在WebDAV操作后清理目录缓存
  */
-import { clearCache } from "../../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../../cache/index.js";
 
 /**
  * 在WebDAV操作后清理相关的目录缓存
@@ -21,13 +21,13 @@ export async function clearCacheAfterWebDAVOperation(db, s3SubPath, s3Config, is
 
     // 如果提供了挂载点ID，直接清理该挂载点的缓存
     if (mountId) {
-      const clearedCount = await clearCache({ mountId });
+      const clearedCount = await clearDirectoryCache({ mountId });
       console.log(`WebDAV操作后缓存已清理 - 挂载点ID: ${mountId}, 路径: ${s3SubPath}, 清理项: ${clearedCount}`);
       return;
     }
 
     // 否则通过S3配置ID查找并清理所有相关挂载点的缓存
-    const clearedCount = await clearCache({ db, s3ConfigId: s3Config.id });
+    const clearedCount = await clearDirectoryCache({ db, s3ConfigId: s3Config.id });
     console.log(`WebDAV操作后缓存已清理 - S3配置ID: ${s3Config.id}, 路径: ${s3SubPath}, 清理项: ${clearedCount}`);
   } catch (error) {
     // 记录错误但不抛出，避免影响主要操作

@@ -17,9 +17,9 @@ class DirectoryCacheManager extends BaseCache {
    */
   constructor(options = {}) {
     super({
-      maxItems: options.maxItems || 500,
+      maxItems: options.maxItems || 300, 
       prunePercentage: options.prunePercentage || 20,
-      defaultTtl: 300, // 5分钟默认缓存时间
+      defaultTtl: 300, 
       name: "DirectoryCache",
       ...options,
     });
@@ -156,7 +156,7 @@ const directoryCacheManager = new DirectoryCacheManager();
  * @param {string} [options.s3ConfigId] - S3配置ID，将清理所有关联的挂载点
  * @returns {Promise<number>} 清除的缓存项数量
  */
-export async function clearCache(options = {}) {
+export async function clearDirectoryCache(options = {}) {
   const { mountId, db, s3ConfigId } = options;
   let totalCleared = 0;
 
@@ -254,34 +254,6 @@ export async function clearCache(options = {}) {
     return 0;
   }
 }
-
-// /**
-//  * 为文件路径清除相关缓存 - 兼容性函数，内部调用clearCache
-//  * @param {D1Database} db - 数据库连接
-//  * @param {string} filePath - 文件路径
-//  * @param {string} s3ConfigId - S3配置ID
-//  * @returns {Promise<number>} 清除的缓存项数量
-//  * @deprecated 请直接使用 clearCache 函数
-//  */
-// export async function clearCacheForFilePath(db, filePath, s3ConfigId) {
-//   console.warn("clearCacheForFilePath 已废弃，请使用 clearCache 函数");
-//   return await clearCache({ db, s3ConfigId });
-// }
-
-// /**
-//  * 为指定路径清除缓存 - 兼容性函数，内部调用clearCache
-//  * @param {string} mountId - 挂载点ID
-//  * @param {string} path - 路径
-//  * @param {boolean} recursive - 是否递归清除（已忽略）
-//  * @param {string} reason - 清除原因（已忽略）
-//  * @param {Object} s3Config - S3配置（已忽略）
-//  * @returns {number} 清除的缓存项数量
-//  * @deprecated 请直接使用 clearCache 函数
-//  */
-// export function clearCacheForPath(mountId, path, recursive, reason, s3Config) {
-//   console.warn("clearCacheForPath 已废弃，请使用 clearCache 函数");
-//   return directoryCacheManager.invalidateMount(mountId);
-// }
 
 // 导出单例实例和类 (单例用于实际应用，类用于测试和特殊场景)
 export { directoryCacheManager, DirectoryCacheManager };

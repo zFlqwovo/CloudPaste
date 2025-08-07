@@ -442,8 +442,8 @@ export class FileShareService {
 
     try {
       // 清除相关缓存
-      const { clearCache } = await import("../utils/DirectoryCache.js");
-      await clearCache({ db: this.db, s3ConfigId: fileRecord.storage_config_id });
+      const { clearDirectoryCache } = await import("../cache/index.js");
+      await clearDirectoryCache({ db: this.db, s3ConfigId: fileRecord.storage_config_id });
     } catch (error) {
       console.warn("清除缓存失败:", error);
     }

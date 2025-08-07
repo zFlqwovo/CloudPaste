@@ -382,9 +382,9 @@ export class S3StorageDriver extends BaseDriver {
     });
 
     // 处理缓存清理
-    const { clearCache } = await import("../../../utils/DirectoryCache.js");
+    const { clearDirectoryCache } = await import("../../../cache/index.js");
     if (mount && mount.cache_ttl > 0) {
-      await clearCache({ mountId: mount.id });
+      await clearDirectoryCache({ mountId: mount.id });
     }
 
     // 更新挂载点的最后使用时间
@@ -772,9 +772,9 @@ export class S3StorageDriver extends BaseDriver {
 
     // 清除缓存
     if (mount) {
-      const { clearCache } = await import("../../../utils/DirectoryCache.js");
+      const { clearDirectoryCache } = await import("../../../cache/index.js");
       try {
-        await clearCache({ mountId: mount.id });
+        await clearDirectoryCache({ mountId: mount.id });
         console.log(`后端分片上传完成后缓存已清除 - 挂载点=${mount.id}`);
       } catch (cacheError) {
         console.warn(`清除缓存时出错: ${cacheError.message}`);

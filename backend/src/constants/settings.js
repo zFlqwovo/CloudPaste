@@ -330,16 +330,14 @@ export function validateSettingValue(key, value, type) {
       }
       return true;
 
+    case SETTING_TYPES.TEXT:
     case SETTING_TYPES.TEXTAREA:
+      if (typeof value !== "string") return false;
+
       // 自定义头部和body的长度限制
       if (key === "site_custom_head" || key === "site_custom_body") {
         return value.length <= 100000; // 100KB限制
       }
-      return true;
-
-    case SETTING_TYPES.TEXT:
-    case SETTING_TYPES.TEXTAREA:
-      if (typeof value !== "string") return false;
 
       // 预览设置的特殊验证
       if (key.startsWith("preview_") && key.endsWith("_types")) {

@@ -1,12 +1,6 @@
 /**
- * 基础缓存管理器 - 统一的缓存实现基类
- * 提供通用的缓存功能，消除各个缓存管理器之间的重复代码
- * 
- * 设计原则：
- * 1. 抽象通用逻辑：get、set、prune、stats等核心功能
- * 2. 保留扩展性：子类可以重写特定方法
- * 3. 统一配置：标准化缓存配置选项
- * 4. 一致性：确保所有缓存管理器行为一致
+ * 基础缓存管理器
+ * 提供通用的缓存功能
  */
 
 export class BaseCache {
@@ -230,7 +224,7 @@ export class BaseCache {
   has(...params) {
     const key = this.generateKey(...params);
     const cacheItem = this.cache.get(key);
-    
+
     if (!cacheItem) {
       return false;
     }
@@ -254,9 +248,9 @@ export class BaseCache {
  */
 export function createCache(type, options = {}) {
   const defaultConfigs = {
-    directory: { maxItems: 500, defaultTtl: 300, name: "DirectoryCache" },
-    search: { maxItems: 500, defaultTtl: 300, name: "SearchCache" },
-    s3url: { maxItems: 1000, defaultTtl: 3600, name: "S3UrlCache" },
+    directory: { maxItems: 300, defaultTtl: 300, name: "DirectoryCache" }, 
+    search: { maxItems: 200, defaultTtl: 600, name: "SearchCache" }, 
+    s3url: { maxItems: 1000, defaultTtl: 3600, name: "S3UrlCache" }, 
   };
 
   const config = { ...defaultConfigs[type], ...options };

@@ -4,7 +4,7 @@
  */
 
 import { FILE_TYPES, FILE_TYPE_NAMES } from "../constants/index.js";
-import previewSettingsCache from "./previewSettingsCache.js";
+import previewSettingsCache from "../cache/PreviewSettingsCache.js";
 
 /**
  * 从文件名提取扩展名

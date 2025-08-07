@@ -12,10 +12,10 @@ import { SETTING_GROUPS } from "../constants/settings.js";
  */
 export class PreviewSettingsCache {
   constructor() {
-    this.cache = new Map(); // 原始设置缓存
-    this.typeCache = new Map(); // 扩展名到类型的映射缓存
+    this.cache = new Map();
+    this.typeCache = new Map();
     this.lastUpdate = null;
-    this.ttl = 3600000; // 1小时TTL
+    this.ttl = Infinity;
     this._isLoaded = false;
   }
 
@@ -35,7 +35,7 @@ export class PreviewSettingsCache {
    * @returns {boolean}
    */
   isLoaded() {
-    return this._isLoaded && this.lastUpdate && Date.now() - this.lastUpdate < this.ttl;
+    return this._isLoaded && this.lastUpdate; // 永不过期，只检查是否已加载
   }
 
   /**
@@ -167,8 +167,9 @@ export class PreviewSettingsCache {
       lastUpdate: this.lastUpdate,
       settingsCount: this.cache.size,
       extensionMappings: this.typeCache.size,
-      ttl: this.ttl,
+      ttl: "永不过期",
       age: this.lastUpdate ? Date.now() - this.lastUpdate : null,
+      cacheStrategy: "永不过期 + 主动刷新",
     };
   }
 }

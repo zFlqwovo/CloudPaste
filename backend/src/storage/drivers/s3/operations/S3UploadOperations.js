@@ -11,7 +11,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 
-import { clearCache } from "../../../../utils/DirectoryCache.js";
+import { clearDirectoryCache } from "../../../../cache/index.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
 
@@ -94,7 +94,7 @@ export class S3UploadOperations {
 
         // 清除缓存
         if (mount) {
-          await clearCache({ mountId: mount.id });
+          await clearDirectoryCache({ mountId: mount.id });
         }
 
         return {
@@ -169,7 +169,7 @@ export class S3UploadOperations {
 
       // 清除缓存
       if (mount) {
-        await clearCache({ mountId: mount.id });
+        await clearDirectoryCache({ mountId: mount.id });
       }
 
       // 构建S3 URL
@@ -343,7 +343,7 @@ export class S3UploadOperations {
           finalS3Path = s3SubPath + fileName;
         }
 
-        // 验证parts格式 
+        // 验证parts格式
         const validatedParts = parts.map((part) => {
           if (!part.PartNumber || !part.ETag) {
             throw new Error(`分片数据不完整: PartNumber=${part.PartNumber}, ETag=${part.ETag}`);
@@ -378,7 +378,7 @@ export class S3UploadOperations {
 
         // 清除缓存
         if (mount) {
-          await clearCache({ mountId: mount.id });
+          await clearDirectoryCache({ mountId: mount.id });
         }
 
         // 推断MIME类型

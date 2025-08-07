@@ -3,9 +3,7 @@ import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { Permission } from "../constants/permissions.js";
 import { login, logout, changePassword, testAdminToken } from "../services/adminService.js";
 import { ApiStatus } from "../constants/index.js";
-import { directoryCacheManager, clearCache } from "../utils/DirectoryCache.js";
-import { s3UrlCacheManager, clearS3UrlCache } from "../utils/S3UrlCache.js";
-import { searchCacheManager, clearSearchCache } from "../utils/SearchCache.js";
+import { directoryCacheManager, clearDirectoryCache, s3UrlCacheManager, clearS3UrlCache, searchCacheManager, clearSearchCache } from "../cache/index.js";
 
 const adminRoutes = new Hono();
 
@@ -155,12 +153,12 @@ adminRoutes.post("/api/admin/cache/clear", authGateway.requireAdmin(), async (c)
 
     // 如果指定了挂载点ID，清理特定挂载点的缓存
     if (mountId) {
-      clearedCount = await clearCache({ mountId });
+      clearedCount = await clearDirectoryCache({ mountId });
       console.log(`管理员手动清理挂载点缓存 - 挂载点ID: ${mountId}, 清理项: ${clearedCount}`);
     }
     // 如果指定了S3配置ID，清理相关挂载点的缓存
     else if (s3ConfigId) {
-      clearedCount = await clearCache({ db, s3ConfigId });
+      clearedCount = await clearDirectoryCache({ db, s3ConfigId });
       console.log(`管理员手动清理S3配置缓存 - S3配置ID: ${s3ConfigId}, 清理项: ${clearedCount}`);
     }
     // 如果没有指定参数，清理所有缓存
@@ -224,12 +222,12 @@ adminRoutes.post("/api/user/cache/clear", authGateway.requireMount(), async (c) 
 
     // 如果指定了挂载点ID，清理特定挂载点的缓存
     if (mountId) {
-      clearedCount = await clearCache({ mountId });
+      clearedCount = await clearDirectoryCache({ mountId });
       console.log(`API密钥用户手动清理挂载点缓存 - 用户: ${apiKeyInfo.name}, 挂载点ID: ${mountId}, 清理项: ${clearedCount}`);
     }
     // 如果指定了S3配置ID，清理相关挂载点的缓存
     else if (s3ConfigId) {
-      clearedCount = await clearCache({ db, s3ConfigId });
+      clearedCount = await clearDirectoryCache({ db, s3ConfigId });
       console.log(`API密钥用户手动清理S3配置缓存 - 用户: ${apiKeyInfo.name}, S3配置ID: ${s3ConfigId}, 清理项: ${clearedCount}`);
     }
     // 如果没有指定参数，清理所有缓存（API密钥用户只能清理所有缓存，不能指定特定缓存）

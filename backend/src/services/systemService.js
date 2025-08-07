@@ -2,7 +2,7 @@ import { DEFAULT_MAX_UPLOAD_SIZE_MB } from "../constants/index.js";
 import { SETTING_GROUPS } from "../constants/settings.js";
 import { getS3ConfigsWithUsage } from "./s3ConfigService.js";
 import { RepositoryFactory } from "../repositories/index.js";
-import previewSettingsCache from "../utils/previewSettingsCache.js";
+import { previewSettingsCache } from "../cache/index.js";
 
 /**
  * 获取最大上传文件大小限制

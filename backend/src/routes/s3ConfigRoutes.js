@@ -119,6 +119,17 @@ s3ConfigRoutes.put("/api/s3-configs/:id", authGateway.requireAdmin(), async (c) 
     const body = await c.req.json();
     await updateS3Config(db, id, body, adminId, encryptionSecret);
 
+    // S3配置更新后，清理相关的驱动缓存
+    try {
+      const { MountManager } = await import("../storage/managers/MountManager.js");
+      const mountManager = new MountManager(db, encryptionSecret);
+      await mountManager.clearConfigCache("S3", id);
+      console.log(`S3配置更新后已清理驱动缓存: ${id}`);
+    } catch (cacheError) {
+      console.warn("清理驱动缓存失败:", cacheError);
+      // 缓存清理失败不影响主要操作
+    }
+
     return c.json({
       code: ApiStatus.SUCCESS,
       message: "S3配置已更新",
@@ -135,8 +146,20 @@ s3ConfigRoutes.delete("/api/s3-configs/:id", authGateway.requireAdmin(), async (
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
+  const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
 
   try {
+    // S3配置删除前，先清理相关的驱动缓存
+    try {
+      const { MountManager } = await import("../storage/managers/MountManager.js");
+      const mountManager = new MountManager(db, encryptionSecret);
+      await mountManager.clearConfigCache("S3", id);
+      console.log(`S3配置删除前已清理驱动缓存: ${id}`);
+    } catch (cacheError) {
+      console.warn("清理驱动缓存失败:", cacheError);
+      // 缓存清理失败不影响主要操作
+    }
+
     await deleteS3Config(db, id, adminId);
 
     return c.json({
