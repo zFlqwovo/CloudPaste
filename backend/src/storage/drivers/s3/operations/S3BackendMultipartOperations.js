@@ -17,6 +17,7 @@ import { buildS3Url } from "../../../../utils/s3Utils.js";
 import { updateParentDirectoriesModifiedTime, checkDirectoryExists } from "../utils/S3DirectoryUtils.js";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../../../constants/index.js";
+import { getRecommendedPartSize } from "../../../../utils/environmentUtils.js";
 
 export class S3BackendMultipartOperations {
   /**
@@ -95,8 +96,7 @@ export class S3BackendMultipartOperations {
           bucket: this.config.bucket_name,
           key: s3SubPath,
           storage_type: "S3",
-          // 建议的分片大小 (5MB)
-          recommendedPartSize: 5 * 1024 * 1024,
+          recommendedPartSize: getRecommendedPartSize(),
         };
       },
       "初始化后端分片上传",

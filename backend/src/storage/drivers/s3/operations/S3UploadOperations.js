@@ -14,6 +14,7 @@ import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 import { clearDirectoryCache } from "../../../../cache/index.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
+import { getEnvironmentOptimizedUploadConfig } from "../../../../utils/environmentUtils.js";
 
 export class S3UploadOperations {
   /**
@@ -143,6 +144,11 @@ export class S3UploadOperations {
           // 使用AWS SDK Upload类进行流式分片上传
           const { Upload } = await import("@aws-sdk/lib-storage");
 
+          // 获取环境自适应的上传配置
+          const uploadConfig = getEnvironmentOptimizedUploadConfig();
+
+          console.log(`S3流式分片上传 - 环境: ${uploadConfig.environment}, 分片: ${uploadConfig.partSize / 1024 / 1024}MB, 并发: ${uploadConfig.queueSize}`);
+
           const upload = new Upload({
             client: this.s3Client,
             params: {
@@ -151,8 +157,8 @@ export class S3UploadOperations {
               Body: stream,
               ContentType: contentType,
             },
-            queueSize: 3, // 并发数
-            partSize: 6 * 1024 * 1024, // 分片大小
+            queueSize: uploadConfig.queueSize,
+            partSize: uploadConfig.partSize,
             leavePartsOnError: false, // 出错时自动清理分片
           });
 

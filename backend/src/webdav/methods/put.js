@@ -4,13 +4,12 @@
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { getMimeTypeFromFilename } from "../../utils/fileUtils.js";
+import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 import { handleWebDAVError } from "../utils/errorUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
 import { getSettingsByGroup } from "../../services/systemService.js";
 import { getLockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
-
 
 /**
  * 获取WebDAV上传模式设置
@@ -27,6 +26,27 @@ async function getWebDAVUploadMode(db) {
     console.warn("获取WebDAV上传模式设置失败，使用默认值:", error);
     return "direct"; // 默认分片上传
   }
+}
+
+/**
+ * 智能检测是否为真正的空文件
+ * @param {number} contentLength - Content-Length头部值
+ * @param {string|null} transferEncoding - Transfer-Encoding头部值
+ * @returns {boolean} 是否为真正的空文件
+ */
+function isReallyEmptyFile(contentLength, transferEncoding) {
+  // 如果Content-Length大于0，肯定不是空文件
+  if (contentLength > 0) {
+    return false;
+  }
+
+  // 如果有Transfer-Encoding: chunked，不能仅依赖Content-Length判断
+  if (transferEncoding && transferEncoding.toLowerCase().includes("chunked")) {
+    return false; // 分块传输时，使用流式分片上传
+  }
+
+  // Content-Length为0且没有分块传输，才是真正的空文件
+  return true;
 }
 
 /**
@@ -65,8 +85,12 @@ export async function handlePut(c, path, userId, userType, db) {
 
     // 获取请求头信息
     const contentLengthHeader = c.req.header("content-length");
-    const contentType = c.req.header("content-type") || getMimeTypeFromFilename(path);
+    const clientContentType = c.req.header("content-type");
+    const transferEncoding = c.req.header("transfer-encoding");
     const declaredContentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+
+    // 智能MIME类型检测：优先使用文件名推断，客户端类型作为备选
+    const contentType = getEffectiveMimeType(clientContentType, path);
 
     console.log(`WebDAV PUT - 开始处理: ${path}, 声明大小: ${declaredContentLength} 字节, 类型: ${contentType}`);
 
@@ -78,9 +102,11 @@ export async function handlePut(c, path, userId, userType, db) {
 
     const filename = path.split("/").pop();
 
-    // 使用 Content-Length 头部判断空文件
-    if (declaredContentLength === 0) {
-      console.log(`WebDAV PUT - 检测到0字节文件（基于Content-Length），使用FileSystem直接上传`);
+    // 使用智能空文件检测
+    const isEmptyFile = isReallyEmptyFile(declaredContentLength, transferEncoding);
+
+    if (isEmptyFile) {
+      console.log(`WebDAV PUT - 确认为空文件，使用FileSystem直接上传`);
 
       // 创建一个空的File对象
       const emptyFile = new File([""], filename, { type: contentType });
@@ -110,8 +136,15 @@ export async function handlePut(c, path, userId, userType, db) {
     // 直接使用原始流
     const processedStream = bodyStream;
 
-    // 根据配置决定上传模式
-    if (uploadMode === "direct") {
+    // 对分块传输强制使用multipart
+    let finalUploadMode = uploadMode;
+    if (transferEncoding && transferEncoding.toLowerCase().includes("chunked")) {
+      finalUploadMode = "multipart";
+      console.log(`WebDAV PUT - 检测到分块传输，强制使用流式分片上传`);
+    }
+
+    // 根据最终决定的上传模式处理
+    if (finalUploadMode === "direct") {
       console.log(`WebDAV PUT - 使用直接流式上传模式`);
 
       try {

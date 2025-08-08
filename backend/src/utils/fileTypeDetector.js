@@ -59,7 +59,6 @@ export async function GetFileType(filename, db = null) {
           return FILE_TYPES.DOCUMENT;
         default:
           // 如果预览设置中没有配置，回退到硬编码检测
-          console.log(`文件类型检测回退: ${filename} (扩展名: ${extension}) - 预览设置未配置，使用硬编码检测`);
           return getFileTypeByExtensionFallback(extension);
       }
     }
