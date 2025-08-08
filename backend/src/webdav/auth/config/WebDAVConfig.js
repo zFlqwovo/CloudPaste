@@ -94,13 +94,11 @@ export const WEBDAV_PERMISSIONS = {
 
 /**
  * 平台特定配置
- * 处理不同平台的特殊需求
+ *
  */
 export const PLATFORM_CONFIG = {
   // Cloudflare Workers特定配置
   WORKERS: {
-    TIMEOUT: 30000, // 30秒超时
-    MAX_REQUEST_SIZE: 100 * 1024 * 1024, // 100MB
     HEADERS: {
       "CF-Cache-Status": "DYNAMIC",
     },
@@ -108,15 +106,12 @@ export const PLATFORM_CONFIG = {
 
   // Express/Docker特定配置
   EXPRESS: {
-    TIMEOUT: 60000, // 60秒超时
-    MAX_REQUEST_SIZE: 500 * 1024 * 1024, // 500MB
     TRUST_PROXY: true,
   },
 
   // Hono特定配置
   HONO: {
-    TIMEOUT: 45000, // 45秒超时
-    MAX_REQUEST_SIZE: 200 * 1024 * 1024, // 200MB
+    // 暂无特殊配置
   },
 };
 

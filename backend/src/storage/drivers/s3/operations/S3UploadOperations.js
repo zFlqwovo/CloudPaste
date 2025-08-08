@@ -29,6 +29,7 @@ export class S3UploadOperations {
   }
 
   /**
+   * 待废弃，使用uploadStream代替
    * 直接上传文件
    * @param {string} s3SubPath - S3子路径
    * @param {File} file - 文件对象
@@ -110,6 +111,122 @@ export class S3UploadOperations {
       },
       "上传文件",
       "上传文件失败"
+    );
+  }
+
+  /**
+   * 上传流式数据
+   * @param {string} s3SubPath - S3子路径
+   * @param {ReadableStream} stream - 数据流
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 上传结果
+   */
+  async uploadStream(s3SubPath, stream, options = {}) {
+    const { mount, db, filename, contentType, contentLength, useMultipart = false } = options;
+
+    return handleFsError(
+      async () => {
+        // 构建最终的S3路径
+        let finalS3Path;
+        if (s3SubPath && s3SubPath.endsWith(filename)) {
+          finalS3Path = s3SubPath;
+        } else if (s3SubPath && !s3SubPath.endsWith("/")) {
+          finalS3Path = s3SubPath + "/" + filename;
+        } else {
+          finalS3Path = s3SubPath + filename;
+        }
+
+        let result;
+        let etag;
+
+        if (useMultipart) {
+          // 使用AWS SDK Upload类进行流式分片上传
+          const { Upload } = await import("@aws-sdk/lib-storage");
+
+          const upload = new Upload({
+            client: this.s3Client,
+            params: {
+              Bucket: this.config.bucket_name,
+              Key: finalS3Path,
+              Body: stream,
+              ContentType: contentType,
+            },
+            queueSize: 3, // 并发数
+            partSize: 6 * 1024 * 1024, // 分片大小
+            leavePartsOnError: false, // 出错时自动清理分片
+          });
+
+          // 监听上传进度
+          let lastProgressLog = 0;
+          upload.on("httpUploadProgress", (progress) => {
+            const { loaded = 0, total = contentLength } = progress;
+
+            // 每50MB记录一次进度，与成功代码完全相同
+            const REDUCED_LOG_INTERVAL = 50 * 1024 * 1024; // 50MB
+            if (loaded - lastProgressLog >= REDUCED_LOG_INTERVAL || loaded === total) {
+              const progressMB = (loaded / (1024 * 1024)).toFixed(2);
+              const totalMB = total > 0 ? (total / (1024 * 1024)).toFixed(2) : "未知";
+              const percentage = total > 0 ? ((loaded / total) * 100).toFixed(1) : "未知";
+              console.log(`WebDAV PUT - 流式上传进度: ${progressMB}MB / ${totalMB}MB (${percentage}%)`);
+              lastProgressLog = loaded;
+            }
+          });
+
+          // 执行上传
+          const startTime = Date.now();
+          result = await upload.done();
+          const duration = Date.now() - startTime;
+          const speedMBps = contentLength > 0 ? (contentLength / 1024 / 1024 / (duration / 1000)).toFixed(2) : "未知";
+
+          console.log(`WebDAV PUT - 流式上传完成，用时: ${duration}ms，平均速度: ${speedMBps}MB/s`);
+
+          etag = result.ETag ? result.ETag.replace(/"/g, "") : undefined;
+        } else {
+          // 使用PutObjectCommand进行直接流式上传
+          console.log(`WebDAV PUT [${filename}]: 开始直接上传 (${(contentLength / 1024 / 1024).toFixed(1)}MB)`);
+
+          const putCommand = new PutObjectCommand({
+            Bucket: this.config.bucket_name,
+            Key: finalS3Path,
+            Body: stream,
+            ContentType: contentType,
+            ContentLength: contentLength > 0 ? contentLength : undefined,
+          });
+
+          result = await this.s3Client.send(putCommand);
+
+          etag = result.ETag ? result.ETag.replace(/"/g, "") : undefined;
+
+          console.log(`WebDAV PUT [${filename}]: 直接上传完成 100%`);
+        }
+
+        // 更新父目录的修改时间
+        await updateParentDirectoriesModifiedTime(this.s3Client, this.config.bucket_name, finalS3Path);
+
+        // 更新最后使用时间
+        if (db && mount.id) {
+          await updateMountLastUsed(db, mount.id);
+        }
+
+        // 清除缓存
+        if (mount) {
+          await clearDirectoryCache({ mountId: mount.id });
+        }
+
+        // 构建S3 URL
+        const s3Url = buildS3Url(this.config, finalS3Path);
+
+        return {
+          success: true,
+          message: useMultipart ? "流式分片上传成功" : "流式直接上传成功",
+          s3Path: finalS3Path,
+          s3Url: s3Url,
+          etag: etag,
+          contentType: contentType,
+        };
+      },
+      "流式上传",
+      "流式上传失败"
     );
   }
 

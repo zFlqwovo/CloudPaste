@@ -183,35 +183,38 @@ export class StorageDriver {
     throw new Error("getStats方法必须在子类中实现");
   }
 
-  /**
-   * 初始化后端分片上传
-   * @param {string} path - 目标路径
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 初始化结果
-   */
-  async initializeBackendMultipartUpload(path, options = {}) {
-    throw new Error("initializeBackendMultipartUpload方法必须在子类中实现");
-  }
+  // /**
+  //  * 初始化后端分片上传 - 已废弃，项目使用前端分片上传
+  //  * @deprecated 使用前端分片上传 initializeFrontendMultipartUpload 替代
+  //  * @param {string} path - 目标路径
+  //  * @param {Object} options - 选项参数
+  //  * @returns {Promise<Object>} 初始化结果
+  //  */
+  // async initializeBackendMultipartUpload(path, options = {}) {
+  //   throw new Error("initializeBackendMultipartUpload方法必须在子类中实现");
+  // }
 
-  /**
-   * 上传后端分片
-   * @param {string} path - 目标路径
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 上传结果
-   */
-  async uploadBackendPart(path, options = {}) {
-    throw new Error("uploadBackendPart方法必须在子类中实现");
-  }
+  // /**
+  //  * 上传后端分片 - 已废弃，项目使用前端分片上传
+  //  * @deprecated 使用前端分片上传替代
+  //  * @param {string} path - 目标路径
+  //  * @param {Object} options - 选项参数
+  //  * @returns {Promise<Object>} 上传结果
+  //  */
+  // async uploadBackendPart(path, options = {}) {
+  //   throw new Error("uploadBackendPart方法必须在子类中实现");
+  // }
 
-  /**
-   * 完成后端分片上传
-   * @param {string} path - 目标路径
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 完成结果
-   */
-  async completeBackendMultipartUpload(path, options = {}) {
-    throw new Error("completeBackendMultipartUpload方法必须在子类中实现");
-  }
+  // /**
+  //  * 完成后端分片上传 - 已废弃，项目使用前端分片上传
+  //  * @deprecated 使用前端分片上传 completeFrontendMultipartUpload 替代
+  //  * @param {string} path - 目标路径
+  //  * @param {Object} options - 选项参数
+  //  * @returns {Promise<Object>} 完成结果
+  //  */
+  // async completeBackendMultipartUpload(path, options = {}) {
+  //   throw new Error("completeBackendMultipartUpload方法必须在子类中实现");
+  // }
 
   /**
    * 中止后端分片上传

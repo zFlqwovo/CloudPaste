@@ -875,7 +875,7 @@ location /dav {
 
 3. **⚠️⚠️ Webdav 上传问题**:
 
-   - 关于 Cloudflare 的 Worker 上传限制(免费计划100MB)，建议使用直传模式，不要使用分片
+   - Worker部署的建议使用直传模式（理论单次最高5GB），避免使用分片（受CPU限制）
    - 对于 Docker 部署，只需注意 nginx 代理配置，上传模式任意。
 
 </details>

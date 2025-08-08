@@ -18,7 +18,7 @@ import { checkAndInitDatabase } from "./src/utils/database.js";
 import app from "./src/index.js";
 import { ApiStatus } from "./src/constants/index.js";
 
-import { getWebDAVConfig } from "./src/webdav/auth/index.js";
+import { getWebDAVConfig, getPlatformConfig } from "./src/webdav/auth/index.js";
 
 // ES模块兼容性处理：获取__dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -222,6 +222,9 @@ function createErrorResponse(error, status = ApiStatus.INTERNAL_ERROR, defaultMe
 const server = express();
 const PORT = process.env.PORT || 8787;
 
+// 获取Express平台配置（仅用于代理设置）
+const platformConfig = getPlatformConfig("express");
+
 // 数据目录和数据库设置
 const dataDir = process.env.DATA_DIR || path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
@@ -241,6 +244,12 @@ let isDbInitialized = false;
 
 // 获取WebDAV配置
 const webdavConfig = getWebDAVConfig();
+
+// 应用Express平台配置
+if (platformConfig.TRUST_PROXY) {
+  server.set("trust proxy", true);
+  console.log("Express: 已启用代理信任");
+}
 
 // CORS配置 - 使用统一配置
 const corsOptions = {
@@ -373,7 +382,7 @@ server.use((req, res, next) => {
 server.use(
   express.raw({
     type: ["application/xml", "text/xml", "application/octet-stream"],
-    limit: "1gb", // 设置合理的大小限制
+    limit: "5gb", 
     verify: (req, res, buf, encoding) => {
       // 对于WebDAV方法，特别是MKCOL，记录详细信息以便调试
       if ((req.method === "MKCOL" || req.method === "PUT") && buf && buf.length > 10 * 1024 * 1024) {
@@ -452,7 +461,7 @@ server.use((err, req, res, next) => {
 server.use(
   express.urlencoded({
     extended: true,
-    limit: "1gb",
+    limit: "5gb",
   })
 );
 
@@ -460,7 +469,7 @@ server.use(
 server.use(
   express.json({
     type: ["application/json", "application/json; charset=utf-8", "+json", "*/json"],
-    limit: "1gb",
+    limit: "5gb",
   })
 );
 
@@ -522,8 +531,6 @@ server.use(async (req, res, next) => {
 // ==========================================
 // 路由处理
 // ==========================================
-
-
 
 // 通配符路由 - 处理所有其他API请求
 server.use("*", async (req, res) => {
