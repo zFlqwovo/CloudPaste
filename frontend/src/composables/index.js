@@ -10,6 +10,9 @@ import { usePreviewRenderers } from "./file-preview/usePreviewRenderers.js";
 import { useFilePreviewExtensions } from "./file-preview/useFilePreviewExtensions.js";
 import { useFilePreview } from "./file-preview/useFilePreview.js";
 
+// ===== 压缩文件功能 =====
+import { useArchivePreview } from "./archive/useArchivePreview.js";
+
 // ===== 文件系统功能 =====
 import { useFileOperations } from "./file-system/useFileOperations.js";
 import { useDirectorySort } from "./file-system/useDirectorySort.js";
@@ -28,6 +31,7 @@ export {
   usePreviewRenderers,
   useFilePreviewExtensions,
   useFilePreview,
+  useArchivePreview,
   useFileOperations,
   useDirectorySort,
   useFileBasket,
@@ -48,6 +52,7 @@ export const FilePreviewComposables = {
   usePreviewRenderers,
   useFilePreviewExtensions,
   useFilePreview,
+  useArchivePreview,
 };
 
 /**

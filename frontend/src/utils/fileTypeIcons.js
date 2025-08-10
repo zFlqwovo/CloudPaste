@@ -455,7 +455,7 @@ export const getFileIcon = (item, darkMode = false) => {
     }
 
     // 压缩文件的特殊处理（跨类型）
-    const archiveExtensions = ["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "tar.gz", "tar.bz2", "tar.xz"];
+    const archiveExtensions = ["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "tgz", "tbz", "tbz2", "txz", "cpio", "iso", "cab", "xar", "ar", "a", "mtree"];
     if (archiveExtensions.includes(ext)) {
       return fileIconsMap.archive(darkMode);
     }

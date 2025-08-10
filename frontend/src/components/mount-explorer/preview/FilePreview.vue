@@ -502,6 +502,18 @@
           </div>
         </div>
 
+        <!-- 压缩文件预览 -->
+        <div v-else-if="isArchive" class="flex-1">
+          <ArchivePreview
+            :file="file"
+            :dark-mode="darkMode"
+            :authenticated-preview-url="authenticatedPreviewUrl"
+            @download="handleDownload"
+            @loaded="handleContentLoaded"
+            @error="handleContentError"
+          />
+        </div>
+
         <!-- 不支持预览的文件类型 -->
         <div v-else class="flex-1 flex items-center justify-center">
           <div class="generic-preview text-center py-12">
@@ -535,9 +547,11 @@ import { useI18n } from "vue-i18n";
 import { usePreviewRenderers, useFilePreviewExtensions, useFileSave } from "../../../composables/index.js";
 import { useAuthStore } from "@/stores/authStore.js";
 import { getPreviewModeFromFilename, PREVIEW_MODES, SUPPORTED_ENCODINGS } from "@/utils/textUtils.js";
+import { isArchiveFile } from "@/utils/fileTypes.js";
 import AudioPreview from "./AudioPreview.vue";
 import VideoPreview from "./VideoPreview.vue";
 import TextPreview from "./TextPreview.vue";
+import ArchivePreview from "./ArchivePreview.vue";
 
 const { t } = useI18n();
 
@@ -783,6 +797,11 @@ const isMarkdown = computed(() => {
   return ["md", "markdown", "mdown", "mkd"].includes(ext);
 });
 
+// 压缩文件检测
+const isArchive = computed(() => {
+  return props.file?.name && isArchiveFile(props.file.name);
+});
+
 // 监听模式变化
 watch(textPreviewMode, (newMode) => {
   console.log("模式切换到:", newMode);
@@ -901,7 +920,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
 }
-
 
 /* 全屏模式下工具栏的暗色主题适配 */
 :deep(:fullscreen .fullscreen-toolbar.bg-gray-800) {

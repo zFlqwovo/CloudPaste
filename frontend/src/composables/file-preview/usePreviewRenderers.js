@@ -6,7 +6,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { createAuthenticatedPreviewUrl } from "@/utils/fileUtils.js";
 import { formatDateTime } from "@/utils/timeUtils.js";
-import { formatFileSize as formatFileSizeUtil, FileType } from "@/utils/fileTypes.js";
+import { formatFileSize as formatFileSizeUtil, FileType, isArchiveFile } from "@/utils/fileTypes.js";
 
 export function usePreviewRenderers(file, emit, darkMode) {
   // ===== 状态管理 =====
@@ -459,9 +459,15 @@ export function usePreviewRenderers(file, emit, darkMode) {
         console.log(`✅ 最终预览类型: ${selectedType}`);
         console.groupEnd();
 
-        // 使用S3预签名URL（图片、视频、音频、PDF）
+        // 使用S3预签名URL（图片、视频、音频、PDF、压缩文件）
         if (typeChecks.isImage || typeChecks.isVideo || typeChecks.isAudio || typeChecks.isPdf) {
           authenticatedPreviewUrl.value = previewUrl.value;
+        }
+
+        // 为压缩文件也生成预览URL（用于在线解压）
+        if (file.value?.name && isArchiveFile(file.value.name)) {
+          authenticatedPreviewUrl.value = previewUrl.value;
+          console.log("为压缩文件生成预览URL:", previewUrl.value);
         }
 
         // 如果是Office文件，更新Office预览URL

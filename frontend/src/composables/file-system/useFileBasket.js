@@ -296,9 +296,15 @@ export function useFileBasket() {
    * @param {number} taskId - 任务ID
    */
   const processPackTask = async (taskId) => {
-    // 用于清理资源的变量
-    let fileStates = null;
-    let activeXHRs = new Set(); // 跟踪活动的XMLHttpRequest
+    // 初始化文件状态跟踪
+    const fileStates = new Map();
+
+    // 清理函数
+    const cleanup = () => {
+      if (fileStates) {
+        fileStates.clear();
+      }
+    };
 
     try {
       // 更新任务状态
@@ -313,15 +319,16 @@ export function useFileBasket() {
       // 获取收集的文件
       const files = fileBasketStore.getCollectedFiles();
 
-      // 动态导入JSZip和file-saver
-      const JSZip = (await import("jszip")).default;
+      // 动态导入zip.js和file-saver
+      const { ZipWriter, BlobWriter, BlobReader, HttpReader } = await import("@zip.js/zip.js");
       const { saveAs } = await import("file-saver");
 
-      const zip = new JSZip();
+      // 创建 ZipWriter（zip.js官方推荐的最佳实践）
+      console.log(`处理 ${files.length} 个文件`);
+      const blobWriter = new BlobWriter();
+      const zipWriter = new ZipWriter(blobWriter);
       const failedFiles = [];
-
-      // 并行文件状态跟踪
-      fileStates = new Map(); // 跟踪每个文件的状态
+      const addedFiles = new Set();
 
       // 初始化文件状态
       files.forEach((file) => {
@@ -329,215 +336,26 @@ export function useFileBasket() {
           name: file.name,
           path: file.path,
           size: file.size,
-          status: "pending", // pending, downloading, completed, failed
+          status: "pending",
           progress: 0,
           receivedBytes: 0,
           totalBytes: file.size || 0,
         });
       });
 
-      // 计算总文件大小（参考上传逻辑）
-      const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
-      let completedSize = 0;
-
-      // 移除速度计算，简化逻辑
-
-      // 进度更新节流控制（避免过度更新导致跳动）
-      // 使用Map为每个文件单独跟踪节流状态，避免竞态条件
-      const fileProgressThrottles = new Map(); // 每个文件的节流状态
-      const PROGRESS_UPDATE_INTERVAL = 200; // 200ms更新一次，避免过于频繁
-
-      // 全局进度更新锁，防止并发更新冲突
-      let isUpdatingProgress = false;
-
-      // 清理资源的函数
-      const cleanup = () => {
-        // 取消所有活动的XMLHttpRequest
-        activeXHRs.forEach((xhr) => {
-          if (xhr.readyState !== XMLHttpRequest.DONE) {
-            xhr.abort();
-          }
-        });
-        activeXHRs.clear();
-
-        // 清理fileStates Map
-        if (fileStates) {
-          fileStates.clear();
-          fileStates = null;
-        }
-
-        // 清理节流状态
-        fileProgressThrottles.clear();
-        isUpdatingProgress = false;
-      };
-
-      // 更新任务进度的辅助函数
-      const updateTaskWithFileStates = (overallProgress, currentFile = "") => {
-        if (!fileStates) return; // 防止在清理后调用
-
-        const fileStatesArray = Array.from(fileStates.values());
-
-        taskManager.updateTaskProgress(taskId, overallProgress, {
-          status: t("fileBasket.task.downloading"),
-          currentFile: currentFile,
-          processed: fileStatesArray.filter((f) => f.status === "completed").length,
-          total: files.length,
-          totalProgress: overallProgress,
-          // 添加并行文件状态信息
-          parallelFiles: fileStatesArray,
-          showParallelDetails: true, // 标记这是并行下载任务
-        });
-      };
-
-      // 处理单个文件的函数
-      const processFile = async (file) => {
+      // 并发添加文件到ZIP
+      const zipAddPromises = files.map(async (file) => {
         try {
-          // 更新文件状态为下载中
-          const fileState = fileStates.get(file.path);
-          fileState.status = "downloading";
-
-          // 获取文件下载URL
           const downloadUrl = await getFileDownloadUrl(file);
 
-          // 使用XMLHttpRequest下载文件并监控实时进度（参考上传逻辑）
-          const blob = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            activeXHRs.add(xhr); // 跟踪活动的XMLHttpRequest（局部）
-            globalActiveXHRs.add(xhr); // 跟踪活动的XMLHttpRequest（全局）
-
-            // 设置超时时间（60分钟）
-            xhr.timeout = 60 * 60 * 1000;
-
-            xhr.open("GET", downloadUrl);
-            xhr.responseType = "blob";
-
-            // 进度事件监听（完全参考文件上传的进度监控算法）
-            xhr.onprogress = (event) => {
-              if (event.lengthComputable) {
-                const fileProgress = Math.round((event.loaded / event.total) * 100);
-
-                // 更新当前文件状态
-                fileState.progress = fileProgress;
-                fileState.receivedBytes = event.loaded;
-                fileState.totalBytes = event.total;
-
-                // 计算总体进度（基于所有文件的完成情况）
-                const completedFilesSize = Array.from(fileStates.values())
-                  .filter((f) => f.status === "completed")
-                  .reduce((sum, f) => sum + f.totalBytes, 0);
-
-                const currentDownloadingSize = Array.from(fileStates.values())
-                  .filter((f) => f.status === "downloading")
-                  .reduce((sum, f) => sum + f.receivedBytes, 0);
-
-                const overallProgress = totalSize > 0 ? Math.round(((completedFilesSize + currentDownloadingSize) / totalSize) * 90) : 0;
-
-                // 节流更新任务进度（避免过度更新导致UI跳动）
-                // 使用文件级别的节流，避免竞态条件
-                const now = Date.now();
-                const fileThrottle = fileProgressThrottles.get(file.path) || { lastUpdate: 0 };
-
-                if (now - fileThrottle.lastUpdate >= PROGRESS_UPDATE_INTERVAL || fileProgress === 100) {
-                  fileThrottle.lastUpdate = now;
-                  fileProgressThrottles.set(file.path, fileThrottle);
-
-                  // 使用锁机制防止并发更新冲突
-                  if (!isUpdatingProgress) {
-                    isUpdatingProgress = true;
-
-                    // 使用微任务确保更新的原子性
-                    Promise.resolve().then(() => {
-                      try {
-                        updateTaskWithFileStates(overallProgress, `${file.name} (${fileProgress}%)`);
-                      } finally {
-                        isUpdatingProgress = false;
-                      }
-                    });
-                  }
-                }
-              }
-            };
-
-            // 完整的错误处理事件
-            xhr.onload = () => {
-              activeXHRs.delete(xhr); // 从跟踪中移除
-              if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(xhr.response);
-              } else {
-                reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText || "未知错误"}`));
-              }
-            };
-
-            xhr.onerror = () => {
-              activeXHRs.delete(xhr); // 从跟踪中移除
-              reject(new Error("网络连接错误"));
-            };
-
-            xhr.onabort = () => {
-              activeXHRs.delete(xhr); // 从跟踪中移除
-              reject(new Error("下载被取消"));
-            };
-
-            xhr.ontimeout = () => {
-              activeXHRs.delete(xhr); // 从跟踪中移除
-              reject(new Error("下载超时"));
-            };
-
-            // 监听网络状态变化
-            const handleOffline = () => {
-              if (!navigator.onLine) {
-                xhr.abort();
-                reject(new Error("网络连接已断开"));
-              }
-            };
-
-            // 添加网络状态监听
-            window.addEventListener("offline", handleOffline);
-
-            // 清理网络状态监听的函数
-            const cleanupXHR = () => {
-              window.removeEventListener("offline", handleOffline);
-              activeXHRs.delete(xhr);
-              globalActiveXHRs.delete(xhr); // 同时从全局跟踪中移除
-            };
-
-            // 重写所有事件处理器以包含清理
-            const originalOnload = xhr.onload;
-            const originalOnerror = xhr.onerror;
-            const originalOnabort = xhr.onabort;
-            const originalOntimeout = xhr.ontimeout;
-
-            xhr.onload = (...args) => {
-              cleanupXHR();
-              originalOnload.apply(xhr, args);
-            };
-
-            xhr.onerror = (...args) => {
-              cleanupXHR();
-              originalOnerror.apply(xhr, args);
-            };
-
-            xhr.onabort = (...args) => {
-              cleanupXHR();
-              originalOnabort.apply(xhr, args);
-            };
-
-            xhr.ontimeout = (...args) => {
-              cleanupXHR();
-              originalOntimeout.apply(xhr, args);
-            };
-
-            xhr.send();
-          });
-
-          // 构建ZIP内的路径结构
+          // 构建ZIP路径
           const directoryName = file.sourceDirectory.replace(/^\//, "").replace(/\//g, "_") || "root";
           const zipPath = `${directoryName}/${file.name}`;
 
           // 处理文件名冲突
           let finalZipPath = zipPath;
           let counter = 1;
-          while (zip.file(finalZipPath)) {
+          while (addedFiles.has(finalZipPath)) {
             const lastDotIndex = zipPath.lastIndexOf(".");
             if (lastDotIndex > 0) {
               const name = zipPath.substring(0, lastDotIndex);
@@ -548,68 +366,74 @@ export function useFileBasket() {
             }
             counter++;
           }
+          addedFiles.add(finalZipPath);
 
-          // 添加到ZIP
-          zip.file(finalZipPath, blob);
+          // 更新文件状态
+          let fileState = fileStates.get(file.path);
+          if (fileState) {
+            fileState.status = "downloading";
+          }
 
-          // 文件处理完成，更新文件状态
-          fileState.status = "completed";
-          fileState.progress = 100;
-          completedSize += file.size || 0;
+          await zipWriter.add(
+            finalZipPath,
+            new HttpReader(downloadUrl, {
+              preventHeadRequest: true,
+              useXHR: false,
+            }),
+            {
+              onprogress: (progress, total) => {
+                if (fileState) {
+                  fileState.progress = total > 0 ? Math.round((progress / total) * 100) : 0;
+                  fileState.receivedBytes = progress;
+                  fileState.totalBytes = total;
 
-          // 确保文件完成时的最终进度更新（绕过节流机制）
-          const finalOverallProgress = totalSize > 0 ? Math.round((completedSize / totalSize) * 90) : 0;
+                  const completedFiles = Array.from(fileStates.values()).filter((f) => f.status === "completed").length;
+                  const overallProgress = Math.round(((completedFiles + progress / total) / files.length) * 90);
 
-          // 强制更新最终状态，不受节流和锁机制限制
-          try {
-            updateTaskWithFileStates(finalOverallProgress, `${file.name} (完成)`);
-          } catch (updateError) {
-            console.warn(`更新文件完成状态失败: ${updateError.message}`);
+                  taskManager.updateTaskProgress(taskId, overallProgress, {
+                    status: t("fileBasket.task.downloading"),
+                    currentFile: `${file.name} (${fileState.progress}%)`,
+                    processed: completedFiles,
+                    total: files.length,
+                  });
+                }
+              },
+            }
+          );
+
+          // 文件完成
+          fileState = fileStates.get(file.path);
+          if (fileState) {
+            fileState.status = "completed";
+            fileState.progress = 100;
           }
 
           return { success: true, fileName: file.name };
         } catch (error) {
-          console.error(`下载文件 ${file.name} 失败:`, error);
+          console.error(`添加文件 ${file.name} 失败:`, error);
           failedFiles.push({ fileName: file.name, path: file.path, error: error.message });
 
-          // 失败也要更新文件状态
-          const fileState = fileStates.get(file.path);
-          if (fileState) {
-            fileState.status = "failed";
-            fileState.progress = 0; // 失败时重置进度
-          }
-          completedSize += file.size || 0;
-
-          // 强制更新失败状态，不受节流和锁机制限制
-          const overallProgress = totalSize > 0 ? Math.round((completedSize / totalSize) * 90) : 0;
-          try {
-            updateTaskWithFileStates(overallProgress, `${file.name} (失败)`);
-          } catch (updateError) {
-            console.warn(`更新文件失败状态失败: ${updateError.message}`);
+          const failedFileState = fileStates.get(file.path);
+          if (failedFileState) {
+            failedFileState.status = "failed";
+            failedFileState.progress = 0;
           }
 
           return { success: false, fileName: file.name, error: error.message };
         }
-      };
+      });
 
-      // 简化的并发控制，确保实时进度更新
-      const concurrencyLimit = 3;
+      // 等待所有文件完成
+      await Promise.all(zipAddPromises);
 
-      for (let i = 0; i < files.length; i += concurrencyLimit) {
-        const batch = files.slice(i, i + concurrencyLimit);
-
-        // 并发处理批次中的文件，但每个文件完成时立即更新进度
-        await Promise.all(batch.map(processFile));
-      }
-
-      // 如果有失败的文件，添加错误报告
+      // 添加错误报告
       if (failedFiles.length > 0) {
         const errorReport = [t("fileBasket.task.failedFilesHeader"), "", ...failedFiles.map(({ fileName, path, error }) => `${path} (${fileName}): ${error}`)].join("\n");
 
-        zip.file("下载失败文件列表.txt", errorReport);
+        await zipWriter.add("下载失败文件列表.txt", new BlobReader(new Blob([errorReport], { type: "text/plain" })));
       }
 
-      // 生成ZIP文件
+      // 生成ZIP
       taskManager.updateTaskProgress(taskId, 95, {
         status: t("fileBasket.task.generating"),
         currentFile: "",
@@ -617,16 +441,11 @@ export function useFileBasket() {
         total: files.length,
       });
 
-      const zipBlob = await zip.generateAsync({
-        type: "blob",
-        compression: "DEFLATE",
-        compressionOptions: { level: 6 },
-      });
+      const zipBlob = await zipWriter.close();
 
       // 下载ZIP文件
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       const zipFileName = `CloudPaste_${timestamp}.zip`;
-
       saveAs(zipBlob, zipFileName);
 
       // 完成任务
@@ -647,12 +466,12 @@ export function useFileBasket() {
       fileBasketStore.clearBasket();
     } catch (error) {
       console.error("打包任务失败:", error);
-      taskManager.failTask(taskId, error.message, {
+      taskManager.failTask(taskId, {
         status: t("fileBasket.task.failed"),
+        error: error.message,
         endTime: new Date().toISOString(),
       });
     } finally {
-      // 确保清理资源
       cleanup();
     }
   };
