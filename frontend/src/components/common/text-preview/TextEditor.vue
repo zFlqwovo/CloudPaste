@@ -13,12 +13,12 @@
         <p class="error-text">{{ error }}</p>
         <div class="fallback-editor">
           <textarea
-            v-model="localContent"
-            class="fallback-textarea"
-            :class="{ 'fallback-dark': darkMode }"
-            :readonly="readOnly"
-            @input="handleInput"
-            :placeholder="$t('textPreview.fallbackEditor')"
+              v-model="localContent"
+              class="fallback-textarea"
+              :class="{ 'fallback-dark': darkMode }"
+              :readonly="readOnly"
+              @input="handleInput"
+              :placeholder="$t('textPreview.fallbackEditor')"
           />
         </div>
       </div>
@@ -33,15 +33,13 @@ import loader from "@monaco-editor/loader";
 
 const { t } = useI18n();
 
-// 配置Monaco Editor使用 CDN
-loader.config({
-  paths: {
-    vs: "https://s4.zstatic.net/npm/monaco-editor@0.52.2/min/vs",
-    //vs: "https://cdn.bootcdn.net/ajax/libs/monaco-editor/0.52.2/min/vs", // BootCDN
-    //vs: "https://unpkg.com/monaco-editor@0.52.2/min/vs", // unpkg
-    //vs: "https://fastly.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs", // JSDelivr
-  },
-});
+// CDN 配置列表（按优先级排序）
+const CDN_LIST = [
+  "https://cdnjs.znnu.com/monaco-editor/0.52.2/min/vs",  // cdnjs CDN
+  "https://s4.zstatic.net/npm/monaco-editor@0.52.2/min/vs",  // ZStatic
+  "https://fastly.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs", // JSDelivr
+  "https://unpkg.com/monaco-editor@0.52.2/min/vs", // unpkg
+];
 
 // Props
 const props = defineProps({
@@ -239,15 +237,43 @@ const initMonacoEditor = async () => {
 
     console.log("编辑器容器准备就绪，开始初始化Monaco编辑器");
 
-    // 加载Monaco编辑器
+    // 加载Monaco编辑器（带CDN切换）
     console.log("开始加载Monaco编辑器...");
-    monaco = await loader.init();
 
-    if (!monaco || !monaco.editor) {
-      throw new Error("Monaco编辑器加载失败");
+    let lastError = null;
+    for (let i = 0; i < CDN_LIST.length; i++) {
+      try {
+        const cdnUrl = CDN_LIST[i];
+        console.log(`尝试 CDN ${i + 1}/${CDN_LIST.length}: ${cdnUrl}`);
+
+        // 配置当前 CDN
+        loader.config({
+          paths: {
+            vs: cdnUrl,
+          },
+        });
+
+        // 尝试加载
+        monaco = await loader.init();
+
+        if (monaco && monaco.editor) {
+          console.log(`Monaco编辑器加载成功，使用 CDN: ${cdnUrl}`);
+          break;
+        } else {
+          throw new Error("Monaco编辑器对象无效");
+        }
+      } catch (error) {
+        lastError = error;
+        console.warn(`CDN ${i + 1} 加载失败:`, error.message);
+
+        if (i === CDN_LIST.length - 1) {
+          throw new Error(`所有 CDN 都无法加载 Monaco Editor。最后错误: ${lastError?.message}`);
+        }
+
+        // 继续尝试下一个 CDN
+        continue;
+      }
     }
-
-    console.log("Monaco编辑器加载成功");
 
     // 创建编辑器实例
     monacoEditor = monaco.editor.create(editorContainer.value, {
@@ -414,41 +440,41 @@ const resize = () => {
 
 // 监听props变化
 watch(
-  () => props.content,
-  (newContent) => {
-    if (newContent !== getValue()) {
-      setValue(newContent);
+    () => props.content,
+    (newContent) => {
+      if (newContent !== getValue()) {
+        setValue(newContent);
+      }
     }
-  }
 );
 
 watch(
-  () => props.language,
-  (newLanguage) => {
-    setLanguage(newLanguage);
-  }
+    () => props.language,
+    (newLanguage) => {
+      setLanguage(newLanguage);
+    }
 );
 
 watch(
-  () => props.darkMode,
-  (newDarkMode) => {
-    if (monacoEditor) {
-      monacoEditor.updateOptions({
-        theme: newDarkMode ? "vs-dark" : "vs",
-      });
+    () => props.darkMode,
+    (newDarkMode) => {
+      if (monacoEditor) {
+        monacoEditor.updateOptions({
+          theme: newDarkMode ? "vs-dark" : "vs",
+        });
+      }
     }
-  }
 );
 
 watch(
-  () => props.readOnly,
-  (newReadOnly) => {
-    if (monacoEditor) {
-      monacoEditor.updateOptions({
-        readOnly: newReadOnly,
-      });
+    () => props.readOnly,
+    (newReadOnly) => {
+      if (monacoEditor) {
+        monacoEditor.updateOptions({
+          readOnly: newReadOnly,
+        });
+      }
     }
-  }
 );
 
 // 组件挂载
