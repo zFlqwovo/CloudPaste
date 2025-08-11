@@ -6,6 +6,7 @@
 
 import { ref, computed, onUnmounted } from "vue";
 import { archiveService } from "./archiveService.js";
+import { cleanupZipJS } from "./zipService.js";
 import { lookupMimeType, detectFileTypeFromFilename, FileType, getFileName } from "@/utils/fileTypes.js";
 
 /**
@@ -348,9 +349,16 @@ export function useArchivePreview() {
 
   // ===== 生命周期 =====
 
-  onUnmounted(() => {
+  onUnmounted(async () => {
     // 清理资源
     resetState();
+
+    // 清理zip.js Worker资源
+    try {
+      await cleanupZipJS();
+    } catch (error) {
+      console.warn("清理zip.js资源时出错:", error);
+    }
   });
 
   // ===== 返回接口 =====

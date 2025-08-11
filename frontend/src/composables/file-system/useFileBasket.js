@@ -323,10 +323,15 @@ export function useFileBasket() {
       const { ZipWriter, BlobWriter, BlobReader, HttpReader } = await import("@zip.js/zip.js");
       const { saveAs } = await import("file-saver");
 
-      // 创建 ZipWriter（zip.js官方推荐的最佳实践）
+      // 创建 ZipWriter
       console.log(`处理 ${files.length} 个文件`);
       const blobWriter = new BlobWriter();
-      const zipWriter = new ZipWriter(blobWriter);
+      const zipWriter = new ZipWriter(blobWriter, {
+        keepOrder: true, // 保持文件顺序
+        useWebWorkers: true, // 启用Web Workers
+        useCompressionStream: true, // 使用原生压缩流
+        bufferedWrite: false, // 不缓冲写入，减少内存占用
+      });
       const failedFiles = [];
       const addedFiles = new Set();
 
@@ -377,10 +382,15 @@ export function useFileBasket() {
           await zipWriter.add(
             finalZipPath,
             new HttpReader(downloadUrl, {
-              preventHeadRequest: true,
-              useXHR: false,
+              preventHeadRequest: true, // 避免额外的HEAD请求
+              useXHR: false, // 使用fetch API
+              useCompressionStream: true, // 启用原生压缩流
+              transferStreams: true, // 启用流传输到Web Workers
             }),
             {
+              useWebWorkers: true, // 启用Web Workers
+              useCompressionStream: true, // 使用原生压缩流
+              transferStreams: true, // 启用流传输
               onprogress: (progress, total) => {
                 if (fileState) {
                   fileState.progress = total > 0 ? Math.round((progress / total) * 100) : 0;

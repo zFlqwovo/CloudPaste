@@ -501,7 +501,7 @@ const attemptExtraction = async (password) => {
       // 检测到加密文件，文件已预下载完成，显示密码输入界面
       console.log("检测到加密文件，文件已预下载完成，显示密码输入界面");
       isPasswordRequired.value = true;
-      passwordError.value = ""; 
+      passwordError.value = "";
       isValidatingPassword.value = false;
     } else if (error.message && error.message.includes("INVALID_ARCHIVE_PASSWORD")) {
       // 密码错误，重新显示密码输入界面
@@ -691,11 +691,16 @@ onBeforeUnmount(() => {
   console.log("🧹 ArchivePreview组件卸载，清理缓存");
   resetState(); // 清理所有缓存数据
 
-  // 清理文件Blob缓存
   if (props.authenticatedPreviewUrl) {
     const { archiveService } = useArchivePreview();
+
+    // 清理文件Blob缓存（原始压缩文件）
     archiveService.clearFileBlobCache(props.authenticatedPreviewUrl);
     console.log("🧹 已清理文件Blob缓存");
+
+    // 清理解压结果缓存
+    archiveService.clearFileCache(props.authenticatedPreviewUrl, props.file.name);
+    console.log("🧹 已清理解压结果缓存");
   }
 });
 </script>

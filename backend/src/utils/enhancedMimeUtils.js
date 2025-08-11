@@ -1,6 +1,6 @@
 /**
  * 增强的MIME类型检测工具
- * 策略：文件扩展名优先，魔术字节补充
+ * 文件扩展名优先，魔术字节补充，适配url解析mime的
  */
 
 import { fileTypeFromBuffer } from "file-type";

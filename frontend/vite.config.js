@@ -9,7 +9,7 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   // 统一版本管理
-  const APP_VERSION = "0.7.8";
+  const APP_VERSION = "0.7.9";
   const isDev = command === "serve";
 
   // 打印环境变量，帮助调试
@@ -455,7 +455,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     optimizeDeps: {
-      include: ["vue-i18n", "chart.js", "qrcode"],
+      include: ["vue-i18n", "chart.js", "qrcode", "mime-db"],
       // 移除vditor排除配置，因为现在从本地dist目录加载
     },
     build: {
