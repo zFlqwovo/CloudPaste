@@ -51,10 +51,10 @@
                   </svg>
                 </span>
               </div>
-              <div class="text-xs mt-1" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              <div class="text-xs mt-1 truncate" :class="darkMode ? 'text-gray-400' : 'text-gray-500'" :title="file.slug ? `/${file.slug}` : '无短链接'">
                 {{ file.slug ? `/${file.slug}` : "无短链接" }}
               </div>
-              <div v-if="file.remark" class="text-xs mt-1 italic" :class="darkMode ? 'text-blue-400' : 'text-blue-600'">
+              <div v-if="file.remark" class="text-xs mt-1 italic truncate max-w-xs overflow-hidden" :class="darkMode ? 'text-blue-400' : 'text-blue-600'" :title="file.remark">
                 {{ file.remark }}
               </div>
             </div>
@@ -73,7 +73,11 @@
           <div>
             <div class="text-xs font-medium uppercase" :class="darkMode ? 'text-gray-500' : 'text-gray-500'">类型</div>
             <div>
-              <span class="px-2 py-0.5 text-xs rounded" :class="getMimeTypeClass(file)">
+              <span
+                class="px-2 py-0.5 text-xs rounded inline-block max-w-full truncate"
+                :class="getMimeTypeClass(file)"
+                :title="getSimpleMimeType(file.mimetype, file.filename, file)"
+              >
                 {{ getSimpleMimeType(file.mimetype, file.filename, file) }}
               </span>
             </div>
@@ -262,7 +266,7 @@ const fileColumns = computed(() => [
           h(
             "span",
             {
-              class: "font-medium truncate max-w-xs",
+              class: "font-medium truncate max-w-64",
               title: file.filename,
             },
             truncateFilename(file.filename)
@@ -280,7 +284,8 @@ const fileColumns = computed(() => [
         h(
           "span",
           {
-            class: `text-xs mt-1 truncate max-w-xs ${props.darkMode ? "text-gray-400" : "text-gray-500"}`,
+            class: `text-xs mt-1 truncate max-w-64 ${props.darkMode ? "text-gray-400" : "text-gray-500"}`,
+            title: file.slug ? `/${file.slug}` : "无短链接", // 鼠标悬停显示完整短链接
           },
           file.slug ? `/${file.slug}` : "无短链接"
         ),
@@ -288,7 +293,8 @@ const fileColumns = computed(() => [
           h(
             "span",
             {
-              class: `text-xs mt-1 italic truncate max-w-xs ${props.darkMode ? "text-blue-400" : "text-blue-600"}`,
+              class: `text-xs mt-1 italic truncate max-w-64 ${props.darkMode ? "text-blue-400" : "text-blue-600"}`,
+              title: file.remark, // 鼠标悬停显示完整备注
             },
             file.remark
           ),
@@ -303,12 +309,14 @@ const fileColumns = computed(() => [
     header: "MIME类型",
     sortable: true,
     render: (_, file) => {
+      const mimeTypeText = getSimpleMimeType(file.mimetype, file.filename, file);
       return h(
         "span",
         {
-          class: `px-2 py-1 text-xs rounded ${getMimeTypeClass(file)}`,
+          class: `px-2 py-1 text-xs rounded ${getMimeTypeClass(file)} inline-block max-w-32 truncate`,
+          title: mimeTypeText, // 鼠标悬停显示完整MIME类型
         },
-        getSimpleMimeType(file.mimetype, file.filename, file)
+        mimeTypeText
       );
     },
   },

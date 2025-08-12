@@ -23,13 +23,13 @@
                 <dd class="col-span-2" :class="darkMode ? 'text-white' : 'text-gray-900'">{{ file.filename }}</dd>
 
                 <dt :class="darkMode ? 'text-gray-400' : 'text-gray-500'">短链接</dt>
-                <dd class="col-span-2" :class="darkMode ? 'text-white' : 'text-gray-900'">
+                <dd class="col-span-2 break-words" :class="darkMode ? 'text-white' : 'text-gray-900'">
                   <span v-if="file.slug">{{ baseUrl }}/file/{{ file.slug }}</span>
                   <span v-else class="text-gray-400">未设置</span>
                 </dd>
 
                 <dt :class="darkMode ? 'text-gray-400' : 'text-gray-500'">MIME类型</dt>
-                <dd class="col-span-2" :class="darkMode ? 'text-white' : 'text-gray-900'">{{ file.mimetype || "未知" }}</dd>
+                <dd class="col-span-2 break-words" :class="darkMode ? 'text-white' : 'text-gray-900'">{{ file.mimetype || "未知" }}</dd>
 
                 <dt :class="darkMode ? 'text-gray-400' : 'text-gray-500'">文件大小</dt>
                 <dd class="col-span-2" :class="darkMode ? 'text-white' : 'text-gray-900'">{{ formatFileSize(file.size) }}</dd>
