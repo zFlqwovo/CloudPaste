@@ -6,14 +6,11 @@ import { ApiStatus } from "../constants/index.js";
 
 const backupRoutes = new Hono();
 
-// 应用认证中间件 - 只有管理员可以访问
-backupRoutes.use("*", authGateway.requireAdmin());
-
 /**
  * 创建备份
  * POST /api/admin/backup/create
  */
-backupRoutes.post("/api/admin/backup/create", async (c) => {
+backupRoutes.post("/api/admin/backup/create", authGateway.requireAdmin(), async (c) => {
   try {
     const body = await c.req.json();
     const { backup_type = "full", selected_modules = [] } = body;
@@ -55,7 +52,7 @@ backupRoutes.post("/api/admin/backup/create", async (c) => {
  * 还原备份
  * POST /api/admin/backup/restore
  */
-backupRoutes.post("/api/admin/backup/restore", async (c) => {
+backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async (c) => {
   try {
     const formData = await c.req.formData();
     const file = formData.get("backup_file");
@@ -110,7 +107,7 @@ backupRoutes.post("/api/admin/backup/restore", async (c) => {
  * 获取备份模块信息
  * GET /api/admin/backup/modules
  */
-backupRoutes.get("/api/admin/backup/modules", async (c) => {
+backupRoutes.get("/api/admin/backup/modules", authGateway.requireAdmin(), async (c) => {
   try {
     const backupService = new BackupService(c.env.DB);
 

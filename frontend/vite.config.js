@@ -86,12 +86,12 @@ export default defineConfig(({ command, mode }) => {
             // 第三方CDN资源 - CacheFirst（外部资源稳定）
             {
               urlPattern: ({ url }) =>
-                url.origin !== self.location.origin &&
-                (url.hostname.includes("cdn") ||
-                  url.hostname.includes("googleapis") ||
-                  url.hostname.includes("gstatic") ||
-                  url.hostname.includes("jsdelivr") ||
-                  url.hostname.includes("unpkg")),
+                  url.origin !== self.location.origin &&
+                  (url.hostname.includes("cdn") ||
+                      url.hostname.includes("googleapis") ||
+                      url.hostname.includes("gstatic") ||
+                      url.hostname.includes("jsdelivr") ||
+                      url.hostname.includes("unpkg")),
               handler: "CacheFirst",
               options: {
                 cacheName: "external-cdn-resources",
@@ -108,7 +108,7 @@ export default defineConfig(({ command, mode }) => {
             // 图廊图片 - NetworkFirst
             {
               urlPattern: ({ request, url }) =>
-                request.destination === "image" && (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                  request.destination === "image" && (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "gallery-images",
@@ -126,8 +126,8 @@ export default defineConfig(({ command, mode }) => {
             // 用户媒体文件 - NetworkFirst（大文件适度缓存）
             {
               urlPattern: ({ request, url }) =>
-                (request.destination === "video" || request.destination === "audio" || /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/i.test(url.pathname)) &&
-                (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                  (request.destination === "video" || request.destination === "audio" || /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/i.test(url.pathname)) &&
+                  (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "user-media",
@@ -146,8 +146,8 @@ export default defineConfig(({ command, mode }) => {
             // 用户文档文件 - NetworkFirst（文档快速更新）
             {
               urlPattern: ({ url }) =>
-                /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|md)$/i.test(url.pathname) &&
-                (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                  /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|md)$/i.test(url.pathname) &&
+                  (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "user-documents",
@@ -295,8 +295,8 @@ export default defineConfig(({ command, mode }) => {
             // 管理员配置写入API - NetworkOnly（POST/PUT/DELETE操作）
             {
               urlPattern: ({ request, url }) =>
-                ["POST", "PUT", "DELETE"].includes(request.method) &&
-                /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings|admin\/login|admin\/change-password|admin\/cache).*$/.test(url.href),
+                  ["POST", "PUT", "DELETE"].includes(request.method) &&
+                  /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings|admin\/login|admin\/change-password|admin\/cache).*$/.test(url.href),
               handler: "NetworkOnly",
               options: {
                 cacheName: "admin-config-write",
