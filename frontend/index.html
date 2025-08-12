@@ -11,16 +11,10 @@
     <link rel="apple-touch-icon" href="/icons-32.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>CloudPaste - 安全分享您的内容</title>
-    <!-- 运行时配置文件，现代动态加载方式 -->
+    <!-- 运行时配置文件，使用document.write确保同步加载 -->
     <script>
-        // 动态加载config.js
-        (function loadConfig() {
-            const script = document.createElement("script");
-            script.type = "text/javascript";
-            script.src = "/config.js?t=" + new Date().getTime();
-            script.async = false; // 确保同步加载，在main.js之前执行
-            document.head.appendChild(script);
-        })();
+        // 使用document.write确保config.js在main.js之前同步加载
+        document.write('<script src="/config.js?t=' + new Date().getTime() + '"><\/script>');
     </script>
 </head>
 <body>
