@@ -195,88 +195,48 @@ export default defineConfig(({ command, mode }) => {
               },
             },
 
-            // 文件系统API缓存 - NetworkFirst
+            // 文件系统动态操作API - NetworkOnly（不缓存，确保实时性）
             {
-              urlPattern: /^.*\/api\/fs\/.*$/,
-              handler: "NetworkFirst",
+              urlPattern: /^.*\/api\/fs\/(get|list|upload|batch-remove|batch-copy|mkdir|multipart|download|update|create-share).*$/,
+              handler: "NetworkOnly",
               options: {
-                cacheName: "fs-api",
-                expiration: {
-                  maxEntries: 200, // 增加容量支持更多文件信息
-                  maxAgeSeconds: 30 * 60, // 30分钟（文件信息相对稳定）
-                },
-                networkTimeoutSeconds: 8, // 增加超时时间
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
+                cacheName: "fs-dynamic-operations",
               },
             },
 
-            // 文本分享API缓存 - NetworkFirst（内容短期缓存）
+            // 文件系统预签名URL - NetworkOnly（每次生成新URL和fileId）
+            {
+              urlPattern: /^.*\/api\/fs\/(presign|file-link).*$/,
+              handler: "NetworkOnly",
+              options: {
+                cacheName: "fs-presign-operations",
+              },
+            },
+
+            // 文本分享API - NetworkOnly（涉及访问计数，必须实时）
             {
               urlPattern: /^.*\/api\/(pastes|paste|raw)\/.*$/,
-              handler: "NetworkFirst",
+              handler: "NetworkOnly",
               options: {
-                cacheName: "pastes-api",
-                expiration: {
-                  maxEntries: 30,
-                  maxAgeSeconds: 5 * 60, // 5分钟（文本内容短期缓存）
-                },
-                networkTimeoutSeconds: 4,
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
+                cacheName: "pastes-realtime",
               },
             },
 
-            // 配置管理API缓存 - NetworkFirst
-            {
-              urlPattern: /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings|files)\/.*$/,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "config-api",
-                expiration: {
-                  maxEntries: 30,
-                  maxAgeSeconds: 30 * 60, // 30分钟
-                },
-                networkTimeoutSeconds: 4,
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-
-            // 搜索API缓存 - NetworkFirst
+            // 搜索API - NetworkOnly（后端已有缓存，前端不应再缓存）
             {
               urlPattern: /^.*\/api\/fs\/search.*$/,
-              handler: "NetworkFirst",
+              handler: "NetworkOnly",
               options: {
-                cacheName: "search-api",
-                expiration: {
-                  maxEntries: 20,
-                  maxAgeSeconds: 5 * 60, // 5分钟
-                },
-                networkTimeoutSeconds: 6,
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
+                cacheName: "search-realtime",
               },
             },
 
-            // 上传API缓存 - NetworkFirst
+            // 上传相关API - NetworkOnly（操作性API，不应缓存）
             {
-              urlPattern: /^.*\/api\/(upload|fs\/upload|fs\/presign|fs\/multipart|url)\/.*$/,
-              handler: "NetworkFirst",
+              urlPattern: /^.*\/api\/(upload|url)\/.*$/,
+              handler: "NetworkOnly",
               options: {
-                cacheName: "upload-api",
-                expiration: {
-                  maxEntries: 20,
-                  maxAgeSeconds: 10 * 60, // 10分钟
-                },
-                networkTimeoutSeconds: 8,
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
+                cacheName: "upload-operations",
               },
             },
 
@@ -297,37 +257,49 @@ export default defineConfig(({ command, mode }) => {
               },
             },
 
-            // WebDAV缓存 - NetworkFirst（WebDAV操作无缓存）
+            // WebDAV API - NetworkOnly（实时性要求高）
             {
               urlPattern: /^.*\/dav\/.*$/,
+              handler: "NetworkOnly",
+              options: {
+                cacheName: "webdav-realtime",
+              },
+            },
+
+            // S3预签名URL - NetworkOnly（避免URL过期问题）
+            {
+              urlPattern: ({ url }) => url.searchParams.has("X-Amz-Algorithm") || url.searchParams.has("Signature") || url.pathname.includes("/presigned/"),
+              handler: "NetworkOnly",
+              options: {
+                cacheName: "presigned-urls-realtime",
+              },
+            },
+
+            // 管理员配置读取API - 短期缓存（仅GET请求）
+            {
+              urlPattern: ({ request, url }) => request.method === "GET" && /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings).*$/.test(url.href),
               handler: "NetworkFirst",
               options: {
-                cacheName: "webdav-api",
+                cacheName: "admin-config-read",
                 expiration: {
-                  maxEntries: 30,
-                  maxAgeSeconds: 1 * 60, // 1分钟（WebDAV操作几乎无缓存）
+                  maxEntries: 20,
+                  maxAgeSeconds: 5 * 60, // 5分钟（配置读取短期缓存）
                 },
-                networkTimeoutSeconds: 10,
+                networkTimeoutSeconds: 3,
                 cacheableResponse: {
-                  statuses: [0, 200, 207], // 包含WebDAV的207状态码
+                  statuses: [0, 200],
                 },
               },
             },
 
-            // 预签名URL缓存 - NetworkFirst
+            // 管理员配置写入API - NetworkOnly（POST/PUT/DELETE操作）
             {
-              urlPattern: ({ url }) => url.searchParams.has("X-Amz-Algorithm") || url.searchParams.has("Signature") || url.pathname.includes("/presigned/"),
-              handler: "NetworkFirst",
+              urlPattern: ({ request, url }) =>
+                ["POST", "PUT", "DELETE"].includes(request.method) &&
+                /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings|admin\/login|admin\/change-password|admin\/cache).*$/.test(url.href),
+              handler: "NetworkOnly",
               options: {
-                cacheName: "presigned-urls",
-                expiration: {
-                  maxEntries: 20,
-                  maxAgeSeconds: 30 * 60, // 30分钟
-                },
-                networkTimeoutSeconds: 8,
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
+                cacheName: "admin-config-write",
               },
             },
 

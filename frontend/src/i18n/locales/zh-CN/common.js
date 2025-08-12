@@ -5,6 +5,7 @@ export default {
     confirm: "确认",
     cancel: "取消",
     back: "返回",
+    close: "关闭",
     required: "请填写必填项",
     noPermission: "无此功能权限，请联系管理员",
     contactAdmin: "联系管理员",

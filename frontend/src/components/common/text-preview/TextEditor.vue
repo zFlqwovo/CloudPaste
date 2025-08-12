@@ -13,12 +13,12 @@
         <p class="error-text">{{ error }}</p>
         <div class="fallback-editor">
           <textarea
-              v-model="localContent"
-              class="fallback-textarea"
-              :class="{ 'fallback-dark': darkMode }"
-              :readonly="readOnly"
-              @input="handleInput"
-              :placeholder="$t('textPreview.fallbackEditor')"
+            v-model="localContent"
+            class="fallback-textarea"
+            :class="{ 'fallback-dark': darkMode }"
+            :readonly="readOnly"
+            @input="handleInput"
+            :placeholder="$t('textPreview.fallbackEditor')"
           />
         </div>
       </div>
@@ -440,41 +440,41 @@ const resize = () => {
 
 // 监听props变化
 watch(
-    () => props.content,
-    (newContent) => {
-      if (newContent !== getValue()) {
-        setValue(newContent);
-      }
+  () => props.content,
+  (newContent) => {
+    if (newContent !== getValue()) {
+      setValue(newContent);
     }
+  }
 );
 
 watch(
-    () => props.language,
-    (newLanguage) => {
-      setLanguage(newLanguage);
-    }
+  () => props.language,
+  (newLanguage) => {
+    setLanguage(newLanguage);
+  }
 );
 
 watch(
-    () => props.darkMode,
-    (newDarkMode) => {
-      if (monacoEditor) {
-        monacoEditor.updateOptions({
-          theme: newDarkMode ? "vs-dark" : "vs",
-        });
-      }
+  () => props.darkMode,
+  (newDarkMode) => {
+    if (monacoEditor) {
+      monacoEditor.updateOptions({
+        theme: newDarkMode ? "vs-dark" : "vs",
+      });
     }
+  }
 );
 
 watch(
-    () => props.readOnly,
-    (newReadOnly) => {
-      if (monacoEditor) {
-        monacoEditor.updateOptions({
-          readOnly: newReadOnly,
-        });
-      }
+  () => props.readOnly,
+  (newReadOnly) => {
+    if (monacoEditor) {
+      monacoEditor.updateOptions({
+        readOnly: newReadOnly,
+      });
     }
+  }
 );
 
 // 组件挂载

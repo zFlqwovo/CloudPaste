@@ -39,6 +39,7 @@ export default {
     storageConfig: "S3存储配置",
     mountManagement: "挂载管理",
     keyManagement: "密钥管理",
+    backup: "数据备份",
     systemSettings: "系统设置",
     globalSettings: "全局设置",
     previewSettings: "预览设置",

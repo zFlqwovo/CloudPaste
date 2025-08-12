@@ -39,6 +39,7 @@ export default {
     storageConfig: "S3 Storage Config",
     mountManagement: "Mount Management",
     keyManagement: "Key Management",
+    backup: "Data Backup",
     systemSettings: "System Settings",
     globalSettings: "Global Settings",
     previewSettings: "Preview Settings",

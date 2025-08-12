@@ -116,6 +116,7 @@
             <div class="flex items-center space-x-2">
               <input
                 :type="showPassword ? 'text' : 'password'"
+                autocomplete="new-password"
                 class="form-input w-full rounded-md shadow-sm"
                 :class="getInputClasses(darkMode)"
                 placeholder="设置访问密码..."

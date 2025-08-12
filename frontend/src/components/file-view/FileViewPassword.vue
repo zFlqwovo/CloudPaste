@@ -11,6 +11,7 @@
           <input
             :type="showPassword ? 'text' : 'password'"
             id="password"
+            autocomplete="current-password"
             v-model="password"
             :placeholder="t('fileView.password.placeholder')"
             class="block w-full px-3 py-2 rounded-md shadow-sm border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-offset-gray-800 password-input"

@@ -133,6 +133,15 @@ const routes = [
             },
           },
           {
+            path: "backup",
+            name: "AdminBackup",
+            component: createOfflineAwareImport(() => import("../views/admin/BackupView.vue"), "数据备份"),
+            meta: {
+              title: "数据备份 - CloudPaste",
+              adminOnly: true, // 只有管理员可访问
+            },
+          },
+          {
             path: "settings",
             children: [
               {

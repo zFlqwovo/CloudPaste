@@ -21,7 +21,7 @@ export default {
   ...pwa,
   ...gallery,
   announcement: {
-    title: "公告栏",
+    title: "公告",
     dontShowAgain: "不再显示",
     gotIt: "我知道了",
   },

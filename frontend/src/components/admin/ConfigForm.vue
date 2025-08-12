@@ -524,6 +524,7 @@ const closeModal = () => {
                 <input
                   type="password"
                   id="secret_access_key"
+                  autocomplete="new-password"
                   v-model="formData.secret_access_key"
                   :required="!isEdit"
                   @blur="trimInput('secret_access_key')"

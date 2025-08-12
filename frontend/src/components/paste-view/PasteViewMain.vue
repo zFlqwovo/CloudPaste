@@ -582,6 +582,7 @@ onBeforeUnmount(() => {
               <input
                 :type="showPassword ? 'text' : 'password'"
                 id="password"
+                autocomplete="current-password"
                 v-model="passwordInput"
                 @keyup.enter="submitPassword"
                 class="block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 password-input"

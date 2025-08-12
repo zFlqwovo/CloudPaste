@@ -166,7 +166,7 @@ const handleApiKeyLogin = async () => {
               <label for="password" class="block text-sm font-medium leading-6" :class="darkMode ? 'text-gray-200' : 'text-gray-900'">{{ $t("admin.login.password") }}</label>
             </div>
             <div class="mt-2">
-              <input id="password" v-model="form.password" name="password" type="password" required class="form-input" />
+              <input id="password" v-model="form.password" name="password" type="password" autocomplete="current-password" required class="form-input" />
             </div>
           </div>
 

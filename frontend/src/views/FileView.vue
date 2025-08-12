@@ -1,5 +1,5 @@
 <template>
-  <div class="file-view-container flex flex-col flex-1 bg-white dark:bg-gray-900">
+  <div class="file-view-container flex flex-col flex-1">
     <!-- 添加面包屑导航标题，与文本分享页面风格一致 -->
     <div class="max-w-4xl mx-auto w-full px-4 mt-4">
       <div class="py-3 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 mb-4">
@@ -299,12 +299,12 @@ const openEditModal = async () => {
         // 更新文件信息，但保留分享相关的关键字段
         fileInfo.value = {
           ...response.data,
-          slug: fileInfo.value.slug, 
-          type: fileInfo.value.type, 
-          requires_password: fileInfo.value.requires_password, 
-          passwordVerified: fileInfo.value.passwordVerified, 
-          currentPassword: fileInfo.value.currentPassword, 
-          use_proxy: fileInfo.value.use_proxy, 
+          slug: fileInfo.value.slug,
+          type: fileInfo.value.type,
+          requires_password: fileInfo.value.requires_password,
+          passwordVerified: fileInfo.value.passwordVerified,
+          currentPassword: fileInfo.value.currentPassword,
+          use_proxy: fileInfo.value.use_proxy,
         };
       } else {
         console.error("获取文件详情失败:", response.message);
