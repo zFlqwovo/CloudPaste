@@ -40,36 +40,6 @@ class MountService {
   }
 
   /**
-   * 通过ID获取挂载点（管理员访问）
-   * @param {string} id - 挂载点ID
-   * @param {string} adminId - 管理员ID
-   * @returns {Promise<Object>} 挂载点对象
-   * @throws {HTTPException} 404 - 如果挂载点不存在
-   */
-  async getMountByIdForAdmin(id, adminId) {
-    const mount = await this.mountRepository.findById(id);
-    if (!mount) {
-      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "挂载点不存在" });
-    }
-    return mount;
-  }
-
-  /**
-   * 通过ID获取API密钥用户的挂载点
-   * @param {string} id - 挂载点ID
-   * @param {string} apiKeyId - API密钥ID
-   * @returns {Promise<Object>} 挂载点对象
-   * @throws {HTTPException} 404 - 如果挂载点不存在或未激活
-   */
-  async getMountByIdForApiKey(id, apiKeyId) {
-    const mount = await this.mountRepository.findActiveById(id);
-    if (!mount) {
-      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "挂载点不存在或未激活" });
-    }
-    return mount;
-  }
-
-  /**
    * 验证挂载点数据
    * @param {Object} mountData - 挂载点数据
    * @param {string} creatorId - 创建者ID
@@ -290,34 +260,6 @@ export async function getMountsByAdmin(db, adminId, includeInactive = false) {
 export async function getAllMounts(db, includeInactive = true) {
   const mountService = new MountService(db);
   return await mountService.getAllMounts(includeInactive);
-}
-
-/**
- * 通过ID获取挂载点（管理员访问）
- * @param {D1Database} db - D1数据库实例
- * @param {string} id - 挂载点ID
- * @param {string} adminId - 管理员ID（仅用于记录访问，不作权限限制）
- * @returns {Promise<Object>} 挂载点对象
- * @throws {HTTPException} 404 - 如果挂载点不存在
- * @throws {Error} 数据库操作错误
- */
-export async function getMountByIdForAdmin(db, id, adminId) {
-  const mountService = new MountService(db);
-  return await mountService.getMountByIdForAdmin(id, adminId);
-}
-
-/**
- * 通过ID获取API密钥用户的挂载点
- * @param {D1Database} db - D1数据库实例
- * @param {string} id - 挂载点ID
- * @param {string} apiKeyId - API密钥ID
- * @returns {Promise<Object>} 挂载点对象
- * @throws {HTTPException} 404 - 如果挂载点不存在或未激活
- * @throws {Error} 数据库操作错误
- */
-export async function getMountByIdForApiKey(db, id, apiKeyId) {
-  const mountService = new MountService(db);
-  return await mountService.getMountByIdForApiKey(id, apiKeyId);
 }
 
 /**

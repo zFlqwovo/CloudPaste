@@ -1,17 +1,19 @@
 /**
- * 管理员存储挂载路由
+ * 统一挂载点路由
  */
 import { Hono } from "hono";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
-import { getMountsByAdmin, getMountByIdForAdmin, createMount, updateMount, deleteMount, getAllMounts } from "../services/storageMountService.js";
-import { DbTables, ApiStatus } from "../constants/index.js";
+import { createMount, updateMount, deleteMount, getAllMounts } from "../services/storageMountService.js";
+import { ApiStatus } from "../constants/index.js";
 import { createErrorResponse } from "../utils/common.js";
 import { HTTPException } from "hono/http-exception";
+import { Permission } from "../constants/permissions.js";
 
-const adminStorageMountRoutes = new Hono();
+const mountRoutes = new Hono();
 
 /**
- * 处理API错误的辅助函数
+ * 统一的API错误处理函数
+ * 消除原来两个文件中的重复代码
  * @param {Context} c - Hono上下文
  * @param {Error} error - 捕获的错误
  * @param {string} defaultMessage - 默认错误消息
@@ -30,48 +32,54 @@ const handleApiError = (c, error, defaultMessage) => {
   return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || defaultMessage), ApiStatus.INTERNAL_ERROR);
 };
 
-// 获取挂载点列表（管理员权限）
-adminStorageMountRoutes.get("/api/admin/mounts", authGateway.requireAdmin(), async (c) => {
+/**
+ * 获取挂载点列表
+ * 统一入口，根据用户权限返回不同数据：
+ * - 管理员：返回所有挂载点（包括禁用的）
+ * - API密钥用户：返回有权限的活跃挂载点
+ */
+mountRoutes.get("/api/mount/list", authGateway({
+  requireAuth: true,
+  customCheck: (authResult) => {
+    // 管理员或有挂载查看权限的API密钥用户
+    return authResult.isAdmin() || authResult.hasPermission(Permission.MOUNT_VIEW);
+  }
+}), async (c) => {
   const db = c.env.DB;
+  const authResult = c.get("authResult");
 
   try {
-    // 管理员获取所有挂载点（包括禁用的，用于管理界面）
-    const mounts = await getAllMounts(db, true);
-
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取挂载点列表成功",
-      data: mounts,
-      success: true,
-    });
+    if (authResult.isAdmin()) {
+      // 管理员：获取所有挂载点（包括禁用的，用于管理界面）
+      const mounts = await getAllMounts(db, true);
+      
+      return c.json({
+        code: ApiStatus.SUCCESS,
+        message: "获取挂载点列表成功",
+        data: mounts,
+        success: true,
+      });
+    } else {
+      // API密钥用户：根据基本路径获取可访问的挂载点
+      const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
+      const mounts = await authGateway.utils.getAccessibleMounts(db, apiKeyInfo, "apiKey");
+      
+      return c.json({
+        code: ApiStatus.SUCCESS,
+        message: "获取挂载点列表成功",
+        data: mounts,
+        success: true,
+      });
+    }
   } catch (error) {
     return handleApiError(c, error, "获取挂载点列表失败");
   }
 });
 
-// 获取单个挂载点详情（管理员权限）
-adminStorageMountRoutes.get("/api/admin/mounts/:id", authGateway.requireAdmin(), async (c) => {
-  const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
-  const { id } = c.req.param();
-
-  try {
-    // 管理员查询
-    const mount = await getMountByIdForAdmin(db, id, adminId);
-
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取挂载点成功",
-      data: mount,
-      success: true,
-    });
-  } catch (error) {
-    return handleApiError(c, error, "获取挂载点失败");
-  }
-});
-
-// 创建挂载点（管理员权限）
-adminStorageMountRoutes.post("/api/admin/mounts", authGateway.requireAdmin(), async (c) => {
+/**
+ * 创建挂载点（仅管理员）
+ */
+mountRoutes.post("/api/mount/create", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
 
@@ -91,8 +99,10 @@ adminStorageMountRoutes.post("/api/admin/mounts", authGateway.requireAdmin(), as
   }
 });
 
-// 更新挂载点（管理员权限）
-adminStorageMountRoutes.put("/api/admin/mounts/:id", authGateway.requireAdmin(), async (c) => {
+/**
+ * 更新挂载点（仅管理员）
+ */
+mountRoutes.put("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
@@ -111,8 +121,10 @@ adminStorageMountRoutes.put("/api/admin/mounts/:id", authGateway.requireAdmin(),
   }
 });
 
-// 删除挂载点（管理员权限）
-adminStorageMountRoutes.delete("/api/admin/mounts/:id", authGateway.requireAdmin(), async (c) => {
+/**
+ * 删除挂载点（仅管理员）
+ */
+mountRoutes.delete("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
@@ -130,4 +142,4 @@ adminStorageMountRoutes.delete("/api/admin/mounts/:id", authGateway.requireAdmin
   }
 });
 
-export default adminStorageMountRoutes;
+export default mountRoutes;

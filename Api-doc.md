@@ -33,25 +33,25 @@ Authorization: Bearer <admin_token>
 Authorization: ApiKey <api_key>
 ```
 
-API 密钥由管理员在后台创建，支持以下权限类型：
+API 密钥由管理员在后台创建，使用位标志权限系统，支持以下权限类型：
 
-**基础权限：**
+**权限位标志值：**
 
-- **TEXT**: 文本分享权限 - 允许创建、查看、修改和删除文本分享
-- **FILE_SHARE**: 文件分享权限 - 允许创建和管理文件分享链接
+- **1 (TEXT)**: 文本分享权限 - 允许创建、查看、修改和删除文本分享
+- **2 (FILE_SHARE)**: 文件分享权限 - 允许创建和管理文件分享链接
+- **4 (MOUNT_VIEW)**: 挂载页查看权限 - 允许浏览挂载页内容
+- **8 (MOUNT_UPLOAD)**: 上传权限 - 允许上传文件和创建目录
+- **16 (MOUNT_COPY)**: 复制权限 - 允许复制文件和目录
+- **32 (MOUNT_RENAME)**: 重命名权限 - 允许重命名文件和目录
+- **64 (MOUNT_DELETE)**: 删除权限 - 允许删除文件和目录
+- **128 (WEBDAV_READ)**: WebDAV 读取权限 - 允许通过 WebDAV 读取文件（GET、PROPFIND 等）
+- **256 (WEBDAV_MANAGE)**: WebDAV 管理权限 - 允许通过 WebDAV 管理文件（PUT、DELETE、MKCOL 等）
 
-**挂载页权限：**
+**权限组合示例：**
 
-- **MOUNT_VIEW**: 挂载页查看权限 - 允许浏览挂载页内容
-- **MOUNT_UPLOAD**: 上传权限 - 允许上传文件和创建目录
-- **MOUNT_COPY**: 复制权限 - 允许复制文件和目录
-- **MOUNT_RENAME**: 重命名权限 - 允许重命名文件和目录
-- **MOUNT_DELETE**: 删除权限 - 允许删除文件和目录
-
-**WebDAV 权限：**
-
-- **WEBDAV_READ**: WebDAV 读取权限 - 允许通过 WebDAV 读取文件（GET、PROPFIND 等）
-- **WEBDAV_MANAGE**: WebDAV 管理权限 - 允许通过 WebDAV 管理文件（PUT、DELETE、MKCOL 等）
+- `7` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+4) - 基础查看权限
+- `15` = 基础权限 + MOUNT_UPLOAD (1+2+4+8) - 包含上传权限
+- `511` = 所有权限 (1+2+4+8+16+32+64+128+256) - 完整权限
 
 **路径限制：**
 
@@ -142,36 +142,143 @@ X-Custom-Auth-Key: <api_key>
 
 #### 系统设置 API
 
-- `GET /api/admin/system-settings`
+**注意：系统设置 API 已重构为分组管理架构，支持更灵活的设置管理**
 
-  - 描述：获取系统设置信息
+- `GET /api/admin/settings`
+
+  - 描述：获取系统设置（支持按分组查询或获取所有分组）
   - 授权：需要管理员令牌
-  - 响应：包含系统设置的对象
+  - 查询参数：
+    - `group` - 分组 ID（可选）：1=全局设置，3=WebDAV 设置
+    - `metadata` - 是否包含元数据（可选，默认 true）
+    - `includeSystem` - 是否包含系统内部分组（可选，默认 false，仅在不指定 group 时有效）
+  - 响应：
+    - **按分组查询时**：
+      ```json
+      {
+        "code": 200,
+        "message": "获取分组设置成功",
+        "data": [
+          {
+            "key": "max_upload_size",
+            "value": "100",
+            "description": "最大上传文件大小限制（MB）",
+            "type": "number",
+            "group_id": 1,
+            "options": null,
+            "sort_order": 1
+          }
+        ],
+        "success": true
+      }
+      ```
+    - **获取所有分组时**：
+      ```json
+      {
+        "code": 200,
+        "message": "获取所有分组设置成功",
+        "data": {
+          "1": {
+            "groupName": "全局设置",
+            "settings": [...]
+          },
+          "3": {
+            "groupName": "WebDAV设置",
+            "settings": [...]
+          }
+        },
+        "success": true
+      }
+      ```
+
+- `GET /api/admin/settings/groups`
+
+  - 描述：获取分组列表和统计信息
+  - 授权：需要管理员令牌
+  - 响应：分组信息列表
     ```json
     {
       "code": 200,
-      "message": "获取系统设置成功",
+      "message": "获取分组信息成功",
       "data": {
-        "max_upload_size": 100,
-        "default_paste_expiry": 7,
-        "default_file_expiry": 7
+        "groups": [
+          {
+            "id": 1,
+            "name": "全局设置",
+            "description": "系统全局配置项",
+            "settingCount": 5
+          },
+          {
+            "id": 3,
+            "name": "WebDAV设置",
+            "description": "WebDAV协议相关配置",
+            "settingCount": 2
+          }
+        ]
       },
       "success": true
     }
     ```
 
-- `PUT /api/admin/system-settings`
-  - 描述：更新系统设置
+- `GET /api/admin/settings/metadata`
+
+  - 描述：获取设置项元数据
   - 授权：需要管理员令牌
-  - 请求体：
+  - 查询参数：
+    - `key` - 设置键名（必填）
+  - 响应：设置项的详细元数据
     ```json
     {
-      "max_upload_size": 100, // 可选，最大上传大小（MB）
-      "default_paste_expiry": 7, // 可选，默认文本过期天数
-      "default_file_expiry": 7 // 可选，默认文件过期天数
+      "code": 200,
+      "message": "获取设置元数据成功",
+      "data": {
+        "key": "max_upload_size",
+        "description": "最大上传文件大小限制（MB）",
+        "type": "number",
+        "group_id": 1,
+        "options": null,
+        "sort_order": 1,
+        "flags": 0
+      },
+      "success": true
     }
     ```
-  - 响应：更新后的系统设置
+
+- `PUT /api/admin/settings/group/:groupId`
+  - 描述：按分组批量更新设置
+  - 授权：需要管理员令牌
+  - 参数：groupId - 分组 ID（1=全局设置，3=WebDAV 设置）
+  - 查询参数：
+    - `validate` - 是否进行类型验证（可选，默认 true）
+  - 请求体：设置键值对
+    ```json
+    {
+      "max_upload_size": 200,
+      "default_paste_expiry": 14,
+      "default_file_expiry": 30
+    }
+    ```
+  - 响应：批量更新结果
+    ```json
+    {
+      "code": 200,
+      "message": "批量更新设置成功，共更新3项",
+      "data": {
+        "success": true,
+        "updated": 3,
+        "failed": 0,
+        "results": [
+          {
+            "key": "max_upload_size",
+            "success": true,
+            "oldValue": "100",
+            "newValue": "200"
+          }
+        ]
+      },
+      "success": true
+    }
+    ```
 
 ### 文本分享 API
 
@@ -614,14 +721,27 @@ X-Custom-Auth-Key: <api_key>
     ```json
     {
       "name": "密钥名称", // 必填
-      "text_permission": true, // 是否有文本权限，默认false
-      "file_permission": true, // 是否有文件权限，默认false
-      "mount_permission": true, // 是否有挂载权限，默认false
+      "permissions": 7, // 必填，位标志权限值（数字）
+      "role": "GENERAL", // 可选，用户角色：GUEST/GENERAL/ADMIN，默认GENERAL
+      "basic_path": "/", // 可选，基本路径权限，默认为根路径"/"
+      "is_guest": false, // 可选，是否为访客（免密访问），默认false
       "expires_at": "2023-12-31T23:59:59Z", // 可选，过期时间
-      "custom_key": "custom-api-key-123", // 可选，自定义密钥值（仅限字母、数字、横杠和下划线）
-      "basic_path": "/" // 可选，基本路径权限，默认为根路径"/"
+      "custom_key": "custom-api-key-123" // 可选，自定义密钥值（仅限字母、数字、横杠和下划线）
     }
     ```
+  - 权限位标志说明：
+    - `1` (TEXT) - 文本分享权限
+    - `2` (FILE_SHARE) - 文件分享权限
+    - `4` (MOUNT_VIEW) - 挂载页查看权限
+    - `8` (MOUNT_UPLOAD) - 上传权限
+    - `16` (MOUNT_COPY) - 复制权限
+    - `32` (MOUNT_RENAME) - 重命名权限
+    - `64` (MOUNT_DELETE) - 删除权限
+    - `128` (WEBDAV_READ) - WebDAV 读取权限
+    - `256` (WEBDAV_MANAGE) - WebDAV 管理权限
+  - 示例权限组合：
+    - `7` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+4)
+    - `511` = 所有权限 (1+2+4+8+16+32+64+128+256)
   - 响应：新创建的 API 密钥信息，包含完整的密钥值（仅在创建时返回）
 
 - `PUT /api/admin/api-keys/:id`
@@ -633,11 +753,11 @@ X-Custom-Auth-Key: <api_key>
     ```json
     {
       "name": "新密钥名称", // 可选
-      "text_permission": true, // 可选
-      "file_permission": false, // 可选
-      "mount_permission": true, // 可选
-      "expires_at": "2023-12-31T23:59:59Z", // 可选
-      "basic_path": "/restricted/path/" // 可选，基本路径权限
+      "permissions": 15, // 可选，位标志权限值（数字）
+      "role": "GENERAL", // 可选，用户角色：GUEST/GENERAL/ADMIN
+      "basic_path": "/restricted/path/", // 可选，基本路径权限
+      "is_guest": false, // 可选，是否为访客（免密访问）
+      "expires_at": "2023-12-31T23:59:59Z" // 可选，过期时间
     }
     ```
   - 响应：更新后的密钥信息
@@ -663,12 +783,21 @@ X-Custom-Auth-Key: <api_key>
         "permissions": {
           "text": true,
           "file": true,
-          "mount": false
+          "mount_view": true,
+          "mount_upload": false,
+          "mount_copy": false,
+          "mount_rename": false,
+          "mount_delete": false,
+          "webdav_read": false,
+          "webdav_manage": false
         },
         "key_info": {
           "id": "密钥ID",
           "name": "密钥名称",
-          "basic_path": "/"
+          "basic_path": "/",
+          "permissions": 7,
+          "role": "GENERAL",
+          "is_guest": false
         }
       },
       "success": true
@@ -692,39 +821,6 @@ X-Custom-Auth-Key: <api_key>
       "success": true
     }
     ```
-
-- `GET /api/admin/system-settings`
-
-  - 描述：获取系统设置
-  - 授权：需要管理员令牌
-  - 响应：系统设置信息，包含最大上传大小等系统参数
-    ```json
-    {
-      "code": 200,
-      "message": "获取系统设置成功",
-      "data": {
-        "max_upload_size": 100,
-        "default_paste_expiry": 7,
-        "default_file_expiry": 7,
-        "webdav_upload_mode": "direct"
-      },
-      "success": true
-    }
-    ```
-
-- `PUT /api/admin/system-settings`
-  - 描述：更新系统设置
-  - 授权：需要管理员令牌
-  - 请求体：
-    ```json
-    {
-      "max_upload_size": 100, // 可选，最大上传大小（MB）
-      "default_paste_expiry": 7, // 可选，默认文本过期天数
-      "default_file_expiry": 7, // 可选，默认文件过期天数
-      "webdav_upload_mode": "direct" // 可选，WebDAV上传模式：multipart/direct
-    }
-    ```
-  - 响应：更新后的系统设置
 
 ### 缓存管理 API
 
@@ -750,6 +846,13 @@ X-Custom-Auth-Key: <api_key>
             "totalEntries": 50,
             "hitRate": 0.9,
             "missRate": 0.1
+          },
+          "search": {
+            "totalEntries": 25,
+            "hitRate": 0.75,
+            "missRate": 0.25,
+            "cacheSize": "2.5MB",
+            "maxAge": 300
           }
         },
         "system": {
@@ -768,22 +871,34 @@ X-Custom-Auth-Key: <api_key>
 
 - `POST /api/admin/cache/clear`
 
-  - 描述：清理目录缓存
+  - 描述：清理系统缓存（支持目录缓存、S3URL 缓存和搜索缓存）
   - 授权：需要管理员令牌
   - 请求体：
     ```json
     {
-      "mountId": "挂载点ID", // 可选，清理特定挂载点的缓存
-      "s3ConfigId": "S3配置ID" // 可选，清理特定S3配置相关的缓存
+      "mountId": "挂载点ID", // 可选，清理特定挂载点的目录缓存
+      "s3ConfigId": "S3配置ID", // 可选，清理特定S3配置相关的缓存
+      "cacheType": "all", // 可选，缓存类型：all（默认）、directory、s3Url、search
+      "searchScope": {
+        // 可选，搜索缓存清理范围（仅当cacheType包含search时有效）
+        "mountId": "挂载点ID", // 可选，清理特定挂载点的搜索缓存
+        "userId": "用户ID", // 可选，清理特定用户的搜索缓存
+        "userType": "admin" // 可选，用户类型：admin、apikey
+      }
     }
     ```
   - 响应：清理结果
     ```json
     {
       "code": 200,
-      "message": "缓存清理成功，共清理 50 项",
+      "message": "缓存清理成功，共清理 75 项",
       "data": {
-        "clearedCount": 50,
+        "clearedCount": 75,
+        "details": {
+          "directory": 50,
+          "s3Url": 15,
+          "search": 10
+        },
         "timestamp": "2023-05-01T12:00:00Z"
       },
       "success": true
@@ -793,32 +908,35 @@ X-Custom-Auth-Key: <api_key>
 #### API 密钥用户缓存管理
 
 - `POST /api/user/cache/clear`
-  - 描述：API 密钥用户清理缓存
+  - 描述：API 密钥用户清理缓存（仅限其权限范围内的缓存）
   - 授权：需要有挂载权限的 API 密钥
-  - 请求体：格式同管理员版本
-  - 响应：清理结果
+  - 请求体：格式同管理员版本，但会自动限制在用户的 basic_path 权限范围内
+    ```json
+    {
+      "mountId": "挂载点ID", // 可选，仅能清理用户有权限访问的挂载点
+      "cacheType": "all" // 可选，缓存类型：all（默认）、directory、search
+    }
+    ```
+  - 响应：清理结果（仅包含用户权限范围内的缓存清理统计）
+  - 注意：API 密钥用户只能清理其 basic_path 权限范围内的缓存
 
 ### 挂载管理 API
 
-#### 管理员挂载点管理
+#### 统一挂载点管理接口
 
-- `GET /api/admin/mounts`
+- `GET /api/mount/list`
 
-  - 描述：管理员获取所有挂载点列表
-  - 授权：需要管理员令牌
+  - 描述：获取挂载点列表（统一接口，支持管理员和 API 密钥用户）
+  - 授权：需要管理员令牌或有挂载权限的 API 密钥
   - 参数：无
   - 响应：挂载点列表和详细信息
+  - 权限说明：
+    - **管理员用户**：返回所有挂载点（包括禁用的），用于管理界面
+    - **API 密钥用户**：只返回 basic_path 权限范围内的活跃挂载点
 
-- `GET /api/admin/mounts/:id`
+- `POST /api/mount/create`
 
-  - 描述：管理员获取单个挂载点详情
-  - 授权：需要管理员令牌
-  - 参数：id - 挂载点 ID
-  - 响应：挂载点详细信息
-
-- `POST /api/admin/mounts`
-
-  - 描述：管理员创建新的挂载点
+  - 描述：创建新的挂载点（仅管理员）
   - 授权：需要管理员令牌
   - 请求体：
     ```json
@@ -835,39 +953,25 @@ X-Custom-Auth-Key: <api_key>
     ```
   - 响应：新创建的挂载点信息
 
-- `PUT /api/admin/mounts/:id`
+- `PUT /api/mount/:id`
 
-  - 描述：管理员更新挂载点信息
+  - 描述：更新挂载点信息（仅管理员）
   - 授权：需要管理员令牌
   - 参数：id - 挂载点 ID
   - 请求体：包含需要更新的字段，格式同创建
   - 响应：更新结果
 
-- `DELETE /api/admin/mounts/:id`
-  - 描述：管理员删除挂载点
+- `DELETE /api/mount/:id`
+  - 描述：删除挂载点（仅管理员）
   - 授权：需要管理员令牌
   - 参数：id - 挂载点 ID
   - 响应：删除结果
 
-#### API 密钥用户挂载点访问
+**注意**：
 
-- `GET /api/user/mounts`
-
-  - 描述：API 密钥用户获取可访问的挂载点列表（基于 basic_path 权限）
-  - 授权：需要有挂载权限的 API 密钥
-  - 参数：无
-  - 响应：挂载点列表和详细信息
-  - 注意：只返回 API 密钥 basic_path 权限范围内的挂载点
-
-- `GET /api/user/mounts/:id`
-
-  - 描述：API 密钥用户获取单个挂载点详情（基于 basic_path 权限）
-  - 授权：需要有挂载权限的 API 密钥
-  - 参数：id - 挂载点 ID
-  - 响应：挂载点详细信息
-  - 注意：只能访问 API 密钥 basic_path 权限范围内的挂载点
-
-**注意**：API 密钥用户无法创建、更新或删除挂载点。挂载点的管理完全由管理员在后台进行，API 密钥用户只能查看管理员分配给其 basic_path 权限范围内的挂载点。
+- 挂载点的创建、更新和删除操作仅限管理员执行
+- API 密钥用户只能通过 `/api/mount/list` 查看其 basic_path 权限范围内的挂载点
+- 统一接口根据用户权限自动返回相应的数据范围，无需区分不同的 API 端点
 
 ### 文件系统 API
 
@@ -1406,7 +1510,7 @@ X-Custom-Auth-Key: <api_key>
 
 ### 文件上传限制
 
-- 最大文件大小由系统设置决定，可通过 `/api/system/max-upload-size`（公共 API）或 `/api/admin/system-settings`（管理员 API）查询
+- 最大文件大小由系统设置决定，可通过 `/api/system/max-upload-size`（公共 API）或 `/api/admin/settings?group=1`（管理员 API）查询
 - 大文件建议使用分片上传或预签名 URL 上传
 - API 密钥用户受 basic_path 路径限制
 

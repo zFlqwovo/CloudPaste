@@ -138,16 +138,11 @@ export const api = {
   },
 
   mount: {
-    // 挂载点管理
-    getMountsList: mountService.getAdminMountsList,
-    getMountById: mountService.getAdminMountById,
-    createMount: mountService.createAdminMount,
-    updateMount: mountService.updateAdminMount,
-    deleteMount: mountService.deleteAdminMount,
-
-    // API密钥用户访问
-    getUserMountsList: mountService.getUserMountsList,
-    getUserMountById: mountService.getUserMountById,
+    // 统一挂载点管理API
+    getMountsList: mountService.getMountsList,
+    createMount: mountService.createMount,
+    updateMount: mountService.updateMount,
+    deleteMount: mountService.deleteMount,
   },
 
   test: {
@@ -167,10 +162,9 @@ export const api = {
       batchDeletePastes: pasteService.batchDeletePastes,
     },
 
-    // API密钥用户的挂载服务（只读）
+    // API密钥用户的挂载服务（统一API，根据权限自动过滤）
     mount: {
-      getMounts: mountService.getUserMountsList,
-      getMountById: mountService.getUserMountById,
+      getMounts: mountService.getMountsList,
     },
 
     // API密钥用户的文件系统服务 - 使用统一API

@@ -9,7 +9,7 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   // 统一版本管理
-  const APP_VERSION = "0.7.9";
+  const APP_VERSION = "0.7.9.1";
   const isDev = command === "serve";
 
   // 打印环境变量，帮助调试
@@ -83,40 +83,53 @@ export default defineConfig(({ command, mode }) => {
               },
             },
 
-            // 第三方CDN资源 - CacheFirst（外部资源稳定）
+            // 第三方CDN资源 - StaleWhileRevalidate
             {
               urlPattern: ({ url }) =>
-                  url.origin !== self.location.origin &&
-                  (url.hostname.includes("cdn") ||
-                      url.hostname.includes("googleapis") ||
-                      url.hostname.includes("gstatic") ||
-                      url.hostname.includes("jsdelivr") ||
-                      url.hostname.includes("unpkg")),
-              handler: "CacheFirst",
+                url.origin !== self.location.origin &&
+                (url.hostname.includes("cdn") ||
+                  url.hostname.includes("googleapis") ||
+                  url.hostname.includes("gstatic") ||
+                  url.hostname.includes("jsdelivr") ||
+                  url.hostname.includes("unpkg") ||
+                  url.hostname.includes("elemecdn") ||
+                  url.hostname.includes("bootcdn") ||
+                  url.hostname.includes("staticfile")),
+              handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "external-cdn-resources",
                 expiration: {
                   maxEntries: 100,
-                  maxAgeSeconds: 30 * 24 * 60 * 60, // 30天（第三方资源稳定）
+                  maxAgeSeconds: 30 * 24 * 60 * 60, // 30天
                 },
                 cacheableResponse: {
                   statuses: [0, 200],
                 },
+                plugins: [
+                  {
+                    cacheWillUpdate: async ({ response }) => {
+                      return response && response.status === 200;
+                    },
+                    handlerDidError: async ({ request, error }) => {
+                      console.warn(`CDN资源处理失败: ${request.url}`, error);
+                      return null; // 优雅降级
+                    },
+                  },
+                ],
               },
             },
 
-            // 图廊图片 - NetworkFirst
+            // 图廊图片 - StaleWhileRevalidate（图片适合后台更新）
             {
               urlPattern: ({ request, url }) =>
-                  request.destination === "image" && (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
-              handler: "NetworkFirst",
+                request.destination === "image" && (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+              handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "gallery-images",
                 expiration: {
-                  maxEntries: 300, // 增加图廊容量
-                  maxAgeSeconds: 7 * 24 * 60 * 60, // 7天（图片内容稳定）
+                  maxEntries: 300,
+                  maxAgeSeconds: 7 * 24 * 60 * 60, // 7天
                 },
-                networkTimeoutSeconds: 10, // NetworkFirst支持此参数
                 cacheableResponse: {
                   statuses: [0, 200],
                 },
@@ -126,8 +139,8 @@ export default defineConfig(({ command, mode }) => {
             // 用户媒体文件 - NetworkFirst（大文件适度缓存）
             {
               urlPattern: ({ request, url }) =>
-                  (request.destination === "video" || request.destination === "audio" || /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/i.test(url.pathname)) &&
-                  (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                (request.destination === "video" || request.destination === "audio" || /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/i.test(url.pathname)) &&
+                (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "user-media",
@@ -146,8 +159,8 @@ export default defineConfig(({ command, mode }) => {
             // 用户文档文件 - NetworkFirst（文档快速更新）
             {
               urlPattern: ({ url }) =>
-                  /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|md)$/i.test(url.pathname) &&
-                  (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
+                /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|md)$/i.test(url.pathname) &&
+                (url.pathname.includes("/api/") || url.searchParams.has("X-Amz-Algorithm") || url.hostname !== self.location.hostname),
               handler: "NetworkFirst",
               options: {
                 cacheName: "user-documents",
@@ -162,15 +175,15 @@ export default defineConfig(({ command, mode }) => {
               },
             },
 
-            // 应用内置图片 - StaleWhileRevalidate（应用资源）
+            // 应用内置图片 - CacheFirst（应用资源稳定）
             {
               urlPattern: ({ request, url }) => request.destination === "image" && url.origin === self.location.origin && !url.pathname.includes("/api/"),
-              handler: "StaleWhileRevalidate",
+              handler: "CacheFirst",
               options: {
                 cacheName: "app-images",
                 expiration: {
                   maxEntries: 100,
-                  maxAgeSeconds: 7 * 24 * 60 * 60, // 7天（应用图片）
+                  maxAgeSeconds: 30 * 24 * 60 * 60, // 30天（应用图片稳定）
                 },
                 cacheableResponse: {
                   statuses: [0, 200],
@@ -240,17 +253,16 @@ export default defineConfig(({ command, mode }) => {
               },
             },
 
-            // 公共API缓存 - NetworkFirst
+            // 公共API缓存 - StaleWhileRevalidate（公共内容后台更新）
             {
               urlPattern: /^.*\/api\/public\/.*$/,
-              handler: "NetworkFirst",
+              handler: "StaleWhileRevalidate",
               options: {
                 cacheName: "public-api",
                 expiration: {
                   maxEntries: 50,
-                  maxAgeSeconds: 30 * 60, // 30分钟
+                  maxAgeSeconds: 60 * 60, // 1小时（公共内容相对稳定）
                 },
-                networkTimeoutSeconds: 4,
                 cacheableResponse: {
                   statuses: [0, 200],
                 },
@@ -277,7 +289,7 @@ export default defineConfig(({ command, mode }) => {
 
             // 管理员配置读取API - 短期缓存（仅GET请求）
             {
-              urlPattern: ({ request, url }) => request.method === "GET" && /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings).*$/.test(url.href),
+              urlPattern: ({ request, url }) => request.method === "GET" && /^.*\/api\/(mount\/list|admin\/api-keys|admin\/system-settings).*$/.test(url.href),
               handler: "NetworkFirst",
               options: {
                 cacheName: "admin-config-read",
@@ -295,8 +307,8 @@ export default defineConfig(({ command, mode }) => {
             // 管理员配置写入API - NetworkOnly（POST/PUT/DELETE操作）
             {
               urlPattern: ({ request, url }) =>
-                  ["POST", "PUT", "DELETE"].includes(request.method) &&
-                  /^.*\/api\/(admin\/mounts|admin\/api-keys|admin\/system-settings|admin\/login|admin\/change-password|admin\/cache).*$/.test(url.href),
+                ["POST", "PUT", "DELETE"].includes(request.method) &&
+                /^.*\/api\/(mount\/(create|[^\/]+)|admin\/api-keys|admin\/system-settings|admin\/login|admin\/change-password|admin\/cache).*$/.test(url.href),
               handler: "NetworkOnly",
               options: {
                 cacheName: "admin-config-write",
