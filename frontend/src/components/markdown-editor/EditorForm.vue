@@ -42,7 +42,7 @@
 
       <div class="form-group">
         <label class="form-label" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">{{ $t("markdown.form.expiryTime") }}</label>
-        <select class="form-input" :class="getInputClasses()" v-model="formData.expiryTime" :disabled="!hasPermission">
+        <select class="form-input" :class="getInputClasses()" v-model="formData.expiry_time" :disabled="!hasPermission">
           <option value="1">1 {{ $t("markdown.form.expiryHour") }}</option>
           <option value="24">1 {{ $t("markdown.form.expiryDay") }}</option>
           <option value="168">7 {{ $t("markdown.form.expiryDay") }}</option>
@@ -61,7 +61,7 @@
           class="form-input"
           :class="getInputClasses()"
           :placeholder="$t('markdown.form.maxViewsPlaceholder')"
-          v-model.number="formData.maxViews"
+          v-model.number="formData.max_views"
           @input="validateMaxViews"
           :disabled="!hasPermission"
         />
@@ -114,8 +114,8 @@ const formData = reactive({
   remark: "",
   customLink: "",
   password: "",
-  expiryTime: "0",
-  maxViews: 0,
+  expiry_time: "0",
+  max_views: 0,
 });
 
 // 验证错误
@@ -146,18 +146,18 @@ const validateMaxViews = (event) => {
   const value = event.target.value;
 
   if (value < 0) {
-    formData.maxViews = 0;
+    formData.max_views = 0;
     return;
   }
 
   if (value.toString().includes(".")) {
-    formData.maxViews = parseInt(value);
+    formData.max_views = parseInt(value);
   }
 
   if (isNaN(value) || value === "") {
-    formData.maxViews = 0;
+    formData.max_views = 0;
   } else {
-    formData.maxViews = parseInt(value);
+    formData.max_views = parseInt(value);
   }
 
   emit("form-change", { ...formData, isValid: !slugError.value });
@@ -200,8 +200,8 @@ const resetForm = () => {
   formData.remark = "";
   formData.customLink = "";
   formData.password = "";
-  formData.expiryTime = "0";
-  formData.maxViews = 0;
+  formData.expiry_time = "0";
+  formData.max_views = 0;
   slugError.value = "";
 };
 

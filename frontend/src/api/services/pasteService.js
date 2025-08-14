@@ -55,9 +55,9 @@ export function getRawPasteUrl(slug, password = null) {
  * @param {string} pasteData.content - 分享内容
  * @param {string} [pasteData.slug] - 自定义链接后缀（可选）
  * @param {string} [pasteData.remark] - 备注信息（可选）
- * @param {string} [pasteData.expiresAt] - 过期时间，ISO格式（可选）
+ * @param {string} [pasteData.expires_at] - 过期时间，ISO格式（可选）
  * @param {string} [pasteData.password] - 访问密码（可选）
- * @param {number} [pasteData.maxViews] - 最大查看次数（可选）
+ * @param {number} [pasteData.max_views] - 最大查看次数（可选）
  * @returns {Promise<Object>} 创建结果
  */
 export function createPaste(pasteData) {
@@ -114,8 +114,8 @@ export function getPasteById(id) {
  * @param {string} [data.password] - 新的访问密码
  * @param {boolean} [data.clearPassword] - 是否清除密码
  * @param {string} [data.remark] - 新的备注
- * @param {string} [data.expiresAt] - 新的过期时间
- * @param {number} [data.maxViews] - 新的最大查看次数
+ * @param {string} [data.expires_at] - 新的过期时间
+ * @param {number} [data.max_views] - 新的最大查看次数
  * @param {string} [data.newSlug] - 新的链接后缀，为空则自动生成
  * @returns {Promise<ApiResponse>} - API响应
  */

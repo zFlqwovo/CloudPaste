@@ -155,17 +155,17 @@ export function isPasteAccessible(paste) {
  * 创建新的文本分享
  * @param {D1Database} db - D1数据库实例
  * @param {Object} pasteData - 文本分享数据
- * @param {string} createdBy - 创建者标识
+ * @param {string} created_by - 创建者标识
  * @returns {Promise<Object>} 创建的文本分享
  */
-export async function createPaste(db, pasteData, createdBy) {
+export async function createPaste(db, pasteData, created_by) {
   // 必须提供内容
   if (!pasteData.content) {
     throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "内容不能为空" });
   }
 
   // 验证可打开次数不能为负数
-  if (pasteData.maxViews !== null && pasteData.maxViews !== undefined && parseInt(pasteData.maxViews) < 0) {
+  if (pasteData.max_views !== null && pasteData.max_views !== undefined && parseInt(pasteData.max_views) < 0) {
     throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "可打开次数不能为负数" });
   }
 
@@ -194,9 +194,9 @@ export async function createPaste(db, pasteData, createdBy) {
     content: pasteData.content,
     remark: pasteData.remark || null,
     password: passwordHash,
-    expires_at: pasteData.expiresAt || null,
-    max_views: pasteData.maxViews || null,
-    created_by: createdBy,
+    expires_at: pasteData.expires_at || null,
+    max_views: pasteData.max_views || null,
+    created_by: created_by,
     created_at: createdAt,
     updated_at: createdAt,
   };
@@ -209,10 +209,10 @@ export async function createPaste(db, pasteData, createdBy) {
     id: pasteId,
     slug,
     remark: pasteData.remark,
-    expiresAt: pasteData.expiresAt,
-    maxViews: pasteData.maxViews,
+    expires_at: pasteData.expires_at,
+    max_views: pasteData.max_views,
     hasPassword: !!passwordHash,
-    createdAt: createdAt,
+    created_at: createdAt,
   };
 }
 
@@ -304,19 +304,10 @@ export async function verifyPastePassword(db, slug, password, incrementViews = t
     }
   }
 
+  // 返回包含明文密码的完整paste对象
   return {
-    id: paste.id,
-    slug: paste.slug,
-    content: paste.content,
-    remark: paste.remark,
-    hasPassword: true,
+    ...paste,
     plain_password: plainPassword,
-    expiresAt: paste.expires_at,
-    maxViews: paste.max_views,
-    views: incrementViews ? paste.views + 1 : paste.views, // 根据是否增加次数返回对应的值
-    createdAt: paste.created_at,
-    updatedAt: paste.updated_at,
-    created_by: paste.created_by,
   };
 }
 
@@ -325,12 +316,12 @@ export async function verifyPastePassword(db, slug, password, incrementViews = t
  * @param {D1Database} db - D1数据库实例
  * @param {number} page - 页码（兼容性参数）
  * @param {number} limit - 每页条数
- * @param {string} createdBy - 创建者筛选
+ * @param {string} created_by - 创建者筛选
  * @param {string} search - 搜索关键词
  * @param {number} offset - 偏移量（优先使用）
  * @returns {Promise<Object>} 分页结果
  */
-export async function getAllPastes(db, page = 1, limit = 10, createdBy = null, search = null, offset = null) {
+export async function getAllPastes(db, page = 1, limit = 10, created_by = null, search = null, offset = null) {
   // 使用 Repository
   const repositoryFactory = new RepositoryFactory(db);
   const pasteRepository = repositoryFactory.getPasteRepository();
@@ -341,7 +332,7 @@ export async function getAllPastes(db, page = 1, limit = 10, createdBy = null, s
     page,
     limit,
     offset,
-    createdBy,
+    created_by,
     search,
   });
 
@@ -399,8 +390,8 @@ export async function getUserPastes(db, apiKeyId, limit = 30, offset = 0, search
   const apiKeyRepository = repositoryFactory.getApiKeyRepository();
 
   // 使用 PasteRepository 获取用户文本列表
-  const createdBy = `apikey:${apiKeyId}`;
-  const pasteData = await pasteRepository.findByCreatorWithPagination(createdBy, {
+  const created_by = `apikey:${apiKeyId}`;
+  const pasteData = await pasteRepository.findByCreatorWithPagination(created_by, {
     limit,
     offset,
     search,
@@ -551,10 +542,10 @@ export async function batchDeleteUserPastes(db, ids, apiKeyId) {
   const pasteRepository = repositoryFactory.getPasteRepository();
 
   // 构建创建者标识
-  const createdBy = `apikey:${apiKeyId}`;
+  const created_by = `apikey:${apiKeyId}`;
 
   // 执行批量删除（只删除属于该API密钥用户的文本）
-  const result = await pasteRepository.batchDeleteByCreator(ids, createdBy);
+  const result = await pasteRepository.batchDeleteByCreator(ids, created_by);
 
   return result.deletedCount;
 }
@@ -564,16 +555,16 @@ export async function batchDeleteUserPastes(db, ids, apiKeyId) {
  * @param {D1Database} db - D1数据库实例
  * @param {string} slug - 唯一标识
  * @param {Object} updateData - 更新数据
- * @param {string} createdBy - 创建者标识（可选，用于权限检查）
+ * @param {string} created_by - 创建者标识（可选，用于权限检查）
  * @returns {Promise<Object>} 更新后的信息
  */
-export async function updatePaste(db, slug, updateData, createdBy = null) {
+export async function updatePaste(db, slug, updateData, created_by = null) {
   // 使用 Repository
   const repositoryFactory = new RepositoryFactory(db);
   const pasteRepository = repositoryFactory.getPasteRepository();
 
   // 检查分享是否存在
-  const paste = await pasteRepository.findBySlugForUpdate(slug, createdBy);
+  const paste = await pasteRepository.findBySlugForUpdate(slug, created_by);
 
   if (!paste) {
     throw new HTTPException(ApiStatus.NOT_FOUND, { message: "文本分享不存在或无权修改" });
@@ -590,7 +581,7 @@ export async function updatePaste(db, slug, updateData, createdBy = null) {
   }
 
   // 验证可打开次数
-  if (updateData.maxViews !== null && updateData.maxViews !== undefined && parseInt(updateData.maxViews) < 0) {
+  if (updateData.max_views !== null && updateData.max_views !== undefined && parseInt(updateData.max_views) < 0) {
     throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "可打开次数不能为负数" });
   }
 
@@ -634,8 +625,8 @@ export async function updatePaste(db, slug, updateData, createdBy = null) {
   const updateDataForRepo = {
     content: updateData.content,
     remark: updateData.remark,
-    expires_at: updateData.expiresAt,
-    max_views: updateData.maxViews,
+    expires_at: updateData.expires_at,
+    max_views: updateData.max_views,
   };
 
   // 准备更新选项

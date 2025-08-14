@@ -25,12 +25,22 @@ class S3ConfigService {
   }
 
   /**
-   * 获取管理员的S3配置列表
+   * 获取管理员的S3配置列表（支持分页）
    * @param {string} adminId - 管理员ID
-   * @returns {Promise<Array>} S3配置列表
+   * @param {Object} options - 查询选项
+   * @param {number} [options.page] - 页码
+   * @param {number} [options.limit] - 每页数量
+   * @returns {Promise<Object>} S3配置列表和分页信息
    */
-  async getS3ConfigsByAdmin(adminId) {
-    return await this.s3ConfigRepository.findByAdmin(adminId);
+  async getS3ConfigsByAdmin(adminId, options = {}) {
+    if (options.page !== undefined || options.limit !== undefined) {
+      // 明确的分页查询
+      return await this.s3ConfigRepository.findByAdminWithPagination(adminId, options);
+    } else {
+      // 兼容性：无分页参数时返回所有数据
+      const configs = await this.s3ConfigRepository.findByAdmin(adminId);
+      return { configs, total: configs.length };
+    }
   }
 
   /**
@@ -961,14 +971,15 @@ async function executeFrontendSimulationTest(testResult, strategy) {
 // ==================== 向后兼容的导出函数 ====================
 
 /**
- * 获取S3配置列表（向后兼容）
+ * 获取S3配置列表（向后兼容，支持分页）
  * @param {D1Database} db - D1数据库实例
  * @param {string} adminId - 管理员ID
- * @returns {Promise<Array>} S3配置列表
+ * @param {Object} [options] - 查询选项
+ * @returns {Promise<Object>} S3配置列表和分页信息
  */
-export async function getS3ConfigsByAdmin(db, adminId) {
+export async function getS3ConfigsByAdmin(db, adminId, options = {}) {
   const s3ConfigService = new S3ConfigService(db);
-  return await s3ConfigService.getS3ConfigsByAdmin(adminId);
+  return await s3ConfigService.getS3ConfigsByAdmin(adminId, options);
 }
 
 /**

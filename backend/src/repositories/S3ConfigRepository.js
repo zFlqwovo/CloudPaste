@@ -27,6 +27,33 @@ export class S3ConfigRepository extends BaseRepository {
   }
 
   /**
+   * 根据管理员ID获取S3配置列表（分页）
+   * @param {string} adminId - 管理员ID
+   * @param {Object} options - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.limit=10] - 每页数量
+   * @returns {Promise<Object>} 包含配置列表和分页信息的对象
+   */
+  async findByAdminWithPagination(adminId, options = {}) {
+    const { page = 1, limit = 10 } = options;
+    const offset = (page - 1) * limit;
+
+    // 获取总数
+    const total = await this.count(DbTables.S3_CONFIGS, { admin_id: adminId });
+
+    // 获取分页数据
+    const configs = await this.findMany(DbTables.S3_CONFIGS, { admin_id: adminId }, { orderBy: "name ASC", limit, offset });
+
+    return {
+      configs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * 根据提供商类型获取S3配置
    * @param {string} providerType - 提供商类型
    * @param {string} adminId - 管理员ID（可选）

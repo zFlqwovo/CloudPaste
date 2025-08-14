@@ -225,12 +225,33 @@ const originalPlainTextContent = ref("");
 const copyFormatMenuVisible = ref(false);
 const copyFormatMenuPosition = ref({ x: 0, y: 0 });
 
+// 计算初始过期时间选项
+const getInitialExpiryTime = (expiresAt) => {
+  if (!expiresAt) return "0";
+
+  const expiryDate = new Date(expiresAt);
+  const now = new Date();
+  const diffHours = Math.round((expiryDate - now) / (1000 * 60 * 60));
+
+  if (diffHours <= 1) {
+    return "1";
+  } else if (diffHours <= 24) {
+    return "24";
+  } else if (diffHours <= 168) {
+    return "168";
+  } else if (diffHours <= 720) {
+    return "720";
+  } else {
+    return "0"; // 设置为永不过期
+  }
+};
+
 // 编辑表单数据
 const editForm = ref({
   remark: props.paste?.remark || "",
   customLink: props.paste?.slug || "",
-  expiryTime: "24",
-  maxViews: props.paste?.maxViews || 0,
+  expiryTime: getInitialExpiryTime(props.paste?.expires_at),
+  maxViews: props.paste?.max_views || 0,
   password: "",
   clearPassword: false, // 新增是否清除密码的标志
 });
@@ -356,8 +377,11 @@ watch(
     if (newPaste) {
       editForm.value.remark = newPaste.remark || "";
       editForm.value.customLink = newPaste.slug || "";
-      editForm.value.maxViews = newPaste.maxViews || 0;
+      editForm.value.maxViews = newPaste.max_views || 0;
       editForm.value.password = "";
+
+      // 处理过期时间
+      editForm.value.expiryTime = getInitialExpiryTime(newPaste.expires_at);
     }
   }
 );
@@ -388,7 +412,7 @@ const saveEdit = async () => {
   const updateData = {
     content: newContent,
     remark: editForm.value.remark || null,
-    maxViews: editForm.value.maxViews === 0 ? null : parseInt(editForm.value.maxViews),
+    max_views: editForm.value.maxViews === 0 ? null : parseInt(editForm.value.maxViews),
   };
 
   // 处理自定义链接 - 注意：链接后缀不可修改，所以不包含在更新数据中
@@ -398,9 +422,9 @@ const saveEdit = async () => {
     const hours = parseInt(editForm.value.expiryTime);
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + hours);
-    updateData.expiresAt = expiresAt.toISOString();
+    updateData.expires_at = expiresAt.toISOString();
   } else {
-    updateData.expiresAt = null; // 永不过期
+    updateData.expires_at = null; // 永不过期
   }
 
   // 处理密码设置

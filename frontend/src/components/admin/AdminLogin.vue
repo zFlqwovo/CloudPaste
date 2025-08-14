@@ -63,6 +63,9 @@ const handleLogin = async () => {
     if (err.status === ApiStatus.UNAUTHORIZED || err.response?.status === ApiStatus.UNAUTHORIZED || err.code === ApiStatus.UNAUTHORIZED) {
       // 401 Unauthorized - 用户名或密码错误
       error.value = t("admin.login.errors.invalidCredentials") || "用户名或密码错误";
+    } else if (err.message && err.message.includes("认证失败")) {
+      // 特殊处理：如果错误消息包含"认证失败"，也显示用户名或密码错误
+      error.value = t("admin.login.errors.invalidCredentials") || "用户名或密码错误";
     } else {
       // 后备判断：基于错误消息内容判断错误类型（保持兼容性）
       error.value = err.message || t("admin.login.errors.loginFailed");
@@ -101,6 +104,9 @@ const handleApiKeyLogin = async () => {
     } else if (err.status === ApiStatus.FORBIDDEN || err.response?.status === ApiStatus.FORBIDDEN || err.code === ApiStatus.FORBIDDEN) {
       // 403 Forbidden - 权限不足
       error.value = t("admin.login.errors.insufficientPermissions") || "API密钥权限不足";
+    } else if (err.message && err.message.includes("认证失败")) {
+      // 特殊处理：如果错误消息包含"认证失败"，显示API密钥无效
+      error.value = t("admin.login.errors.invalidApiKey") || "API密钥无效或未授权";
     } else {
       // 后备判断：基于错误消息内容判断错误类型（保持兼容性）
       error.value = err.message || t("admin.login.errors.keyValidationFailed");

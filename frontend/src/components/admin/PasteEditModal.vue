@@ -30,8 +30,8 @@ const editForm = reactive({
   remark: "", // 备注信息
   password: "", // 不回显密码，如果填写则更新密码
   clearPassword: false, // 是否清除密码的标记
-  expiryTime: "0", // 过期时间（小时），0表示永不过期
-  maxViews: 0, // 最大查看次数，0表示无限制
+  expiry_time: "0", // 过期时间（小时），0表示永不过期
+  max_views: 0, // 最大查看次数，0表示无限制
   slug: "", // 链接后缀，为空则系统自动生成
 });
 
@@ -57,22 +57,22 @@ watch(
       const diffHours = Math.round((expiryDate - now) / (1000 * 60 * 60));
 
       if (diffHours <= 1) {
-        editForm.expiryTime = "1";
+        editForm.expiry_time = "1";
       } else if (diffHours <= 24) {
-        editForm.expiryTime = "24";
+        editForm.expiry_time = "24";
       } else if (diffHours <= 168) {
-        editForm.expiryTime = "168";
+        editForm.expiry_time = "168";
       } else if (diffHours <= 720) {
-        editForm.expiryTime = "720";
+        editForm.expiry_time = "720";
       } else {
-        editForm.expiryTime = "0"; // 设置为永不过期
+        editForm.expiry_time = "0"; // 设置为永不过期
       }
     } else {
-      editForm.expiryTime = "0"; // 永不过期
+      editForm.expiry_time = "0"; // 永不过期
     }
 
     // 设置最大查看次数
-    editForm.maxViews = newPaste.max_views || 0;
+    editForm.max_views = newPaste.max_views || 0;
   },
   { immediate: true }
 );
@@ -88,21 +88,21 @@ const validateMaxViews = (event) => {
 
   // 如果是负数，则设置为0
   if (value < 0) {
-    editForm.maxViews = 0;
+    editForm.max_views = 0;
     return;
   }
 
   // 如果包含小数点，截取整数部分
   if (value.toString().includes(".")) {
-    editForm.maxViews = parseInt(value);
+    editForm.max_views = parseInt(value);
   }
 
   // 确保值为有效数字
   if (isNaN(value) || value === "") {
-    editForm.maxViews = 0;
+    editForm.max_views = 0;
   } else {
     // 确保是整数
-    editForm.maxViews = parseInt(value);
+    editForm.max_views = parseInt(value);
   }
 };
 
@@ -120,7 +120,7 @@ const closeEditModal = () => {
  */
 const saveEdit = () => {
   // 验证可打开次数不能为负数
-  if (editForm.maxViews < 0) {
+  if (editForm.max_views < 0) {
     // 通过emit传递错误信息
     emit("save", { error: "可打开次数不能为负数" });
     return;
@@ -132,7 +132,7 @@ const saveEdit = () => {
     slug: props.paste?.slug, // 当前slug（用于API请求路径）
     content: props.paste?.content, // 使用原内容
     remark: editForm.remark || null,
-    maxViews: editForm.maxViews === 0 ? null : parseInt(editForm.maxViews),
+    max_views: editForm.max_views === 0 ? null : parseInt(editForm.max_views),
   };
 
   // 只有当用户修改了slug时，才包含newSlug参数
@@ -143,19 +143,18 @@ const saveEdit = () => {
   // 处理密码 - 三种情况：不变、更新、清除
   if (editForm.password) {
     updateData.password = editForm.password;
-    updateData.clearPassword = false;
   } else if (editForm.clearPassword) {
     updateData.clearPassword = true;
   }
 
   // 处理过期时间 - 将小时数转换为ISO日期字符串
-  if (editForm.expiryTime !== "0") {
-    const hours = parseInt(editForm.expiryTime);
+  if (editForm.expiry_time !== "0") {
+    const hours = parseInt(editForm.expiry_time);
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + hours);
-    updateData.expiresAt = expiresAt.toISOString();
+    updateData.expires_at = expiresAt.toISOString();
   } else {
-    updateData.expiresAt = null; // 永不过期
+    updateData.expires_at = null; // 永不过期
   }
 
   // 传递更新数据给父组件
@@ -229,7 +228,7 @@ const saveEdit = () => {
               <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">可打开次数</label>
               <input
                 type="number"
-                v-model.number="editForm.maxViews"
+                v-model.number="editForm.max_views"
                 min="0"
                 step="1"
                 class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
@@ -244,7 +243,7 @@ const saveEdit = () => {
             <div class="mb-4">
               <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">过期时间</label>
               <select
-                v-model="editForm.expiryTime"
+                v-model="editForm.expiry_time"
                 class="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'"
               >

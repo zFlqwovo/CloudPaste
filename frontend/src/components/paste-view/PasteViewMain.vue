@@ -361,8 +361,8 @@ const saveEdit = async (updateData) => {
     // 保存成功后，更新编辑内容的原始值，这样取消按钮可以恢复到最新保存的内容
     editContent.value = updateData.content;
     paste.value.remark = updateData.remark;
-    paste.value.maxViews = updateData.maxViews;
-    paste.value.expiresAt = updateData.expiresAt;
+    paste.value.max_views = updateData.max_views;
+    paste.value.expires_at = updateData.expires_at;
 
     // 切换回预览模式
     switchViewMode("preview");
@@ -637,21 +637,21 @@ onBeforeUnmount(() => {
         <!-- 元信息显示区域 - 显示过期时间和剩余查看次数 -->
         <div class="mb-6 p-5 border rounded-lg" :class="darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'">
           <div class="grid grid-cols-1 gap-4 text-sm">
-            <div v-if="paste.expiresAt">
+            <div v-if="paste.expires_at">
               <span :class="darkMode ? 'text-gray-400' : 'text-gray-500'">过期时间:</span>
-              <span class="ml-2" :class="[darkMode ? 'text-white' : 'text-gray-900', isExpired(paste.expiresAt) ? 'text-red-500' : '']">{{ formatExpiry(paste.expiresAt) }}</span>
+              <span class="ml-2" :class="[darkMode ? 'text-white' : 'text-gray-900', isExpired(paste.expires_at) ? 'text-red-500' : '']">{{ formatExpiry(paste.expires_at) }}</span>
             </div>
-            <div v-if="paste.maxViews">
+            <div v-if="paste.max_views">
               <span :class="darkMode ? 'text-gray-400' : 'text-gray-500'">剩余查看次数:</span>
               <span
                 class="ml-2"
                 :class="[
                   darkMode ? 'text-white' : 'text-gray-900',
-                  paste.maxViews - paste.views <= 5 ? 'text-amber-500' : '',
-                  paste.maxViews - paste.views <= 1 ? 'text-red-500' : '',
+                  paste.max_views - paste.views <= 5 ? 'text-amber-500' : '',
+                  paste.max_views - paste.views <= 1 ? 'text-red-500' : '',
                 ]"
               >
-                {{ paste.maxViews - paste.views }}
+                {{ paste.max_views - paste.views }}
               </span>
             </div>
           </div>

@@ -289,16 +289,16 @@ const saveContent = async (formData) => {
       pasteData.password = formData.password.trim();
     }
 
-    if (formData.maxViews && parseInt(formData.maxViews) > 0) {
-      pasteData.maxViews = parseInt(formData.maxViews);
+    if (formData.max_views && parseInt(formData.max_views) > 0) {
+      pasteData.max_views = parseInt(formData.max_views);
     }
 
     // 处理过期时间
-    const expiryHours = parseInt(formData.expiryTime);
+    const expiryHours = parseInt(formData.expiry_time);
     if (expiryHours > 0) {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + expiryHours);
-      pasteData.expiresAt = expiresAt.toISOString();
+      pasteData.expires_at = expiresAt.toISOString();
     }
 
     console.log("创建分享，数据:", pasteData);

@@ -10,11 +10,24 @@ import { get, post, put, del } from "../client";
  ******************************************************************************/
 
 /**
- * 获取所有S3存储配置
- * @returns {Promise<Object>} 所有S3配置列表
+ * 获取所有S3存储配置（支持分页）
+ * @param {Object} params - 查询参数
+ * @param {number} [params.page] - 页码
+ * @param {number} [params.limit] - 每页数量
+ * @returns {Promise<Object>} S3配置列表和分页信息
  */
-export function getAllS3Configs() {
-  return get("/s3-configs");
+export function getAllS3Configs(params = {}) {
+  const queryParams = new URLSearchParams();
+
+  if (params.page) {
+    queryParams.append("page", params.page.toString());
+  }
+  if (params.limit) {
+    queryParams.append("limit", params.limit.toString());
+  }
+
+  const queryString = queryParams.toString();
+  return get(`/s3-configs${queryString ? `?${queryString}` : ""}`);
 }
 
 /**

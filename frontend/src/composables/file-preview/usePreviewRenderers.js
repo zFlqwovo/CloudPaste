@@ -44,7 +44,7 @@ export function usePreviewRenderers(file, emit, darkMode) {
    */
   const fileTypeInfo = computed(() => {
     if (!file.value) return null;
-    const mimeType = file.value.contentType || file.value.mimetype;
+    const mimeType = file.value.mimetype;
     return {
       mimeType,
       filename: file.value.name,
@@ -65,17 +65,17 @@ export function usePreviewRenderers(file, emit, darkMode) {
   const isPdfFile = computed(() => {
     return file.value?.type === FileType.DOCUMENT;
   });
-  // Office 子类型判断 - 基于MIME类型（保持原有逻辑）
+  // Office 子类型判断 - 统一使用mimetype字段
   const isWordDoc = computed(() => {
-    const mimeType = file.value?.contentType || file.value?.mimetype;
+    const mimeType = file.value?.mimetype;
     return mimeType?.includes("wordprocessingml") || mimeType === "application/msword";
   });
   const isExcel = computed(() => {
-    const mimeType = file.value?.contentType || file.value?.mimetype;
+    const mimeType = file.value?.mimetype;
     return mimeType?.includes("spreadsheetml") || mimeType === "application/vnd.ms-excel";
   });
   const isPowerPoint = computed(() => {
-    const mimeType = file.value?.contentType || file.value?.mimetype;
+    const mimeType = file.value?.mimetype;
     return mimeType?.includes("presentationml") || mimeType === "application/vnd.ms-powerpoint";
   });
 
@@ -435,7 +435,7 @@ export function usePreviewRenderers(file, emit, darkMode) {
         console.group(`📁 文件预览类型分析: ${newFile.name}`);
         console.log("🔍 文件信息:", {
           name: newFile.name,
-          contentType: newFile.contentType || newFile.mimetype,
+          mimetype: newFile.mimetype,
           size: newFile.size,
           path: newFile.path,
         });

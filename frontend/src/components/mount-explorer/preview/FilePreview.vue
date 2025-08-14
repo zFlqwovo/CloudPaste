@@ -87,7 +87,7 @@
         </div>
         <div class="file-info-item flex items-center">
           <span class="font-medium mr-2" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">{{ t("mount.filePreview.fileType") }}</span>
-          <span :class="darkMode ? 'text-gray-400' : 'text-gray-600'">{{ file.contentType || t("mount.filePreview.unknown") }}</span>
+          <span :class="darkMode ? 'text-gray-400' : 'text-gray-600'">{{ file.mimetype || t("mount.filePreview.unknown") }}</span>
         </div>
       </div>
 

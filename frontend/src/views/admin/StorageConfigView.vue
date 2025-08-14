@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted, computed, reactive } from "vue";
-import { api } from "@/api";
+import { onMounted } from "vue";
+import { useStorageConfigManagement } from "@/composables/admin-management/useStorageConfigManagement.js";
 import ConfigForm from "@/components/admin/ConfigForm.vue";
 import CommonPagination from "@/components/common/CommonPagination.vue";
+import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
 
 // 接收darkMode属性
 const props = defineProps({
@@ -12,267 +13,35 @@ const props = defineProps({
   },
 });
 
-// 状态变量
-const s3Configs = ref([]);
-const loading = ref(false);
-const error = ref("");
-const showAddForm = ref(false);
-const showEditForm = ref(false);
-const currentConfig = ref(null);
-const testResults = ref({});
+// 使用S3配置管理composable
+const {
+  // 状态
+  loading,
+  error,
+  s3Configs,
+  pagination,
+  pageSizeOptions,
+  currentConfig,
+  showAddForm,
+  showEditForm,
+  testResults,
+  showTestDetails,
+  selectedTestResult,
+  showDetailedResults,
 
-// 分页相关数据
-const pagination = reactive({
-  page: 1,
-  limit: 4,
-  total: 0,
-  totalPages: 0,
-});
-
-// 处理页码变化
-const handlePageChange = (page) => {
-  pagination.page = page;
-  loadS3Configs();
-};
-
-// 加载S3配置列表
-const loadS3Configs = async () => {
-  loading.value = true;
-  error.value = "";
-
-  try {
-    const response = await api.storage.getAllS3Configs({
-      page: pagination.page,
-      limit: pagination.limit,
-    });
-
-    if (response.data) {
-      s3Configs.value = response.data;
-      // 更新分页信息
-      pagination.total = response.total || response.data.length;
-      pagination.totalPages = Math.ceil(pagination.total / pagination.limit);
-    }
-  } catch (err) {
-    console.error("加载S3配置失败:", err);
-    error.value = err.message || "无法加载S3配置列表，请检查网络连接或刷新页面重试";
-  } finally {
-    loading.value = false;
-  }
-};
-
-// 计算属性：当前页的配置列表
-const currentPageConfigs = computed(() => {
-  const start = (pagination.page - 1) * pagination.limit;
-  const end = start + pagination.limit;
-  return s3Configs.value.slice(start, end);
-});
-
-// 处理删除配置
-const handleDeleteConfig = async (configId) => {
-  if (!confirm("确定要删除此存储配置吗？此操作不可恢复！")) {
-    return;
-  }
-
-  try {
-    await api.storage.deleteS3Config(configId);
-    loadS3Configs(); // 重新加载列表
-  } catch (err) {
-    console.error("删除S3配置失败:", err);
-    // 提供更友好的错误消息，针对不同错误场景
-    if (err.message && err.message.includes("有文件正在使用")) {
-      error.value = `无法删除此配置：${err.message}`;
-    } else {
-      error.value = err.message || "删除S3配置失败，请稍后再试";
-    }
-  }
-};
-
-// 编辑配置
-const editConfig = (config) => {
-  currentConfig.value = { ...config };
-  showEditForm.value = true;
-  showAddForm.value = false;
-};
-
-// 添加新配置
-const addNewConfig = () => {
-  currentConfig.value = null;
-  showAddForm.value = true;
-  showEditForm.value = false;
-};
-
-/**
- * 测试结果处理器
- */
-class TestResultProcessor {
-  constructor(result) {
-    this.result = result;
-  }
-
-  /**
-   * 计算测试状态
-   */
-  calculateStatus() {
-    const basicConnectSuccess = this.result.read?.success === true;
-    const writeSuccess = this.result.write?.success === true;
-    const corsSuccess = this.result.cors?.success === true;
-    const frontendSimSuccess = this.result.frontendSim?.success === true;
-
-    // 完全成功：读写权限都可用、CORS配置正确且前端模拟测试通过
-    const isFullSuccess = basicConnectSuccess && writeSuccess && corsSuccess && frontendSimSuccess;
-    // 部分成功：至少读权限可用
-    const isPartialSuccess = basicConnectSuccess && (!writeSuccess || !corsSuccess || !frontendSimSuccess);
-    // 整体成功状态：至少基础连接成功
-    const isSuccess = basicConnectSuccess;
-
-    return {
-      isFullSuccess,
-      isPartialSuccess,
-      isSuccess,
-    };
-  }
-
-  /**
-   * 生成状态消息
-   */
-  generateStatusMessage() {
-    const status = this.calculateStatus();
-
-    if (status.isFullSuccess) {
-      return "配置完全可用";
-    } else if (status.isPartialSuccess) {
-      return "配置部分可用";
-    } else {
-      return "配置不可用";
-    }
-  }
-
-  /**
-   * 生成简洁的状态消息
-   */
-  generateDetailsMessage() {
-    const details = [];
-
-    // 读权限状态 - 简洁显示
-    if (this.result.read?.success) {
-      details.push("✓ 读权限正常");
-    } else {
-      details.push("✗ 读权限失败");
-      if (this.result.read?.error) {
-        details.push(`  ${this.result.read.error.split("\n")[0]}`);
-      }
-    }
-
-    // 写权限状态 - 简洁显示
-    if (this.result.write?.success) {
-      details.push("✓ 写权限正常");
-    } else {
-      details.push("✗ 写权限失败");
-      if (this.result.write?.error) {
-        details.push(`  ${this.result.write.error.split("\n")[0]}`);
-      }
-    }
-
-    // CORS配置状态 - 简洁显示
-    if (this.result.cors?.success) {
-      details.push("✓ CORS配置正确");
-    } else {
-      details.push("✗ CORS配置有问题");
-      if (this.result.cors?.error) {
-        details.push(`  ${this.result.cors.error.split("\n")[0]}`);
-      }
-    }
-
-    // 前端模拟测试状态 - 简洁显示
-    if (this.result.frontendSim?.success) {
-      details.push("✓ 前端上传模拟成功");
-    } else {
-      details.push("✗ 前端上传模拟失败");
-      if (this.result.frontendSim?.error) {
-        details.push(`  ${this.result.frontendSim.error.split("\n")[0]}`);
-      }
-    }
-
-    return details.join("\n");
-  }
-}
-
-// 测试S3配置连接
-const testConnection = async (configId) => {
-  try {
-    testResults.value[configId] = { loading: true };
-    const response = await api.storage.testS3Config(configId);
-
-    // 使用测试结果处理器
-    const processor = new TestResultProcessor(response.data?.result || {});
-    const status = processor.calculateStatus();
-
-    testResults.value[configId] = {
-      success: status.isFullSuccess,
-      partialSuccess: status.isPartialSuccess,
-      message: processor.generateStatusMessage(),
-      details: processor.generateDetailsMessage(),
-      result: response.data?.result || {},
-      loading: false,
-    };
-  } catch (err) {
-    testResults.value[configId] = {
-      success: false,
-      partialSuccess: false,
-      message: "测试连接失败",
-      details: err.message || "无法连接到服务器",
-      loading: false,
-    };
-  }
-};
-
-// 表单提交成功回调
-const handleFormSuccess = () => {
-  showAddForm.value = false;
-  showEditForm.value = false;
-  loadS3Configs();
-};
-
-// 获取提供商图标
-const getProviderIcon = (providerType) => {
-  switch (providerType) {
-    case "Cloudflare R2":
-      return "M11 16.5l11 7v-14.5m-11 7.5v-13l-11 6.5 11 6.5z";
-    case "Backblaze B2":
-      return "M4 4v16a2 2 0 002 2h12a2 2 0 002-2V8.342a2 2 0 00-.602-1.43l-4.44-4.342A2 2 0 0013.56 2H6a2 2 0 00-2 2zm5 9v-3a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1z";
-    case "AWS S3":
-      return "M5 16.577l2.194-2.195 2.194 2.195L5 20.772l-4.388-4.195 2.194-2.195 2.194 2.195zM5 4.822l2.194 2.195L5 9.211 2.806 7.017 5 4.822zM12 0l2.194 2.195L12 4.389 9.806 2.195 12 0zM5 11.211l2.194 2.195-2.194 2.194-2.194-2.194L5 11.211zM12 7.017l4.389-4.195 4.388 4.195-4.388 4.194-4.389-4.194z";
-    case "Aliyun OSS":
-      return "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z";
-    default:
-      return "M3 19h18a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z";
-  }
-};
-
-// 导入统一的时间处理工具
-import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
-
-// 格式化日期时间
-const formatDateTime = (dateString) => {
-  return formatDateTimeWithSeconds(dateString);
-};
-
-// 组件加载时获取列表
-onMounted(() => {
-  loadS3Configs();
-});
-
-// 测试结果详情模态框
-const showTestDetails = ref(false);
-const selectedTestResult = ref(null);
-const showDetailedResults = ref(true); // 控制是否显示详细测试结果
-
-// 显示测试结果详情
-const showTestDetailsModal = (configId) => {
-  selectedTestResult.value = testResults.value[configId];
-  showTestDetails.value = true;
-  showDetailedResults.value = true; // 默认展开详细结果
-};
+  // 方法
+  loadS3Configs,
+  handlePageChange,
+  handleLimitChange,
+  handleDeleteConfig,
+  editConfig,
+  addNewConfig,
+  handleFormSuccess,
+  handleSetDefaultConfig,
+  testConnection,
+  showTestDetailsModal,
+  getProviderIcon,
+} = useStorageConfigManagement();
 
 // 格式化标签
 const formatLabel = (key) => {
@@ -293,16 +62,10 @@ const formatDate = (isoDate) => {
   return formatDateTimeWithSeconds(isoDate);
 };
 
-// 处理设置默认配置
-const handleSetDefaultConfig = async (configId) => {
-  try {
-    await api.storage.setDefaultS3Config(configId);
-    loadS3Configs(); // 重新加载列表
-  } catch (err) {
-    console.error("设置默认S3配置失败:", err);
-    error.value = err.message || "无法设置为默认配置，请稍后再试";
-  }
-};
+// 组件加载时获取列表
+onMounted(() => {
+  loadS3Configs();
+});
 </script>
 
 <template>
@@ -370,7 +133,7 @@ const handleSetDefaultConfig = async (configId) => {
         <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-3">
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
             <div
-              v-for="config in currentPageConfigs"
+              v-for="config in s3Configs"
               :key="config.id"
               class="rounded-lg shadow-md overflow-hidden transition-colors duration-200 border relative"
               :class="[
@@ -443,12 +206,12 @@ const handleSetDefaultConfig = async (configId) => {
 
                     <div class="flex justify-between">
                       <span class="font-medium">上次使用:</span>
-                      <span>{{ config.last_used ? formatDateTime(config.last_used) : "从未使用" }}</span>
+                      <span>{{ config.last_used ? formatDate(config.last_used) : "从未使用" }}</span>
                     </div>
 
                     <div class="flex justify-between">
                       <span class="font-medium">创建时间:</span>
-                      <span>{{ formatDateTime(config.created_at) }}</span>
+                      <span>{{ formatDate(config.created_at) }}</span>
                     </div>
                   </div>
 
@@ -562,7 +325,14 @@ const handleSetDefaultConfig = async (configId) => {
 
         <!-- 分页组件 - 移到卡片列表外面 -->
         <div class="mt-4">
-          <CommonPagination :dark-mode="darkMode" :pagination="pagination" mode="page" @page-changed="handlePageChange" />
+          <CommonPagination
+            :dark-mode="darkMode"
+            :pagination="pagination"
+            :page-size-options="pageSizeOptions"
+            mode="page"
+            @page-changed="handlePageChange"
+            @limit-changed="handleLimitChange"
+          />
         </div>
       </template>
 

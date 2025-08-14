@@ -246,9 +246,9 @@ export class FileShareService {
 
     // 处理过期时间
     let expiresAt = null;
-    if (typeof expires_in === "number" && expires_in > 0) {
+    if (expires_in && parseInt(expires_in) > 0) {
       const expiresDate = new Date();
-      expiresDate.setHours(expiresDate.getHours() + expires_in);
+      expiresDate.setHours(expiresDate.getHours() + parseInt(expires_in));
       expiresAt = expiresDate.toISOString();
     }
 

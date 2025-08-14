@@ -3,8 +3,9 @@ import { ref, reactive } from "vue";
 /**
  * 管理功能基础composable
  * 提供通用的状态管理、选择逻辑、消息处理等
+ * @param {string} pageKey - 页面标识符，用于区分不同页面的分页设置
  */
-export function useAdminBase() {
+export function useAdminBase(pageKey = "default") {
   // 基础状态管理
   const loading = ref(false);
   const error = ref("");
@@ -15,10 +16,26 @@ export function useAdminBase() {
   // 可选的每页数量选项
   const pageSizeOptions = [10, 20, 30, 50, 100];
 
-  // 从localStorage获取用户偏好的每页数量，默认为20
+  // 从localStorage获取用户偏好的每页数量，按页面区分，默认为20
   const getDefaultPageSize = () => {
-    const saved = localStorage.getItem("admin-page-size");
-    return saved ? parseInt(saved) : 20;
+    try {
+      const saved = localStorage.getItem("admin-page-size");
+      if (saved) {
+        const pageSizes = JSON.parse(saved);
+        return pageSizes[pageKey] || 20;
+      }
+    } catch (error) {
+      // 可能是旧格式（直接存储数字），尝试迁移
+      const oldValue = parseInt(saved) || 20;
+      console.log(`迁移旧的分页设置: ${saved} -> {default: ${oldValue}}`);
+
+      // 迁移到新格式
+      const newFormat = { default: oldValue };
+      localStorage.setItem("admin-page-size", JSON.stringify(newFormat));
+
+      return pageKey === "default" ? oldValue : 20;
+    }
+    return 20;
   };
 
   // 统一的分页状态（支持两种模式的转换）
@@ -89,8 +106,19 @@ export function useAdminBase() {
    * @param {number} newLimit - 新的每页数量
    */
   const changePageSize = (newLimit) => {
-    // 保存用户偏好
-    localStorage.setItem("admin-page-size", newLimit.toString());
+    try {
+      // 获取现有的分页设置
+      const saved = localStorage.getItem("admin-page-size");
+      const pageSizes = saved ? JSON.parse(saved) : {};
+
+      // 更新当前页面的分页设置
+      pageSizes[pageKey] = newLimit;
+
+      // 保存到localStorage
+      localStorage.setItem("admin-page-size", JSON.stringify(pageSizes));
+    } catch (error) {
+      console.warn("保存分页设置失败:", error);
+    }
 
     // 更新分页状态
     pagination.limit = newLimit;

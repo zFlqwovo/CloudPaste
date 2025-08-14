@@ -33,10 +33,10 @@ app.post("/api/paste", authGateway.requireText(), async (c) => {
     const authType = authGateway.utils.getAuthType(c);
 
     // 创建者信息
-    const createdBy = authType === "admin" ? userId : authType === "apikey" ? `apikey:${userId}` : null;
+    const created_by = authType === "admin" ? userId : authType === "apikey" ? `apikey:${userId}` : null;
 
     // 创建文本分享
-    const paste = await createPaste(db, body, createdBy);
+    const paste = await createPaste(db, body, created_by);
 
     // 返回创建结果
     return c.json({
@@ -68,10 +68,10 @@ app.get("/api/paste/:slug", async (c) => {
         slug: paste.slug,
         hasPassword: true,
         remark: paste.remark,
-        expiresAt: paste.expires_at,
-        maxViews: paste.max_views,
+        expires_at: paste.expires_at,
+        max_views: paste.max_views,
         views: paste.views,
-        createdAt: paste.created_at,
+        created_at: paste.created_at,
         created_by: paste.created_by,
         requiresPassword: true,
       });
@@ -91,10 +91,10 @@ app.get("/api/paste/:slug", async (c) => {
         slug: paste.slug,
         content: paste.content,
         remark: paste.remark,
-        expiresAt: paste.expires_at,
-        maxViews: paste.max_views,
+        expires_at: paste.expires_at,
+        max_views: paste.max_views,
         views: result.paste.views, // 使用数据库中的真实views
-        createdAt: paste.created_at,
+        created_at: paste.created_at,
         created_by: paste.created_by,
         hasPassword: false,
         isLastView: true, // 标识这是最后一次查看
@@ -111,10 +111,10 @@ app.get("/api/paste/:slug", async (c) => {
       slug: paste.slug,
       content: paste.content,
       remark: paste.remark,
-      expiresAt: paste.expires_at,
-      maxViews: paste.max_views,
+      expires_at: paste.expires_at,
+      max_views: paste.max_views,
       views: result.paste.views, // 使用数据库中的真实views
-      createdAt: paste.created_at,
+      created_at: paste.created_at,
       created_by: paste.created_by,
       hasPassword: false,
       isLastView: result.isLastView, // 标识这是否是最后一次查看
@@ -150,11 +150,11 @@ app.post("/api/paste/:slug", async (c) => {
         remark: paste.remark,
         hasPassword: true,
         plain_password: paste.plain_password,
-        expiresAt: paste.expiresAt,
-        maxViews: paste.maxViews,
+        expires_at: paste.expires_at,
+        max_views: paste.max_views,
         views: result.paste.views, // 使用数据库中的真实views
-        createdAt: paste.createdAt,
-        updatedAt: paste.updatedAt,
+        created_at: paste.created_at,
+        updated_at: paste.updated_at,
         created_by: paste.created_by,
         isLastView: true, // 标识这是最后一次查看
       });
@@ -172,11 +172,11 @@ app.post("/api/paste/:slug", async (c) => {
       remark: paste.remark,
       hasPassword: true,
       plain_password: paste.plain_password,
-      expiresAt: paste.expiresAt,
-      maxViews: paste.maxViews,
+      expires_at: paste.expires_at,
+      max_views: paste.max_views,
       views: result.paste.views, // 使用数据库中的真实views
-      createdAt: paste.createdAt,
-      updatedAt: paste.updatedAt,
+      created_at: paste.created_at,
+      updated_at: paste.updated_at,
       created_by: paste.created_by,
       isLastView: result.isLastView, // 标识这是否是最后一次查看
     });
@@ -269,10 +269,10 @@ app.get("/api/pastes", authGateway.requireText(), async (c) => {
       const page = parseInt(c.req.query("page") || "1");
       const offset = parseInt(c.req.query("offset") || (page - 1) * limit);
       const search = c.req.query("search");
-      const createdBy = c.req.query("created_by");
+      const created_by = c.req.query("created_by");
 
       // 使用管理员服务获取文本列表，传递offset参数
-      result = await getAllPastes(db, page, limit, createdBy, search, offset);
+      result = await getAllPastes(db, page, limit, created_by, search, offset);
     } else {
       // API密钥用户：获取查询参数
       const limit = parseInt(c.req.query("limit") || "30");

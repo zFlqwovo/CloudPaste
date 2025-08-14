@@ -149,7 +149,7 @@ export class S3FileOperations {
             isDirectory: false,
             size: headResponse.ContentLength || 0,
             modified: headResponse.LastModified ? headResponse.LastModified.toISOString() : new Date().toISOString(),
-            contentType: headResponse.ContentType || "application/octet-stream",
+            mimetype: headResponse.ContentType || "application/octet-stream", 
             etag: headResponse.ETag ? headResponse.ETag.replace(/"/g, "") : undefined,
             mount_id: mount.id,
             storage_type: mount.storage_type,
@@ -223,7 +223,7 @@ export class S3FileOperations {
               isDirectory: false,
               size: getResponse.ContentLength || 0,
               modified: getResponse.LastModified ? getResponse.LastModified.toISOString() : new Date().toISOString(),
-              contentType: getResponse.ContentType || "application/octet-stream",
+              mimetype: getResponse.ContentType || "application/octet-stream", // 统一使用mimetype字段名
               etag: getResponse.ETag ? getResponse.ETag.replace(/"/g, "") : undefined,
               mount_id: mount.id,
               storage_type: mount.storage_type,
@@ -426,7 +426,7 @@ export class S3FileOperations {
           success: true,
           path: s3SubPath,
           etag: result.ETag ? result.ETag.replace(/"/g, "") : undefined,
-          contentType: contentType,
+          mimetype: contentType, 
           message: "文件更新成功",
           isNewFile: !originalMetadata,
         };

@@ -97,7 +97,7 @@ class OfflineStorage {
     if (!db.objectStoreNames.contains("pastes")) {
       console.log("[PWA] 创建 pastes ObjectStore");
       const pasteStore = db.createObjectStore("pastes", { keyPath: "slug" });
-      pasteStore.createIndex("createdAt", "createdAt", { unique: false });
+      pasteStore.createIndex("created_at", "created_at", { unique: false });
       pasteStore.createIndex("cachedAt", "cachedAt", { unique: false });
     }
 
@@ -105,7 +105,7 @@ class OfflineStorage {
     if (!db.objectStoreNames.contains("files")) {
       console.log("[PWA] 创建 files ObjectStore");
       const fileStore = db.createObjectStore("files", { keyPath: "slug" });
-      fileStore.createIndex("createdAt", "createdAt", { unique: false });
+      fileStore.createIndex("created_at", "created_at", { unique: false });
       fileStore.createIndex("cachedAt", "cachedAt", { unique: false });
     }
 

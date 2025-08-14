@@ -130,13 +130,13 @@ class S3UrlCacheManager extends BaseCache {
 
       // S3UrlCache特殊数据结构：保持原有结构，直接存储url字段
       this.cache.set(key, {
-        url, 
+        url,
         expiresAt,
         lastAccessed: now,
-        s3ConfigId, 
-        userType, 
-        userId, 
-        isCustomHost: isCustomHostPreview, 
+        s3ConfigId,
+        userType,
+        userId,
+        isCustomHost: isCustomHostPreview,
       });
     } catch (error) {
       console.warn("S3URL缓存设置失败:", error.message);

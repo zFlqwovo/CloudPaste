@@ -26,29 +26,56 @@ import { createS3Client } from "../utils/s3Utils.js";
 
 const s3ConfigRoutes = new Hono();
 
-// 获取S3配置列表（管理员权限或API密钥文件权限）
+// 获取S3配置列表（管理员权限或API密钥文件权限，支持分页）
 s3ConfigRoutes.get("/api/s3-configs", authGateway.requireFile(), async (c) => {
   const db = c.env.DB;
 
   try {
-    let configs;
     const isAdmin = authGateway.utils.isAdmin(c);
     const adminId = authGateway.utils.getUserId(c);
 
     if (isAdmin) {
-      // 管理员可以看到所有自己的配置
-      configs = await getS3ConfigsByAdmin(db, adminId);
-    } else {
-      // API密钥用户只能看到公开的配置
-      configs = await getPublicS3Configs(db);
-    }
+      // 管理员：区分分页请求和兼容性请求
+      const hasPageParam = c.req.query("page") !== undefined;
+      const hasLimitParam = c.req.query("limit") !== undefined;
 
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取S3配置列表成功",
-      data: configs,
-      success: true, // 添加兼容字段
-    });
+      if (hasPageParam || hasLimitParam) {
+        // 明确的分页查询
+        const limit = parseInt(c.req.query("limit") || "10");
+        const page = parseInt(c.req.query("page") || "1");
+        const result = await getS3ConfigsByAdmin(db, adminId, { page, limit });
+
+        return c.json({
+          code: ApiStatus.SUCCESS,
+          message: "获取S3配置列表成功",
+          data: result.configs,
+          total: result.total,
+          success: true,
+        });
+      } else {
+        // 兼容性：返回所有数据（用于下拉选项等场景）
+        const result = await getS3ConfigsByAdmin(db, adminId);
+
+        return c.json({
+          code: ApiStatus.SUCCESS,
+          message: "获取S3配置列表成功",
+          data: result.configs,
+          total: result.total,
+          success: true,
+        });
+      }
+    } else {
+      // API密钥用户只能看到公开的配置（暂不支持分页）
+      const configs = await getPublicS3Configs(db);
+
+      return c.json({
+        code: ApiStatus.SUCCESS,
+        message: "获取S3配置列表成功",
+        data: configs,
+        total: configs.length,
+        success: true,
+      });
+    }
   } catch (error) {
     console.error("获取S3配置列表错误:", error);
     return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "获取S3配置列表失败"), ApiStatus.INTERNAL_ERROR);
