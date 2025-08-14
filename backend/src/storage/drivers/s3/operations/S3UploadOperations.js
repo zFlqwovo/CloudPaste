@@ -14,7 +14,7 @@ import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 import { clearDirectoryCache } from "../../../../cache/index.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
-import { getEnvironmentOptimizedUploadConfig } from "../../../../utils/environmentUtils.js";
+import { getEnvironmentOptimizedUploadConfig, convertStreamForAWSCompatibility } from "../../../../utils/environmentUtils.js";
 
 export class S3UploadOperations {
   /**
@@ -191,10 +191,13 @@ export class S3UploadOperations {
           // 使用PutObjectCommand进行直接流式上传
           console.log(`WebDAV PUT [${filename}]: 开始直接上传 (${(contentLength / 1024 / 1024).toFixed(1)}MB)`);
 
+          // 处理AWS SDK v3在Node.js环境中的ReadableStream兼容性问题
+          const compatibleStream = await convertStreamForAWSCompatibility(stream);
+
           const putCommand = new PutObjectCommand({
             Bucket: this.config.bucket_name,
             Key: finalS3Path,
-            Body: stream,
+            Body: compatibleStream,
             ContentType: contentType,
             ContentLength: contentLength > 0 ? contentLength : undefined,
           });

@@ -145,7 +145,7 @@ export async function handlePut(c, path, userId, userType, db) {
 
     // 根据最终决定的上传模式处理
     if (finalUploadMode === "direct") {
-      console.log(`WebDAV PUT - 使用直接流式上传模式`);
+      console.log(`WebDAV PUT - 使用直接上传模式`);
 
       try {
         // 使用FileSystem抽象层的uploadStream方法
@@ -159,7 +159,7 @@ export async function handlePut(c, path, userId, userType, db) {
         const duration = Date.now() - startTime;
 
         const speedMBps = declaredContentLength > 0 ? (declaredContentLength / 1024 / 1024 / (duration / 1000)).toFixed(2) : "未知";
-        console.log(`WebDAV PUT - 直接流式上传成功，用时: ${duration}ms，速度: ${speedMBps}MB/s，ETag: ${result.etag}`);
+        console.log(`WebDAV PUT - 直接上传成功，用时: ${duration}ms，速度: ${speedMBps}MB/s，ETag: ${result.etag}`);
 
         return new Response(null, {
           status: 201, // Created
@@ -170,7 +170,7 @@ export async function handlePut(c, path, userId, userType, db) {
           },
         });
       } catch (error) {
-        console.error(`WebDAV PUT - 直接流式上传失败: ${error.message}`);
+        console.error(`WebDAV PUT - 直接上传失败: ${error.message}`);
         throw error;
       }
     } else {
