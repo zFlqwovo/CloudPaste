@@ -50,7 +50,7 @@ app.post("/api/s3/presign", authGateway.requireFile(), async (c) => {
       return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "必须提供 filename"), ApiStatus.BAD_REQUEST);
     }
 
-    // 处理文件覆盖逻辑（从原s3UploadRoutes.js第127-166行提取）
+    // 处理文件覆盖逻辑
     if (body.override === "true" && body.slug) {
       const repositoryFactory = new RepositoryFactory(db);
       const fileRepository = repositoryFactory.getFileRepository();
@@ -199,11 +199,13 @@ app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => 
   // 从查询参数中获取S3配置ID
   let s3ConfigId = c.req.query("s3_config_id");
 
+  // 初始化Repository工厂和S3配置Repository
+  const repositoryFactory = new RepositoryFactory(db);
+  const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
+
   // 处理API密钥用户提供的S3配置ID，确保只能使用公开的配置
   if (authType === "apikey" && s3ConfigId) {
     // 验证指定的S3配置是否存在且公开
-    const repositoryFactory = new RepositoryFactory(db);
-    const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
     const configCheck = await s3ConfigRepository.findPublicById(s3ConfigId);
 
     if (!configCheck) {
@@ -291,7 +293,6 @@ app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => 
     const fileSize = fileContent.byteLength;
 
     // 获取系统最大上传限制
-    const repositoryFactory = new RepositoryFactory(db);
     const systemRepository = repositoryFactory.getSystemRepository();
     const maxUploadSizeResult = await systemRepository.getSettingMetadata("max_upload_size");
 

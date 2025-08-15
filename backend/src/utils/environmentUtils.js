@@ -30,14 +30,14 @@ export function getEnvironmentOptimizedUploadConfig() {
   const isWorker = isCloudflareWorkerEnvironment();
 
   return isWorker
-      ? {
+    ? {
         partSize: 6 * 1024 * 1024, // 6MB - Worker环境内存限制
         queueSize: 1, // 1并发 - 避免CPU时间超限
         environment: "Cloudflare Worker",
         maxConcurrency: 1, // 最大并发数
         bufferSize: 6 * 1024 * 1024, // 缓冲区大小
       }
-      : {
+    : {
         partSize: 8 * 1024 * 1024, // 8MB - Docker环境更大分片
         queueSize: 4, // 4并发
         environment: "Docker/Server",
