@@ -56,9 +56,20 @@ const routes = [
       originalPage: "upload",
     },
   },
+  // 管理员登录页面
+  {
+    path: "/admin/login",
+    name: "AdminLogin",
+    component: createOfflineAwareImport(() => import("../views/admin/AdminLoginView.vue"), "管理员登录"),
+    meta: {
+      title: "登录 - CloudPaste",
+      originalPage: "admin-login",
+    },
+  },
+  // 管理面板
   {
     path: "/admin",
-    component: createOfflineAwareImport(() => import("../views/AdminView.vue"), "管理面板"),
+    component: createOfflineAwareImport(() => import("../views/admin/AdminLayout.vue"), "管理面板布局"),
     meta: {
       title: "管理面板 - CloudPaste",
       originalPage: "admin",
@@ -66,122 +77,116 @@ const routes = [
     },
     children: [
       {
-        path: "",
-        component: createOfflineAwareImport(() => import("../views/admin/AdminLayout.vue"), "管理面板布局"),
+        path: "dashboard",
+        name: "AdminDashboard",
+        component: createOfflineAwareImport(() => import("../views/admin/DashboardView.vue"), "仪表板"),
+        meta: {
+          title: "仪表板 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
+        path: "text-management",
+        name: "AdminTextManagement",
+        component: createOfflineAwareImport(() => import("../views/admin/TextManagementView.vue"), "文本管理"),
+        meta: {
+          title: "文本管理 - CloudPaste",
+          requiredPermissions: ["text"], // 需要文本权限
+        },
+      },
+      {
+        path: "file-management",
+        name: "AdminFileManagement",
+        component: createOfflineAwareImport(() => import("../views/admin/FileManagementView.vue"), "文件管理"),
+        meta: {
+          title: "文件管理 - CloudPaste",
+          requiredPermissions: ["file"], // 需要文件权限
+        },
+      },
+      {
+        path: "key-management",
+        name: "AdminKeyManagement",
+        component: createOfflineAwareImport(() => import("../views/admin/KeyManagementView.vue"), "密钥管理"),
+        meta: {
+          title: "密钥管理 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
+        path: "mount-management",
+        name: "AdminMountManagement",
+        component: createOfflineAwareImport(() => import("../views/admin/MountManagementView.vue"), "挂载管理"),
+        meta: {
+          title: "挂载管理 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
+        path: "storage-config",
+        name: "AdminStorageConfig",
+        component: createOfflineAwareImport(() => import("../views/admin/StorageConfigView.vue"), "存储配置"),
+        meta: {
+          title: "S3存储配置 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
+        path: "account",
+        name: "AdminAccountManagement",
+        component: createOfflineAwareImport(() => import("../views/admin/AccountManagementView.vue"), "账号管理"),
+        meta: {
+          title: "账号管理 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
+        path: "backup",
+        name: "AdminBackup",
+        component: createOfflineAwareImport(() => import("../views/admin/BackupView.vue"), "数据备份"),
+        meta: {
+          title: "数据备份 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
+        path: "settings",
         children: [
           {
-            path: "",
-            name: "AdminDashboard",
-            component: createOfflineAwareImport(() => import("../views/admin/DashboardView.vue"), "仪表板"),
+            path: "global",
+            name: "AdminGlobalSettings",
+            component: createOfflineAwareImport(() => import("../views/admin/settings/GlobalSettingsView.vue"), "全局设置"),
             meta: {
-              title: "仪表板 - CloudPaste",
+              title: "全局设置 - CloudPaste",
               adminOnly: true, // 只有管理员可访问
             },
           },
-          {
-            path: "text-management",
-            name: "AdminTextManagement",
-            component: createOfflineAwareImport(() => import("../views/admin/TextManagementView.vue"), "文本管理"),
-            meta: {
-              title: "文本管理 - CloudPaste",
-              requiredPermissions: ["text"], // 需要文本权限
-            },
-          },
-          {
-            path: "file-management",
-            name: "AdminFileManagement",
-            component: createOfflineAwareImport(() => import("../views/admin/FileManagementView.vue"), "文件管理"),
-            meta: {
-              title: "文件管理 - CloudPaste",
-              requiredPermissions: ["file"], // 需要文件权限
-            },
-          },
-          {
-            path: "key-management",
-            name: "AdminKeyManagement",
-            component: createOfflineAwareImport(() => import("../views/admin/KeyManagementView.vue"), "密钥管理"),
-            meta: {
-              title: "密钥管理 - CloudPaste",
-              adminOnly: true, // 只有管理员可访问
-            },
-          },
-          {
-            path: "mount-management",
-            name: "AdminMountManagement",
-            component: createOfflineAwareImport(() => import("../views/admin/MountManagementView.vue"), "挂载管理"),
-            meta: {
-              title: "挂载管理 - CloudPaste",
-              adminOnly: true, // 只有管理员可访问
-            },
-          },
-          {
-            path: "storage-config",
-            name: "AdminStorageConfig",
-            component: createOfflineAwareImport(() => import("../views/admin/StorageConfigView.vue"), "存储配置"),
-            meta: {
-              title: "S3存储配置 - CloudPaste",
-              adminOnly: true, // 只有管理员可访问
-            },
-          },
-          {
-            path: "account",
-            name: "AdminAccountManagement",
-            component: createOfflineAwareImport(() => import("../views/admin/AccountManagementView.vue"), "账号管理"),
-            meta: {
-              title: "账号管理 - CloudPaste",
-              adminOnly: true, // 只有管理员可访问
-            },
-          },
-          {
-            path: "backup",
-            name: "AdminBackup",
-            component: createOfflineAwareImport(() => import("../views/admin/BackupView.vue"), "数据备份"),
-            meta: {
-              title: "数据备份 - CloudPaste",
-              adminOnly: true, // 只有管理员可访问
-            },
-          },
-          {
-            path: "settings",
-            children: [
-              {
-                path: "global",
-                name: "AdminGlobalSettings",
-                component: createOfflineAwareImport(() => import("../views/admin/settings/GlobalSettingsView.vue"), "全局设置"),
-                meta: {
-                  title: "全局设置 - CloudPaste",
-                  adminOnly: true, // 只有管理员可访问
-                },
-              },
 
-              {
-                path: "webdav",
-                name: "AdminWebDAVSettings",
-                component: createOfflineAwareImport(() => import("../views/admin/settings/WebDAVSettingsView.vue"), "WebDAV设置"),
-                meta: {
-                  title: "WebDAV设置 - CloudPaste",
-                  adminOnly: true, // 只有管理员可访问
-                },
-              },
-              {
-                path: "preview",
-                name: "AdminPreviewSettings",
-                component: createOfflineAwareImport(() => import("../views/admin/settings/PreviewSettingsView.vue"), "预览设置"),
-                meta: {
-                  title: "预览设置 - CloudPaste",
-                  adminOnly: true, // 只有管理员可访问
-                },
-              },
-              {
-                path: "site",
-                name: "AdminSiteSettings",
-                component: createOfflineAwareImport(() => import("../views/admin/settings/SiteSettingsView.vue"), "站点设置"),
-                meta: {
-                  title: "站点设置 - CloudPaste",
-                  adminOnly: true, // 只有管理员可访问
-                },
-              },
-            ],
+          {
+            path: "webdav",
+            name: "AdminWebDAVSettings",
+            component: createOfflineAwareImport(() => import("../views/admin/settings/WebDAVSettingsView.vue"), "WebDAV设置"),
+            meta: {
+              title: "WebDAV设置 - CloudPaste",
+              adminOnly: true, // 只有管理员可访问
+            },
+          },
+          {
+            path: "preview",
+            name: "AdminPreviewSettings",
+            component: createOfflineAwareImport(() => import("../views/admin/settings/PreviewSettingsView.vue"), "预览设置"),
+            meta: {
+              title: "预览设置 - CloudPaste",
+              adminOnly: true, // 只有管理员可访问
+            },
+          },
+          {
+            path: "site",
+            name: "AdminSiteSettings",
+            component: createOfflineAwareImport(() => import("../views/admin/settings/SiteSettingsView.vue"), "站点设置"),
+            meta: {
+              title: "站点设置 - CloudPaste",
+              adminOnly: true, // 只有管理员可访问
+            },
           },
         ],
       },
@@ -312,12 +317,28 @@ router.beforeEach(async (to, from, next) => {
       await authStore.validateAuth();
     }
 
+    // 登录页面访问控制
+    if (to.name === "AdminLogin") {
+      if (authStore.isAuthenticated) {
+        console.log("路由守卫：已认证用户访问登录页面，重定向到合适的管理页面");
+        const defaultRoute = getDefaultRouteForUser(authStore);
+        if (defaultRoute) {
+          next({ name: defaultRoute });
+        } else {
+          next({ name: "Home" });
+        }
+        return;
+      }
+      // 未认证用户可以访问登录页面
+      next();
+      return;
+    }
+
     // 管理页面权限检查 - 检查是否是admin路由或其子路由
     if (to.meta.requiresAuth && (to.path.startsWith("/admin") || to.matched.some((record) => record.path.startsWith("/admin")))) {
       if (!authStore.isAuthenticated) {
-        console.log("路由守卫：用户未认证，允许访问管理页面但会显示登录表单");
-        // 允许访问但会显示登录表单，保持原有逻辑
-        next();
+        console.log("路由守卫：用户未认证，重定向到登录页面");
+        next({ name: "AdminLogin", query: { redirect: to.fullPath } });
         return;
       }
 
@@ -327,6 +348,20 @@ router.beforeEach(async (to, from, next) => {
       if (!hasManagementAccess) {
         console.log("路由守卫：用户无管理权限，重定向到首页");
         next({ name: "Home" });
+        return;
+      }
+
+      // 处理 /admin 根路径访问，进行智能重定向
+      if (to.path === "/admin") {
+        console.log("路由守卫：访问 /admin 根路径，进行智能重定向");
+        const defaultRoute = getDefaultRouteForUser(authStore);
+        if (defaultRoute) {
+          console.log("路由守卫：重定向到默认页面", defaultRoute);
+          next({ name: defaultRoute });
+        } else {
+          console.log("路由守卫：用户无任何管理权限，重定向到首页");
+          next({ name: "Home" });
+        }
         return;
       }
 
