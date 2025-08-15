@@ -8,7 +8,18 @@
  * @returns {boolean} 是否为Worker环境
  */
 export function isCloudflareWorkerEnvironment() {
-  return typeof globalThis.caches !== "undefined" && typeof globalThis.EdgeRuntime !== "undefined";
+  // Wrangler 开发环境检测
+  // 检测 Wrangler 特征：有 caches 和 Response，但仍有 process（wrangler dev --local）
+  if (typeof caches !== "undefined" && typeof Response !== "undefined" && typeof window === "undefined" && typeof process !== "undefined") {
+    // 进一步检测是否为 Wrangler 环境
+    const hasWorkerFeatures = typeof navigator !== "undefined" && typeof globalThis !== "undefined";
+    if (hasWorkerFeatures) {
+      return true;
+    }
+  }
+
+  // 标准 Cloudflare Workers 检测
+  return typeof caches !== "undefined" && typeof Response !== "undefined" && typeof process === "undefined" && typeof window === "undefined";
 }
 
 /**
@@ -19,14 +30,14 @@ export function getEnvironmentOptimizedUploadConfig() {
   const isWorker = isCloudflareWorkerEnvironment();
 
   return isWorker
-    ? {
+      ? {
         partSize: 6 * 1024 * 1024, // 6MB - Worker环境内存限制
         queueSize: 1, // 1并发 - 避免CPU时间超限
         environment: "Cloudflare Worker",
         maxConcurrency: 1, // 最大并发数
         bufferSize: 6 * 1024 * 1024, // 缓冲区大小
       }
-    : {
+      : {
         partSize: 8 * 1024 * 1024, // 8MB - Docker环境更大分片
         queueSize: 4, // 4并发
         environment: "Docker/Server",
