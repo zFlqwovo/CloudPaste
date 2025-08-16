@@ -61,7 +61,7 @@ export class S3BackendMultipartOperations {
               const createDirParams = {
                 Bucket: this.config.bucket_name,
                 Key: parentPath,
-                Body: "", // 空内容
+                Body: Buffer.from("", "utf-8"),
                 ContentType: "application/x-directory", // 目录内容类型
               };
 

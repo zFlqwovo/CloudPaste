@@ -12,6 +12,7 @@ import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
 import { CAPABILITIES } from "../../../interfaces/capabilities/index.js";
 import { GetFileType, getFileTypeName } from "../../../../utils/fileTypeDetector.js";
+import { FILE_TYPES, FILE_TYPE_NAMES } from "../../../../constants/index.js";
 
 export class S3FileOperations {
   /**
@@ -140,16 +141,20 @@ export class S3FileOperations {
 
           // 构建文件信息对象
           const fileName = path.split("/").filter(Boolean).pop() || "/";
-          const fileType = await GetFileType(fileName, db);
-          const fileTypeName = await getFileTypeName(fileName, db);
+
+          // 检查是否为目录：基于ContentType判断
+          const isDirectory = headResponse.ContentType === "application/x-directory";
+
+          const fileType = isDirectory ? FILE_TYPES.FOLDER : await GetFileType(fileName, db);
+          const fileTypeName = isDirectory ? FILE_TYPE_NAMES[FILE_TYPES.FOLDER] : await getFileTypeName(fileName, db);
 
           const result = {
             path: path,
             name: fileName,
-            isDirectory: false,
-            size: headResponse.ContentLength || 0,
+            isDirectory: isDirectory,
+            size: isDirectory ? 0 : headResponse.ContentLength || 0, // 目录大小为0
             modified: headResponse.LastModified ? headResponse.LastModified.toISOString() : new Date().toISOString(),
-            mimetype: headResponse.ContentType || "application/octet-stream", 
+            mimetype: headResponse.ContentType || "application/octet-stream",
             etag: headResponse.ETag ? headResponse.ETag.replace(/"/g, "") : undefined,
             mount_id: mount.id,
             storage_type: mount.storage_type,
@@ -214,14 +219,18 @@ export class S3FileOperations {
             const getResponse = await this.s3Client.send(getCommand);
 
             const fileName = path.split("/").filter(Boolean).pop() || "/";
-            const fileType = await GetFileType(fileName, db);
-            const fileTypeName = await getFileTypeName(fileName, db);
+
+            // 检查是否为目录：基于ContentType判断
+            const isDirectory = getResponse.ContentType === "application/x-directory";
+
+            const fileType = isDirectory ? FILE_TYPES.FOLDER : await GetFileType(fileName, db);
+            const fileTypeName = isDirectory ? FILE_TYPE_NAMES[FILE_TYPES.FOLDER] : await getFileTypeName(fileName, db);
 
             const result = {
               path: path,
               name: fileName,
-              isDirectory: false,
-              size: getResponse.ContentLength || 0,
+              isDirectory: isDirectory,
+              size: isDirectory ? 0 : getResponse.ContentLength || 0, // 目录大小为0
               modified: getResponse.LastModified ? getResponse.LastModified.toISOString() : new Date().toISOString(),
               mimetype: getResponse.ContentType || "application/octet-stream", // 统一使用mimetype字段名
               etag: getResponse.ETag ? getResponse.ETag.replace(/"/g, "") : undefined,
@@ -426,7 +435,7 @@ export class S3FileOperations {
           success: true,
           path: s3SubPath,
           etag: result.ETag ? result.ETag.replace(/"/g, "") : undefined,
-          mimetype: contentType, 
+          mimetype: contentType,
           message: "文件更新成功",
           isNewFile: !originalMetadata,
         };

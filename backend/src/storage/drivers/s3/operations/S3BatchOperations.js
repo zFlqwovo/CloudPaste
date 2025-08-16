@@ -440,7 +440,7 @@ export class S3BatchOperations {
             const createDirParams = {
               Bucket: s3Config.bucket_name,
               Key: parentPath,
-              Body: "", // 空内容
+              Body: Buffer.from("", "utf-8"),
               ContentType: "application/x-directory", // 目录内容类型
             };
 

@@ -355,7 +355,7 @@ export class S3DirectoryOperations {
         const putParams = {
           Bucket: this.config.bucket_name,
           Key: s3SubPath,
-          Body: "",
+          Body: Buffer.from("", "utf-8"),
           ContentType: "application/x-directory",
         };
 

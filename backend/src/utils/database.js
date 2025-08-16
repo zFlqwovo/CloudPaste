@@ -678,6 +678,8 @@ async function migrateFilesTableToMultiStorage(db) {
  * @param {D1Database} db - D1数据库实例
  */
 async function rebuildFilesTable(db) {
+  console.log("开始重建files表结构...");
+
   // 创建新表结构
   await db
     .prepare(
