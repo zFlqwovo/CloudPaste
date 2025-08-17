@@ -7,7 +7,7 @@
 
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
-import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
 import { getLockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
@@ -379,21 +379,21 @@ export async function handleMove(c, path, userId, userType, db) {
       console.log(`WebDAV MOVE - 移动成功（覆盖现有资源）: ${path} -> ${destPath}`);
       return new Response(null, {
         status: 204, // No Content
-        headers: {
+        headers: addCorsHeaders({
           "Content-Type": "text/plain",
           "Content-Length": "0",
-        },
+        }),
       });
     } else {
       // 目标不存在，移动成功（创建了新资源）
       console.log(`WebDAV MOVE - 移动成功（创建新资源）: ${path} -> ${destPath}`);
       return new Response(null, {
         status: 201, // Created
-        headers: {
+        headers: addCorsHeaders({
           "Content-Type": "text/plain",
           "Content-Length": "0",
           Location: destination, // RFC 4918建议包含Location头部
-        },
+        }),
       });
     }
   } catch (error) {

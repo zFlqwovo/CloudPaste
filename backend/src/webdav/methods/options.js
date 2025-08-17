@@ -1,4 +1,4 @@
-import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 
 /**
  * 处理WebDAV OPTIONS请求
@@ -48,19 +48,12 @@ function detectCorsPreflightRequest(c) {
 function handleCorsPreflightRequest(c) {
   console.log("处理CORS预检请求");
 
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, HEAD, PUT, DELETE, MKCOL, COPY, MOVE, PROPFIND, PROPPATCH, LOCK, UNLOCK, OPTIONS",
-    "Access-Control-Allow-Headers":
-      "Authorization, Content-Type, Depth, Destination, If-Match, If-Modified-Since, If-None-Match, If-Range, If-Unmodified-Since, Lock-Token, Overwrite, Timeout, X-Requested-With, Origin, Accept, Cache-Control, Pragma",
-    "Access-Control-Max-Age": "86400", // 24小时
-    "Content-Length": "0",
-    "Content-Type": "text/plain",
-  };
-
   return new Response(null, {
     status: 204, // No Content
-    headers: corsHeaders,
+    headers: addCorsHeaders({
+      "Content-Length": "0",
+      "Content-Type": "text/plain",
+    }),
   });
 }
 
@@ -206,7 +199,7 @@ function detectClientInfo(c) {
  * @returns {Object} 响应头对象
  */
 function buildWebDAVResponseHeaders(supportedMethods, davLevel, clientInfo) {
-  const headers = {
+  const baseHeaders = {
     // 标准WebDAV头
     DAV: davLevel,
     Allow: supportedMethods.join(", "),
@@ -226,25 +219,19 @@ function buildWebDAVResponseHeaders(supportedMethods, davLevel, clientInfo) {
     // 安全头
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-
-    // CORS支持
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": supportedMethods.join(", "),
-    "Access-Control-Allow-Headers":
-      "Authorization, Content-Type, Depth, Destination, If-Match, If-Modified-Since, If-None-Match, If-Range, If-Unmodified-Since, Lock-Token, Overwrite, Timeout, X-Requested-With, Origin, Accept, Cache-Control, Pragma",
-    "Access-Control-Max-Age": "86400",
   };
 
   // 客户端特定头（保持兼容性）
   if (clientInfo.isWindows) {
-    headers["MS-Author-Via"] = "DAV";
+    baseHeaders["MS-Author-Via"] = "DAV";
   }
 
   if (clientInfo.isMac) {
-    headers["X-DAV-Powered-By"] = "CloudPaste";
+    baseHeaders["X-DAV-Powered-By"] = "CloudPaste";
   }
 
-  return headers;
+  // 使用统一的CORS头部添加函数
+  return addCorsHeaders(baseHeaders);
 }
 
 /**

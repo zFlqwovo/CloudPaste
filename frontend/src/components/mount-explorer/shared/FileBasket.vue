@@ -32,9 +32,6 @@
         {{ collectionCount > 99 ? "99+" : collectionCount }}
       </span>
     </button>
-
-    <!-- 文件篮面板 -->
-    <FileBasketPanel :is-open="isBasketOpen" :dark-mode="darkMode" @close="closeBasket" @task-created="handleTaskCreated" @show-message="handleShowMessage" />
   </div>
 </template>
 
@@ -42,7 +39,6 @@
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import { useFileBasket } from "../../../composables/file-system/useFileBasket.js";
-import FileBasketPanel from "./FileBasketPanel.vue";
 
 const { t } = useI18n();
 
@@ -53,11 +49,9 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["task-created", "show-message"]);
-
 // 使用文件篮composable
 const fileBasket = useFileBasket();
-const { isBasketOpen, collectionCount, hasCollection, directoryCount, basketButtonText } = storeToRefs(fileBasket);
+const { collectionCount, hasCollection, directoryCount, basketButtonText } = storeToRefs(fileBasket);
 
 // 切换文件篮面板
 const toggleBasket = () => {
@@ -66,24 +60,5 @@ const toggleBasket = () => {
   } catch (error) {
     console.error("切换文件篮面板失败:", error);
   }
-};
-
-// 关闭文件篮面板
-const closeBasket = () => {
-  try {
-    fileBasket.closeBasket();
-  } catch (error) {
-    console.error("关闭文件篮面板失败:", error);
-  }
-};
-
-// 处理任务创建事件
-const handleTaskCreated = (taskInfo) => {
-  emit("task-created", taskInfo);
-};
-
-// 处理消息显示事件
-const handleShowMessage = (messageInfo) => {
-  emit("show-message", messageInfo);
 };
 </script>

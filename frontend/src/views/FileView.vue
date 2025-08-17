@@ -1,7 +1,7 @@
 <template>
-  <div class="file-view-container flex flex-col flex-1">
+  <div class="file-view-container flex flex-col flex-1 pt-6 sm:pt-8">
     <!-- 添加面包屑导航标题，与文本分享页面风格一致 -->
-    <div class="max-w-4xl mx-auto w-full px-4 mt-4">
+    <div class="max-w-6xl mx-auto w-full px-3 sm:px-6">
       <div class="py-3 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 mb-4">
         <a href="/" class="hover:text-primary-600 dark:hover:text-primary-400">{{ t("nav.home") }}</a>
         <span class="mx-2">/</span>
@@ -9,7 +9,7 @@
       </div>
     </div>
 
-    <div v-if="error" class="error-container py-12 px-4 max-w-4xl mx-auto text-center">
+    <div v-if="error" class="error-container py-12 px-3 sm:px-6 max-w-6xl mx-auto text-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-red-600 dark:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           stroke-linecap="round"
@@ -29,7 +29,7 @@
     </div>
 
     <!-- 删除成功提示 -->
-    <div v-else-if="showDeleteSuccess" class="success-container py-12 px-4 max-w-4xl mx-auto text-center">
+    <div v-else-if="showDeleteSuccess" class="success-container py-12 px-3 sm:px-6 max-w-6xl mx-auto text-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-green-600 dark:text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7" />
       </svg>
@@ -38,7 +38,7 @@
       <div class="animate-pulse text-gray-500 dark:text-gray-400">{{ redirectCountdown }} {{ t("fileView.actions.redirecting") }}</div>
     </div>
 
-    <div v-else-if="loading" class="loading-container py-12 px-4 max-w-4xl mx-auto text-center">
+    <div v-else-if="loading" class="loading-container py-12 px-3 sm:px-6 max-w-6xl mx-auto text-center">
       <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 mx-auto mb-4 border-blue-600 dark:border-blue-500"></div>
       <p class="text-lg text-gray-600 dark:text-gray-300">{{ t("fileView.loading") }}</p>
     </div>

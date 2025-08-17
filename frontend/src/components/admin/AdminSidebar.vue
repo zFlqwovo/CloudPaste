@@ -435,6 +435,13 @@ const visibleMenuItems = computed(() => {
     items.push({ id: "file-management", name: t("admin.sidebar.fileManagement"), icon: "folder", type: "item", routeName: "AdminFileManagement" });
   }
 
+  if (props.permissions.mount) {
+    items.push({ id: "mount-management", name: t("admin.sidebar.mountManagement"), icon: "server", type: "item", routeName: "AdminMountManagement" });
+  }
+
+  // 所有API密钥用户都可以访问账户管理（用于查看信息和登出）
+  items.push({ id: "account-management", name: t("admin.sidebar.accountManagement"), icon: "user", type: "item", routeName: "AdminAccountManagement" });
+
   return items;
 });
 

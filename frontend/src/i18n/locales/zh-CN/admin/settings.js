@@ -40,6 +40,13 @@ export default {
   account: {
     title: "账号管理",
     description: "管理管理员账户信息，包括用户名和密码修改",
+    apiKeyTitle: "账户信息",
+    apiKeyDescription: "查看您的账户信息",
+    apiKeyInfo: {
+      title: "账户信息",
+      keyName: "密钥名称",
+      basicPath: "基础路径",
+    },
     adminInfo: {
       title: "管理员信息修改",
       description: "修改管理员用户名和密码",

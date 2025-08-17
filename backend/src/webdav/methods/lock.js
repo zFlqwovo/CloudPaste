@@ -6,7 +6,7 @@
 
 import { getLockManager } from "../utils/LockManager.js";
 import { parseLockXML, parseTimeoutHeader, parseDepthHeader, buildLockResponseXML, hasLockConflict } from "../utils/lockUtils.js";
-import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 
@@ -100,11 +100,11 @@ export async function handleLock(c, path, userId, userType, db) {
 
     return new Response(responseXML, {
       status: 200,
-      headers: {
+      headers: addCorsHeaders({
         "Content-Type": "application/xml; charset=utf-8",
         "Lock-Token": `<${lockInfo.token}>`,
         DAV: "1, 2",
-      },
+      }),
     });
   } catch (error) {
     console.error("处理LOCK失败:", error);

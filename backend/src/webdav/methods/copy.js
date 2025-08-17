@@ -4,7 +4,7 @@
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 import { parseDestinationPath } from "../utils/webdavUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
 import { getLockManager } from "../utils/LockManager.js";
@@ -307,10 +307,10 @@ export async function handleCopy(c, path, userId, userType, db) {
           // 返回标准WebDAV成功响应
           return new Response(null, {
             status: 201, // Created - 跨存储复制总是创建新文件
-            headers: {
+            headers: addCorsHeaders({
               "Content-Type": "text/plain",
               "Content-Length": "0",
-            },
+            }),
           });
         } else {
           // 传输失败，返回错误
@@ -359,10 +359,10 @@ export async function handleCopy(c, path, userId, userType, db) {
 
     return new Response(null, {
       status: statusCode,
-      headers: {
+      headers: addCorsHeaders({
         "Content-Type": "text/plain",
         "Content-Length": "0",
-      },
+      }),
     });
   } catch (error) {
     console.error(`WebDAV COPY - 处理错误: ${error.message}`, error);

@@ -122,7 +122,7 @@ const routes = [
         component: createOfflineAwareImport(() => import("../views/admin/MountManagementView.vue"), "挂载管理"),
         meta: {
           title: "挂载管理 - CloudPaste",
-          adminOnly: true, // 只有管理员可访问
+          requiredPermissions: ["mount"], // 需要挂载权限
         },
       },
       {
@@ -140,7 +140,7 @@ const routes = [
         component: createOfflineAwareImport(() => import("../views/admin/AccountManagementView.vue"), "账号管理"),
         meta: {
           title: "账号管理 - CloudPaste",
-          adminOnly: true, // 只有管理员可访问
+          requiresAuth: true, // 管理员和API密钥用户都可访问
         },
       },
       {
@@ -284,6 +284,8 @@ const hasRoutePermission = (route, authStore) => {
           return authStore.hasTextPermission;
         case "file":
           return authStore.hasFilePermission;
+        case "mount":
+          return authStore.hasMountPermission;
         default:
           return false;
       }
@@ -300,16 +302,26 @@ const getDefaultRouteForUser = (authStore) => {
     return "AdminDashboard";
   }
 
-  // API密钥用户只支持文本管理和文件管理
-  if (authStore.hasTextPermission) {
-    return "AdminTextManagement";
+  // API密钥用户：根据权限确定默认页面
+  if (authStore.authType === "apikey") {
+    // 按优先级检查权限
+    if (authStore.hasTextPermission) {
+      return "AdminTextManagement";
+    }
+
+    if (authStore.hasFilePermission) {
+      return "AdminFileManagement";
+    }
+
+    if (authStore.hasMountPermission) {
+      return "AdminMountManagement";
+    }
+
+    // 没有任何功能权限，默认到账户管理页面
+    return "AdminAccountManagement";
   }
 
-  if (authStore.hasFilePermission) {
-    return "AdminFileManagement";
-  }
-
-  // 无相关权限
+  // 其他情况
   return null;
 };
 
@@ -356,8 +368,9 @@ router.beforeEach(async (to, from, next) => {
         return;
       }
 
-      // 检查是否有管理权限（管理员或有文本/文件权限的API密钥用户）
-      const hasManagementAccess = authStore.isAdmin || (authStore.authType === "apikey" && (authStore.hasTextPermission || authStore.hasFilePermission));
+      // 检查是否有管理权限（管理员或任何已认证的API密钥用户）
+      // API密钥用户需要能够访问管理面板进行登出操作，具体权限在页面级别控制
+      const hasManagementAccess = authStore.isAdmin || authStore.authType === "apikey";
 
       if (!hasManagementAccess) {
         console.log("路由守卫：用户无管理权限，重定向到首页");
@@ -368,7 +381,15 @@ router.beforeEach(async (to, from, next) => {
 
       // 处理 /admin 根路径访问，进行智能重定向
       if (to.path === "/admin") {
-        console.log("路由守卫：访问 /admin 根路径，进行智能重定向");
+        console.log("路由守卫：访问 /admin 根路径，进行重定向");
+        console.log("路由守卫：用户权限详情", {
+          authType: authStore.authType,
+          isAdmin: authStore.isAdmin,
+          hasTextPermission: authStore.hasTextPermission,
+          hasFilePermission: authStore.hasFilePermission,
+          hasMountPermission: authStore.hasMountPermission,
+          apiKeyPermissions: authStore.apiKeyPermissions,
+        });
         const defaultRoute = getDefaultRouteForUser(authStore);
         NProgress.done();
         if (defaultRoute) {

@@ -309,12 +309,19 @@ export async function fetchApi(endpoint, options = {}) {
           }
           // API密钥处理
           else if (authHeader.startsWith("ApiKey ")) {
-            // 检查是否是文件访问权限问题（文件相关API）
-            const isFileAccess = url.includes("/api/files") || url.includes("/api/upload");
-            const isPermissionIssue = responseData && responseData.message && (responseData.message.includes("未授权访问") || responseData.message.includes("无权访问"));
+            // 检查是否是权限不足问题（而非API密钥无效）
+            const isPermissionIssue =
+              responseData &&
+              responseData.message &&
+              (responseData.message.includes("未授权访问") ||
+                responseData.message.includes("无权访问") ||
+                responseData.message.includes("需要管理员权限或有效的API密钥") ||
+                responseData.message.includes("权限不足") ||
+                responseData.message.includes("没有权限"));
 
-            if (isFileAccess && isPermissionIssue) {
-              // 仅抛出错误，但不清除API密钥
+            if (isPermissionIssue) {
+              // 权限不足，仅抛出错误，但不清除API密钥
+              console.log("API密钥权限不足，不执行登出");
               throw new Error(responseData.message || "访问被拒绝，您可能无权执行此操作");
             } else {
               // 其他情况（如密钥真的无效）时，执行登出

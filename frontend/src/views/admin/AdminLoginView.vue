@@ -115,7 +115,7 @@ const handleApiKeyLogin = async () => {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col" :class="darkMode ? 'bg-gray-900' : 'bg-gray-100'">
+  <div class="h-screen flex flex-col">
     <div class="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div class="mx-auto w-full max-w-sm rounded-lg p-6 shadow-md" :class="[darkMode ? 'bg-gray-800 shadow-gray-700/20' : 'bg-white shadow-gray-200/70']">
         <div class="sm:mx-auto sm:w-full sm:max-w-sm">

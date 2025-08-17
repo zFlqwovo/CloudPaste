@@ -27,6 +27,7 @@ export default {
       folderName: "Folder Name",
       create: "Create",
       cancel: "Cancel",
+      creating: "Creating...",
     },
     viewModes: {
       list: "List View",

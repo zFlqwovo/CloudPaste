@@ -41,6 +41,13 @@ export default {
   account: {
     title: "Account Management",
     description: "Manage administrator account information, including username and password modification",
+    apiKeyTitle: "Account Information",
+    apiKeyDescription: "View your account information",
+    apiKeyInfo: {
+      title: "Account Information",
+      keyName: "Key Name",
+      basicPath: "Basic Path",
+    },
     adminInfo: {
       title: "Administrator Information Modification",
       description: "Modify administrator username and password",

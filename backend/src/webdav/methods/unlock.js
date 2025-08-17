@@ -5,7 +5,7 @@
 
 import { getLockManager } from "../utils/LockManager.js";
 import { parseLockTokenHeader } from "../utils/lockUtils.js";
-import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 
 /**
  * 处理UNLOCK请求
@@ -78,9 +78,9 @@ export async function handleUnlock(c, path, userId, userType, db) {
     // 返回204 No Content
     return new Response(null, {
       status: 204,
-      headers: {
+      headers: addCorsHeaders({
         DAV: "1, 2",
-      },
+      }),
     });
   } catch (error) {
     console.error("处理UNLOCK失败:", error);

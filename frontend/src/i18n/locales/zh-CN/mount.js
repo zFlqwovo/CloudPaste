@@ -30,6 +30,7 @@ export default {
       placeholder: "新文件夹",
       cancel: "取消",
       create: "创建",
+      creating: "创建中...",
     },
     viewModes: {
       list: "列表视图",

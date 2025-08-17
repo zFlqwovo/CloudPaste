@@ -16,7 +16,7 @@ import { handleUnlock } from "./methods/unlock.js";
 import { handleProppatch } from "./methods/proppatch.js";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../constants/index.js";
-import { createWebDAVErrorResponse } from "./utils/errorUtils.js";
+import { createWebDAVErrorResponse, addCorsHeaders } from "./utils/errorUtils.js";
 import { createWebDAVMiddleware, getWebDAVConfig } from "./auth/index.js";
 
 /**
@@ -204,7 +204,7 @@ export async function handleWebDAV(c) {
     if (error instanceof HTTPException) {
       return new Response(error.message, {
         status: error.status,
-        headers: { "Content-Type": "text/plain" },
+        headers: addCorsHeaders({ "Content-Type": "text/plain" }),
       });
     }
 

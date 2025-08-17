@@ -4,26 +4,19 @@
       <h2 class="text-xl font-semibold">{{ t("file.uploadPageTitle") }}</h2>
     </div>
 
-    <!-- 权限提示 -->
-    <div
-      v-if="!hasPermission"
-      class="mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700/50 dark:text-yellow-200"
-    >
-      <div class="flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>
-          {{ t("file.permissionRequired") }}
-          <a href="#" @click.prevent="navigateToAdmin" class="font-medium underline">{{ t("file.loginOrAuth") }}</a
-          >。
-        </span>
-      </div>
-    </div>
+    <!-- 权限管理组件 -->
+    <PermissionManager
+      :dark-mode="darkMode"
+      permission-type="file"
+      :permission-required-text="$t('file.permissionRequired')"
+      :login-auth-text="$t('file.loginOrAuth')"
+      @permission-change="handlePermissionChange"
+      @navigate-to-admin="navigateToAdmin"
+    />
 
     <div class="main-content" v-if="hasPermission">
       <!-- 文件上传区域 -->
-      <div class="card mb-6" :class="darkMode ? 'bg-gray-800/50' : 'bg-white'">
+      <div class="card mb-6 p-4 sm:p-6">
         <FileUploader
           :dark-mode="darkMode"
           :s3-configs="s3Configs"
@@ -97,7 +90,7 @@
       </div>
 
       <!-- 最近上传记录 -->
-      <div v-if="recentFiles.length > 0" class="card" :class="darkMode ? 'bg-gray-800/50' : 'bg-white'">
+      <div v-if="recentFiles.length > 0" class="card p-4 sm:p-6">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-medium">{{ t("file.recentUploads") }}</h3>
           <span class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("file.showingRecent") }}</span>
@@ -113,6 +106,7 @@ import { ref, onMounted, computed, onBeforeUnmount } from "vue";
 import { api } from "@/api";
 import FileUploader from "../components/file-upload/FileUploader.vue";
 import FileList from "../components/file-upload/FileList.vue";
+import PermissionManager from "../components/common/PermissionManager.vue";
 import { useI18n } from "vue-i18n"; // 导入i18n
 import { useAuthStore } from "@/stores/authStore.js";
 
@@ -136,9 +130,6 @@ const loadingFiles = ref(false);
 const message = ref(null);
 
 // 从Store获取权限状态的计算属性
-const isAdmin = computed(() => authStore.isAdmin);
-const hasApiKey = computed(() => authStore.authType === "apikey" && !!authStore.apiKey);
-const hasFilePermission = computed(() => authStore.hasFilePermission);
 const hasPermission = computed(() => authStore.hasFilePermission);
 
 // 计算最近3条记录
@@ -156,18 +147,18 @@ const navigateToAdmin = () => {
   });
 };
 
-// 检查权限（简化版，主要用于日志记录）
-const checkPermissions = async () => {
-  try {
-    // 如果需要重新验证，则进行验证
-    if (authStore.needsRevalidation) {
-      console.log("FileUpload: 需要重新验证认证状态");
-      await authStore.validateAuth();
-    }
+// 权限变化处理 - 当权限状态改变时执行相应的业务逻辑
+const handlePermissionChange = async (hasPermissionValue) => {
+  console.log("FileUpload: 权限状态变化", hasPermissionValue);
 
-    console.log("FileUpload: 用户文件上传权限:", hasPermission.value ? "有权限" : "无权限");
-  } catch (error) {
-    console.error("检查权限失败:", error);
+  if (hasPermissionValue) {
+    console.log("用户获得权限，开始加载配置和文件列表");
+    await Promise.all([loadS3Configs(), loadFiles()]);
+  } else {
+    console.log("用户失去权限，清空数据");
+    // 清空相关数据
+    s3Configs.value = [];
+    files.value = [];
   }
 };
 
@@ -281,16 +272,6 @@ onMounted(async () => {
   // 监听认证状态变化事件
   window.addEventListener("auth-state-changed", handleAuthStateChange);
 
-  await checkPermissions();
-  console.log(`FileUpload权限检查结果: isAdmin=${isAdmin.value}, hasApiKey=${hasApiKey.value}, hasFilePermission=${hasFilePermission.value}`);
-  console.log(`hasPermission计算结果: ${hasPermission.value}`);
-
-  if (hasPermission.value) {
-    console.log("用户有权限，开始加载配置和文件列表");
-    await Promise.all([loadS3Configs(), loadFiles()]);
-  } else {
-    console.log("用户无权限访问文件上传功能");
-  }
 });
 
 // 组件卸载时清理
@@ -301,19 +282,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.card {
-  @apply rounded-lg shadow-sm p-4 sm:p-6 mb-4;
-}
-
 /* 响应式设计 */
 @media (max-width: 640px) {
   .file-upload-container {
     padding-top: 1rem;
-  }
-
-  .card {
-    padding: 1rem;
-    margin-bottom: 1rem;
   }
 }
 </style>

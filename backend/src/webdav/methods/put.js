@@ -5,7 +5,7 @@
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { getEffectiveMimeType } from "../../utils/fileUtils.js";
-import { handleWebDAVError } from "../utils/errorUtils.js";
+import { handleWebDAVError, addCorsHeaders } from "../utils/errorUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
 import { getSettingsByGroup } from "../../services/systemService.js";
 import { getLockManager } from "../utils/LockManager.js";
@@ -145,10 +145,10 @@ export async function handlePut(c, path, userId, userType, db) {
 
       return new Response(null, {
         status: 201, // Created
-        headers: {
+        headers: addCorsHeaders({
           "Content-Type": "text/plain",
           "Content-Length": "0",
-        },
+        }),
       });
     }
 
@@ -182,11 +182,11 @@ export async function handlePut(c, path, userId, userType, db) {
 
         return new Response(null, {
           status: 201, // Created
-          headers: {
+          headers: addCorsHeaders({
             "Content-Type": "text/plain",
             "Content-Length": "0",
             ETag: result.etag || "",
-          },
+          }),
         });
       } catch (error) {
         console.error(`WebDAV PUT - 直接上传失败: ${error.message}`);
@@ -212,11 +212,11 @@ export async function handlePut(c, path, userId, userType, db) {
 
         return new Response(null, {
           status: 201, // Created
-          headers: {
+          headers: addCorsHeaders({
             "Content-Type": "text/plain",
             "Content-Length": "0",
             ETag: result.etag || "",
-          },
+          }),
         });
       } catch (error) {
         console.error(`WebDAV PUT - 流式分片上传失败: ${error.message}`);

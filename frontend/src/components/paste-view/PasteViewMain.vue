@@ -533,7 +533,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="paste-view max-w-6xl mx-auto px-4 sm:px-6 flex-1 flex flex-col">
+  <div class="paste-view max-w-6xl mx-auto px-3 sm:px-6 flex-1 flex flex-col pt-6 sm:pt-8">
     <div class="mb-6">
       <!-- 将原来的大标题替换为更简洁的面包屑样式导航 -->
       <div class="py-3 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 mb-4">

@@ -4,6 +4,30 @@
  */
 
 /**
+ * 添加CORS头部到响应头对象
+ * @param {Headers|Object} headers - 响应头对象
+ * @returns {Headers|Object} 添加了CORS头部的响应头
+ */
+export function addCorsHeaders(headers) {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, HEAD, PUT, DELETE, MKCOL, COPY, MOVE, PROPFIND, PROPPATCH, LOCK, UNLOCK, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type, Depth, Destination, If-Match, If-Modified-Since, If-None-Match, If-Range, If-Unmodified-Since, Lock-Token, Overwrite, Timeout, X-Requested-With, Origin, Accept, Cache-Control, Pragma",
+    "Access-Control-Max-Age": "86400",
+  };
+
+  if (headers instanceof Headers) {
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      headers.set(key, value);
+    });
+    return headers;
+  } else {
+    return { ...headers, ...corsHeaders };
+  }
+}
+
+/**
  * 生成唯一错误ID
  * @returns {string} 错误ID
  */
@@ -63,9 +87,11 @@ export function createStandardWebDAVErrorResponse(message, status) {
   <D:message>${escapedMessage}</D:message>
 </D:error>`;
 
+  const headers = addCorsHeaders({ "Content-Type": "application/xml; charset=utf-8" });
+
   return new Response(xml, {
     status: status,
-    headers: { "Content-Type": "application/xml; charset=utf-8" },
+    headers: headers,
   });
 }
 
@@ -83,7 +109,7 @@ export function handleWebDAVError(operation, error, includeDetails = false, useX
 
   // 记录错误信息
   console.error(`WebDAV ${operation} 操作错误 [${errorId}]:`, error);
-  
+
   if (error.status && typeof error.status === "number") {
     const statusCode = error.status;
     const message = error.message || `${operation}操作失败`;
@@ -92,7 +118,7 @@ export function handleWebDAVError(operation, error, includeDetails = false, useX
       ? createStandardWebDAVErrorResponse(message, statusCode)
       : new Response(message, {
           status: statusCode,
-          headers: { "Content-Type": "text/plain" },
+          headers: addCorsHeaders({ "Content-Type": "text/plain" }),
         });
   }
 
@@ -102,7 +128,7 @@ export function handleWebDAVError(operation, error, includeDetails = false, useX
       ? createStandardWebDAVErrorResponse("文件或目录不存在", 404)
       : new Response("文件或目录不存在", {
           status: 404,
-          headers: { "Content-Type": "text/plain" },
+          headers: addCorsHeaders({ "Content-Type": "text/plain" }),
         });
   }
 
@@ -113,7 +139,7 @@ export function handleWebDAVError(operation, error, includeDetails = false, useX
     ? createStandardWebDAVErrorResponse(errorMessage, 500)
     : new Response(errorMessage, {
         status: 500,
-        headers: { "Content-Type": "text/plain" },
+        headers: addCorsHeaders({ "Content-Type": "text/plain" }),
       });
 }
 
@@ -129,6 +155,6 @@ export function createWebDAVErrorResponse(message, status, useXmlResponse = true
     ? createStandardWebDAVErrorResponse(message, status)
     : new Response(message, {
         status,
-        headers: { "Content-Type": "text/plain" },
+        headers: addCorsHeaders({ "Content-Type": "text/plain" }),
       });
 }

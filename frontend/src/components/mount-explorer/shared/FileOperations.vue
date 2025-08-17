@@ -119,29 +119,12 @@
         </button>
       </div>
     </div>
-
-    <!-- 通用 InputDialog 组件替换内联对话框 -->
-    <InputDialog
-      :is-open="showCreateFolderDialog"
-      :title="t('mount.operations.createFolder')"
-      :description="t('mount.createFolder.enterName')"
-      :label="t('mount.createFolder.folderName')"
-      :placeholder="t('mount.createFolder.placeholder')"
-      :confirm-text="t('mount.createFolder.create')"
-      :cancel-text="t('mount.createFolder.cancel')"
-      :dark-mode="darkMode"
-      @confirm="handleCreateFolderConfirm"
-      @cancel="handleCreateFolderCancel"
-      @close="showCreateFolderDialog = false"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import FileBasket from "./FileBasket.vue";
-import InputDialog from "../../common/dialogs/InputDialog.vue";
 
 const { t } = useI18n();
 
@@ -186,33 +169,8 @@ const openCopyModal = () => {
   emit("openCopyModal");
 };
 
-// 新建文件夹相关
-const showCreateFolderDialog = ref(false);
-const newFolderName = ref("");
-const folderNameInput = ref(null);
-
-// 显示新建文件夹对话框
+// 新建文件夹
 const createFolder = () => {
-  newFolderName.value = "";
-  showCreateFolderDialog.value = true;
-
-  // 在下一个DOM更新周期聚焦输入框
-  nextTick(() => {
-    folderNameInput.value?.focus();
-  });
-};
-
-// 处理创建文件夹确认
-const handleCreateFolderConfirm = (folderName) => {
-  emit("createFolder", {
-    name: folderName,
-    path: props.currentPath,
-  });
-  showCreateFolderDialog.value = false;
-};
-
-// 处理创建文件夹取消
-const handleCreateFolderCancel = () => {
-  newFolderName.value = "";
+  emit("createFolder");
 };
 </script>

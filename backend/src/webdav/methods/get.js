@@ -5,7 +5,7 @@
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 
 /**
@@ -156,17 +156,17 @@ export async function handleGet(c, path, userId, userType, db) {
 
       return new Response(null, {
         status: 302,
-        headers: {
+        headers: addCorsHeaders({
           Location: presignedResult.presignedUrl,
           "Cache-Control": "no-cache",
-        },
+        }),
       });
     } else {
       // 代理模式（默认）：使用FileSystem下载文件
       console.log(`WebDAV GET - 使用代理模式: ${path}`);
       const fileResponse = await fileSystem.downloadFile(path, fileName, c.req, userId, userType);
 
-      // 更新响应头以包含WebDAV特有的头信息
+      // 更新响应头以包含WebDAV特有的头信息和CORS头部
       const updatedHeaders = new Headers(fileResponse.headers);
       updatedHeaders.set("Content-Type", contentType);
       updatedHeaders.set("Last-Modified", lastModifiedStr);
@@ -175,6 +175,12 @@ export async function handleGet(c, path, userId, userType, db) {
       }
       updatedHeaders.set("Accept-Ranges", "bytes");
       updatedHeaders.set("Cache-Control", "max-age=3600");
+
+      // 添加CORS头部
+      const corsHeaders = addCorsHeaders({});
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        updatedHeaders.set(key, value);
+      });
 
       return new Response(fileResponse.body, {
         status: fileResponse.status,

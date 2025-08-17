@@ -6,6 +6,7 @@
 
 import { BaseAdapter } from "./BaseAdapter.js";
 import { getPlatformConfig } from "../config/WebDAVConfig.js";
+import { addCorsHeaders } from "../../utils/errorUtils.js";
 
 /**
  * Hono适配器类
@@ -165,7 +166,7 @@ export class HonoAdapter extends BaseAdapter {
   createChallengeResponse(message, headers) {
     return new Response(message, {
       status: 401,
-      headers: headers,
+      headers: addCorsHeaders(headers || {}),
     });
   }
 
@@ -177,9 +178,9 @@ export class HonoAdapter extends BaseAdapter {
   createForbiddenResponse(message) {
     return new Response(message, {
       status: 403,
-      headers: {
+      headers: addCorsHeaders({
         "Content-Type": "text/plain",
-      },
+      }),
     });
   }
 
@@ -191,9 +192,9 @@ export class HonoAdapter extends BaseAdapter {
   createUnauthorizedResponse(message) {
     return new Response(message, {
       status: 401,
-      headers: {
+      headers: addCorsHeaders({
         "Content-Type": "text/plain",
-      },
+      }),
     });
   }
 

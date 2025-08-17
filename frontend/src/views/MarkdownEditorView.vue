@@ -21,7 +21,14 @@
     <AnnouncementModal :content="siteSettings.site_announcement_content" :enabled="siteSettings.site_announcement_enabled" :dark-mode="darkMode" />
 
     <!-- 权限管理组件 -->
-    <PermissionManager :dark-mode="darkMode" @permission-change="handlePermissionChange" @navigate-to-admin="navigateToAdmin" />
+    <PermissionManager
+      :dark-mode="darkMode"
+      permission-type="text"
+      :permission-required-text="$t('markdown.permissionRequired')"
+      :login-auth-text="$t('markdown.loginOrAuth')"
+      @permission-change="handlePermissionChange"
+      @navigate-to-admin="navigateToAdmin"
+    />
 
     <!-- 编辑器组件 -->
     <div class="editor-wrapper">
@@ -78,14 +85,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { api } from "@/api";
 import { ApiStatus } from "../api/ApiStatus";
+import { useAuthStore } from "@/stores/authStore";
 
 // 导入子组件
 import VditorUnified from "../components/common/VditorUnified.vue";
-import PermissionManager from "../components/markdown-editor/PermissionManager.vue";
+import PermissionManager from "../components/common/PermissionManager.vue";
 import EditorForm from "../components/markdown-editor/EditorForm.vue";
 import ShareLinkBox from "../components/markdown-editor/ShareLinkBox.vue";
 import QRCodeModal from "../components/markdown-editor/QRCodeModal.vue";
@@ -93,6 +101,9 @@ import CopyFormatMenu from "../components/markdown-editor/CopyFormatMenu.vue";
 import AnnouncementModal from "../components/admin/AnnouncementModal.vue";
 
 const { t } = useI18n();
+
+// 使用认证Store
+const authStore = useAuthStore();
 
 // Props
 const props = defineProps({
@@ -113,10 +124,12 @@ const savingStatus = ref("");
 const isSubmitting = ref(false);
 const shareLink = ref("");
 const currentSharePassword = ref("");
-const hasPermission = ref(false);
 const isPlainTextMode = ref(false);
 const editorContent = ref("");
 const currentEditor = ref(null);
+
+// 从Store获取权限状态的计算属性
+const hasPermission = computed(() => authStore.hasTextPermission);
 
 // 二维码弹窗状态
 const showQRCodeModal = ref(false);
@@ -131,9 +144,10 @@ const siteSettings = ref({
   site_announcement_content: "",
 });
 
-// 组件事件处理函数
-const handlePermissionChange = (permission) => {
-  hasPermission.value = permission;
+// 权限变化处理 - 当权限状态改变时执行相应的业务逻辑
+const handlePermissionChange = (hasPermissionValue) => {
+  console.log("MarkdownEditor: 权限状态变化", hasPermissionValue);
+  // 权限状态会自动更新，这里只需要记录日志
 };
 
 const handleEditorReady = (editor) => {

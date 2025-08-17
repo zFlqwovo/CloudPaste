@@ -227,28 +227,22 @@ app.get("/api/raw/:slug", async (c) => {
       }
     }
 
-    // 返回原始文本内容
-    return new Response(paste.content, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": `inline; filename="${slug}.txt"`,
-      },
-    });
+    // 设置响应头并返回原始文本内容
+    c.header("Content-Type", "text/plain; charset=utf-8");
+    c.header("Content-Disposition", `inline; filename="${slug}.txt"`);
+
+    return c.text(paste.content);
   } catch (error) {
     console.error("获取原始文本内容失败:", error);
 
     // 根据错误类型返回适当的错误状态和信息
     if (error instanceof HTTPException) {
-      return new Response(error.message, {
-        status: error.status,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
-      });
+      c.header("Content-Type", "text/plain; charset=utf-8");
+      return c.text(error.message, error.status);
     }
 
-    return new Response("获取内容失败", {
-      status: ApiStatus.INTERNAL_ERROR,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+    c.header("Content-Type", "text/plain; charset=utf-8");
+    return c.text("获取内容失败", ApiStatus.INTERNAL_ERROR);
   }
 });
 

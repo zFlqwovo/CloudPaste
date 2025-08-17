@@ -1,10 +1,16 @@
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { api } from "@/api";
 import { useI18n } from "vue-i18n";
+import { useAuthStore } from "@/stores/authStore";
 
-// 使用i18n
+// 使用i18n和认证Store
 const { t } = useI18n();
+const authStore = useAuthStore();
+
+// 检测用户类型
+const isAdmin = computed(() => authStore.isAdmin);
+const isApiKeyUser = computed(() => authStore.authType === "apikey");
 
 // 定义props，接收父组件传递的darkMode
 const props = defineProps({
@@ -124,8 +130,12 @@ const handleChangePassword = async (event) => {
   <div class="flex-1 flex flex-col overflow-y-auto">
     <!-- 页面标题和说明 -->
     <div class="mb-6">
-      <h1 class="text-2xl font-bold mb-2" :class="darkMode ? 'text-white' : 'text-gray-800'">{{ t("admin.account.title") }}</h1>
-      <p class="text-base" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ t("admin.account.description") }}</p>
+      <h1 class="text-2xl font-bold mb-2" :class="darkMode ? 'text-white' : 'text-gray-800'">
+        {{ isAdmin ? t("admin.account.title") : t("admin.account.apiKeyTitle") }}
+      </h1>
+      <p class="text-base" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">
+        {{ isAdmin ? t("admin.account.description") : t("admin.account.apiKeyDescription") }}
+      </p>
     </div>
 
     <!-- 状态消息 -->
@@ -172,8 +182,32 @@ const handleChangePassword = async (event) => {
 
     <!-- 设置表单 -->
     <div class="space-y-6">
+      <!-- API密钥用户信息显示 -->
+      <div v-if="isApiKeyUser" class="setting-group bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
+        <h2 class="text-lg font-medium mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{{ t("admin.account.apiKeyInfo.title") }}</h2>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+            <div class="md:col-span-1">
+              <span class="block text-sm font-medium" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">{{ t("admin.account.apiKeyInfo.keyName") }}</span>
+            </div>
+            <div class="md:col-span-2">
+              <span class="text-sm" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ authStore.apiKeyInfo?.name || t("common.unknown") }}</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+            <div class="md:col-span-1">
+              <span class="block text-sm font-medium" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">{{ t("admin.account.apiKeyInfo.basicPath") }}</span>
+            </div>
+            <div class="md:col-span-2">
+              <span class="text-sm" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ authStore.apiKeyInfo?.basic_path || "/" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 管理员信息修改设置组 -->
-      <div class="setting-group bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
+      <div v-if="isAdmin" class="setting-group bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
         <h2 class="text-lg font-medium mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{{ t("admin.account.adminInfo.title") }}</h2>
         <div class="space-y-4">
           <p class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("admin.account.adminInfo.description") }}</p>
