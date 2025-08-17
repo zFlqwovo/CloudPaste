@@ -6,12 +6,16 @@ import { createRouter, createWebHistory } from "vue-router";
 import { pwaState } from "../pwa/pwaManager.js";
 import OfflineFallback from "../components/OfflineFallback.vue";
 import { showPageUnavailableToast } from "../utils/offlineToast.js";
+import NProgress from "nprogress";
+import "nprogress/nprogress.css";
 
 // 懒加载组件 - 添加离线错误处理
 const createOfflineAwareImport = (importFn, componentName = "页面") => {
   return () =>
     importFn().catch((error) => {
       console.error("组件加载失败:", error);
+
+      NProgress.done();
 
       // 如果是离线状态且加载失败，显示离线回退页面和Toast提示
       if (pwaState.isOffline || !navigator.onLine) {
@@ -260,6 +264,11 @@ const router = createRouter({
   },
 });
 
+// 配置NProgress - 遵循官方默认值
+NProgress.configure({
+  showSpinner: false, // 隐藏旋转器
+});
+
 // 权限检查工具函数
 const hasRoutePermission = (route, authStore) => {
   // 检查是否只有管理员可访问
@@ -306,6 +315,9 @@ const getDefaultRouteForUser = (authStore) => {
 
 // 路由守卫 - 使用认证Store进行主动权限验证
 router.beforeEach(async (to, from, next) => {
+  // 启动进度条
+  NProgress.start();
+
   try {
     // 动态导入认证Store
     const { useAuthStore } = await import("@/stores/authStore.js");
@@ -322,6 +334,7 @@ router.beforeEach(async (to, from, next) => {
       if (authStore.isAuthenticated) {
         console.log("路由守卫：已认证用户访问登录页面，重定向到合适的管理页面");
         const defaultRoute = getDefaultRouteForUser(authStore);
+        NProgress.done();
         if (defaultRoute) {
           next({ name: defaultRoute });
         } else {
@@ -338,6 +351,7 @@ router.beforeEach(async (to, from, next) => {
     if (to.meta.requiresAuth && (to.path.startsWith("/admin") || to.matched.some((record) => record.path.startsWith("/admin")))) {
       if (!authStore.isAuthenticated) {
         console.log("路由守卫：用户未认证，重定向到登录页面");
+        NProgress.done();
         next({ name: "AdminLogin", query: { redirect: to.fullPath } });
         return;
       }
@@ -347,6 +361,7 @@ router.beforeEach(async (to, from, next) => {
 
       if (!hasManagementAccess) {
         console.log("路由守卫：用户无管理权限，重定向到首页");
+        NProgress.done();
         next({ name: "Home" });
         return;
       }
@@ -355,6 +370,7 @@ router.beforeEach(async (to, from, next) => {
       if (to.path === "/admin") {
         console.log("路由守卫：访问 /admin 根路径，进行智能重定向");
         const defaultRoute = getDefaultRouteForUser(authStore);
+        NProgress.done();
         if (defaultRoute) {
           console.log("路由守卫：重定向到默认页面", defaultRoute);
           next({ name: defaultRoute });
@@ -381,6 +397,7 @@ router.beforeEach(async (to, from, next) => {
 
           // 获取用户默认路由
           const defaultRoute = getDefaultRouteForUser(authStore);
+          NProgress.done();
           if (defaultRoute) {
             console.log("路由守卫：重定向到默认页面", defaultRoute);
             next({ name: defaultRoute });
@@ -396,6 +413,7 @@ router.beforeEach(async (to, from, next) => {
           console.log("路由守卫：API密钥用户访问仪表板，重定向到默认页面");
           const defaultRoute = getDefaultRouteForUser(authStore);
           if (defaultRoute && defaultRoute !== "AdminDashboard") {
+            NProgress.done();
             next({ name: defaultRoute });
             return;
           }
@@ -429,6 +447,7 @@ router.beforeEach(async (to, from, next) => {
           console.log("路由守卫：用户无此路径权限，重定向到基本路径");
           const basePath = authStore.userInfo.basicPath || "/";
           const redirectPath = basePath === "/" ? "/mount-explorer" : `/mount-explorer${basePath}`;
+          NProgress.done();
           next({ path: redirectPath });
           return;
         }
@@ -438,6 +457,7 @@ router.beforeEach(async (to, from, next) => {
     next();
   } catch (error) {
     console.error("路由守卫错误:", error);
+    NProgress.done();
     // 发生错误时允许继续，避免阻塞路由
     next();
   }
@@ -446,6 +466,8 @@ router.beforeEach(async (to, from, next) => {
 // 路由错误处理
 router.onError((error) => {
   console.error("路由错误:", error);
+
+  NProgress.done();
 
   // 如果是离线状态下的组件加载失败，不需要额外处理
   // 因为 createOfflineAwareImport 已经处理了
@@ -460,6 +482,8 @@ router.onError((error) => {
 
 // 路由后置守卫 - 处理页面标题和调试信息
 router.afterEach(async (to, from) => {
+  // 完成进度条
+  NProgress.done();
   // 动态设置页面标题，支持国际化和站点配置
   let title = "CloudPaste";
   let siteTitle = "CloudPaste";

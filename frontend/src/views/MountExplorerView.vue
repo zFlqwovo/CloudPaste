@@ -226,7 +226,7 @@
       <!-- 内容区域 - 根据模式显示文件列表或文件预览 -->
       <div class="card" :class="darkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-white border-gray-200'">
         <!-- 文件列表模式 -->
-        <div v-if="!isPreviewMode">
+        <div v-if="!hasPreviewIntent">
           <!-- 错误提示 -->
           <div v-if="error" class="mb-4 p-4 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
             <div class="flex items-center">
@@ -266,7 +266,36 @@
 
         <!-- 文件预览模式 -->
         <div v-else>
-          <div class="p-4">
+          <!-- 预览加载状态 -->
+          <div v-if="isPreviewLoading" class="p-8 text-center">
+            <div class="flex flex-col items-center space-y-4">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div class="text-gray-600 dark:text-gray-400">{{ $t("common.loading") }}{{ route.query.preview ? ` ${route.query.preview}` : "" }}...</div>
+            </div>
+          </div>
+
+          <!-- 预览错误状态 -->
+          <div v-else-if="previewError" class="p-8 text-center">
+            <div class="flex flex-col items-center space-y-4">
+              <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.694-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
+                ></path>
+              </svg>
+              <div class="text-red-600 dark:text-red-400">
+                {{ previewError }}
+              </div>
+              <button @click="closePreviewWithUrl" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                {{ $t("common.back") }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 预览内容 -->
+          <div v-else-if="previewFile" class="p-4">
             <!-- 返回按钮 -->
             <div class="mb-4">
               <button
@@ -361,7 +390,10 @@ const { refreshDirectory, navigateTo, initializeFromRoute, updateUrl } = fileSys
 
 const { isCheckboxMode, selectedItems, selectedCount, setAvailableItems, toggleCheckboxMode, toggleSelectAll, getSelectedItems, selectItem } = selection;
 
-const { previewFile, previewInfo, isPreviewMode, isLoading: isPreviewLoading, updatePreviewUrl, stopPreview, initPreviewFromRoute } = filePreview;
+const { previewFile, previewInfo, isPreviewMode, isLoading: isPreviewLoading, error: previewError, updatePreviewUrl, stopPreview, initPreviewFromRoute } = filePreview;
+
+// 计算属性：基于路由参数判断是否有预览意图
+const hasPreviewIntent = computed(() => !!route.query.preview);
 
 // 组合式函数状态和方法
 const {
@@ -652,7 +684,7 @@ const batchDelete = () => {
 };
 
 /**
- * 🔧 取消删除 
+ * 🔧 取消删除
  */
 const cancelDelete = () => {
   // 删除过程中不允许取消

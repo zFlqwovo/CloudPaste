@@ -151,14 +151,13 @@ export function useFilePreview() {
         console.log("文件预览初始化成功:", fileInfo.name);
       } else {
         console.warn("无法加载预览文件:", response.message);
-        // 如果文件不存在，重定向到目录
-        clearPreviewUrl();
+        error.value = response.message || "文件不存在或无法访问";
+        // 保持预览模式，显示错误状态，不自动重定向
       }
-    } catch (error) {
-      console.error("初始化文件预览失败:", error);
-      error.value = error.message || "预览失败";
-      // 如果出错，重定向到目录
-      clearPreviewUrl();
+    } catch (err) {
+      console.error("初始化文件预览失败:", err);
+      error.value = err.message || "预览失败";
+      // 保持预览模式，显示错误状态，不自动重定向
     } finally {
       isLoading.value = false;
     }

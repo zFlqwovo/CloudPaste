@@ -50,9 +50,14 @@ const handleLogin = async () => {
   try {
     await authStore.adminLogin(form.username, form.password);
 
-    // 登录成功，重定向到管理面板
-    const redirectPath = router.currentRoute.value.query.redirect || "/admin/dashboard";
-    router.push(redirectPath);
+    // 登录成功，智能重定向到合适的管理页面
+    const redirectQuery = router.currentRoute.value.query.redirect;
+    if (redirectQuery) {
+      router.push(redirectQuery);
+    } else {
+      // 没有指定重定向路径，使用智能重定向
+      router.push("/admin");
+    }
   } catch (err) {
     console.error("管理员登录失败:", err);
     if (err.status === ApiStatus.UNAUTHORIZED || err.response?.status === ApiStatus.UNAUTHORIZED || err.code === ApiStatus.UNAUTHORIZED) {
@@ -79,9 +84,14 @@ const handleApiKeyLogin = async () => {
   try {
     await authStore.apiKeyLogin(apiKeyForm.apiKey);
 
-    // 登录成功，重定向到管理面板
-    const redirectPath = router.currentRoute.value.query.redirect || "/admin/dashboard";
-    router.push(redirectPath);
+    // 登录成功，智能重定向到合适的管理页面
+    const redirectQuery = router.currentRoute.value.query.redirect;
+    if (redirectQuery) {
+      router.push(redirectQuery);
+    } else {
+      // 没有指定重定向路径，使用智能重定向
+      router.push("/admin");
+    }
   } catch (err) {
     console.error("API密钥验证失败:", err);
     // 优先使用HTTP状态码判断错误类型，更可靠
