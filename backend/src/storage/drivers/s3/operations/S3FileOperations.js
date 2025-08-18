@@ -43,10 +43,10 @@ export class S3FileOperations {
     try {
       const s3Client = await createS3Client(s3Config, encryptionSecret);
 
-      // 构建获取对象的参数
+      // 构建GetObject参数
       const getParams = {
         Bucket: s3Config.bucket_name,
-        Key: s3SubPath,
+        Key: s3SubPath.startsWith("/") ? s3SubPath.slice(1) : s3SubPath,
       };
 
       // 处理Range请求（用于视频流等）
@@ -54,9 +54,11 @@ export class S3FileOperations {
         const rangeHeader = request.headers.get("range");
         if (rangeHeader) {
           getParams.Range = rangeHeader;
+          console.log(`[S3FileOperations] Range请求: ${rangeHeader} -> ${s3SubPath}`);
         }
       }
 
+      // 使用AWS SDK v3的GetObjectCommand
       const getCommand = new GetObjectCommand(getParams);
       const response = await s3Client.send(getCommand);
 
@@ -68,8 +70,14 @@ export class S3FileOperations {
       headers.set("Content-Type", contentType);
       headers.set("Content-Length", response.ContentLength?.toString() || "0");
 
-      // 设置缓存控制
-      headers.set("Cache-Control", "public, max-age=31536000"); // 1年缓存
+      // 检查是否为Range请求响应
+      const contentRange = response.ContentRange;
+      const isRangeResponse = !!contentRange;
+
+      // 设置缓存控制 - Range请求使用较短的缓存时间
+      if (isRangeResponse) {
+        headers.set("Cache-Control", "public, max-age=3600"); // Range请求1小时缓存
+      }
 
       // 处理下载
       if (forceDownload) {
@@ -81,11 +89,14 @@ export class S3FileOperations {
         }
       }
 
-      // 处理Range响应
-      if (response.ContentRange) {
-        headers.set("Content-Range", response.ContentRange);
-        headers.set("Accept-Ranges", "bytes");
+      // 处理Range响应 - 确保传递所有Range相关头部
+      if (contentRange) {
+        headers.set("Content-Range", contentRange);
+        console.log(`[S3FileOperations] Range响应: ${contentRange}`);
       }
+
+      // 始终设置Accept-Ranges以支持Range请求
+      headers.set("Accept-Ranges", "bytes");
 
       // 设置ETag
       if (response.ETag) {
@@ -97,21 +108,21 @@ export class S3FileOperations {
         headers.set("Last-Modified", response.LastModified.toUTCString());
       }
 
-      // 转换流为Response
-      const status = response.ContentRange ? 206 : 200;
+      // 返回Response，AWS SDK v3成功响应状态码为200或206
+      const statusCode = isRangeResponse ? 206 : 200;
       return new Response(response.Body, {
-        status,
+        status: statusCode,
         headers,
       });
     } catch (error) {
       console.error("从S3获取文件失败:", error);
 
-      if (error.$metadata?.httpStatusCode === 404) {
-        throw new HTTPException(ApiStatus.NOT_FOUND, { message: "文件不存在" });
-      } else if (error.$metadata?.httpStatusCode === 403) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限访问该文件" });
+      // 如果是HTTPException，直接抛出
+      if (error instanceof HTTPException) {
+        throw error;
       }
 
+      // 处理网络错误或其他错误
       throw new HTTPException(ApiStatus.INTERNAL_ERROR, {
         message: `获取文件失败: ${error.message}`,
       });
@@ -157,6 +168,7 @@ export class S3FileOperations {
 
           const fileType = isDirectory ? FILE_TYPES.FOLDER : await GetFileType(fileName, db);
           const fileTypeName = isDirectory ? FILE_TYPE_NAMES[FILE_TYPES.FOLDER] : await getFileTypeName(fileName, db);
+          const detectedMimeType = isDirectory ? "application/x-directory" : getMimeTypeFromFilename(fileName);
 
           const result = {
             path: path,
@@ -164,7 +176,7 @@ export class S3FileOperations {
             isDirectory: isDirectory,
             size: isDirectory ? 0 : exactMatch.Size || 0, // 目录大小为0
             modified: exactMatch.LastModified ? exactMatch.LastModified.toISOString() : new Date().toISOString(),
-            mimetype: isDirectory ? "application/x-directory" : getMimeTypeFromFilename(fileName), // 基于文件扩展名推断 MIME 类型
+            mimetype: detectedMimeType,
             etag: exactMatch.ETag ? exactMatch.ETag.replace(/"/g, "") : undefined,
             mount_id: mount.id,
             storage_type: mount.storage_type,

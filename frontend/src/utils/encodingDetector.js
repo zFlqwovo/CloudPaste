@@ -65,24 +65,24 @@ export async function detectEncodingFromUrl(url, options = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // 获取文件的前几KB数据用于编码检测
+    // 下载完整文件进行编码检测
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        Range: `bytes=0-${sampleSize - 1}`,
-      },
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    if (!response.ok && response.status !== 206) {
+    if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     // 获取二进制数据
     const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
+    const fullUint8Array = new Uint8Array(arrayBuffer);
+
+    // 只使用前sampleSize字节进行编码检测
+    const uint8Array = fullUint8Array.length > sampleSize ? fullUint8Array.slice(0, sampleSize) : fullUint8Array;
 
     // 使用chardet检测编码
     const detectionResults = chardet.analyse(uint8Array);
@@ -100,6 +100,8 @@ export async function detectEncodingFromUrl(url, options = {}) {
         language: result.lang,
       })),
       sampleSize: uint8Array.length,
+      fullFileSize: fullUint8Array.length, 
+      rawBuffer: fullUint8Array,
       error: null,
     };
   } catch (error) {
@@ -111,6 +113,8 @@ export async function detectEncodingFromUrl(url, options = {}) {
       confidence: 0,
       allResults: [],
       sampleSize: 0,
+      fullFileSize: 0,
+      rawBuffer: null,
       error: error.message,
     };
   }

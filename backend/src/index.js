@@ -52,7 +52,7 @@ app.use(
       "X-Requested-With", // 添加X-Requested-With头，支持AJAX请求
     ],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK", "HEAD"],
-    exposeHeaders: ["ETag", "Content-Length", "Content-Disposition"], // 暴露更多响应头
+    exposeHeaders: ["ETag", "Content-Length", "Content-Disposition", "Content-Range", "Accept-Ranges"],
     maxAge: 86400,
     credentials: true, // 允许携带凭证
   })

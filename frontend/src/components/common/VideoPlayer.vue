@@ -472,17 +472,17 @@ const setupMpegTSPlayer = async (options, videoUrl, format) => {
     };
 
     const mediaConfig = {
-      enableWorker: true, 
+      enableWorker: true,
       enableStashBuffer: true,
       stashInitialSize: 128,
       autoCleanupSourceBuffer: true,
-      autoCleanupMaxBackwardDuration: 20, 
+      autoCleanupMaxBackwardDuration: 20,
       autoCleanupMinBackwardDuration: 10,
       fixAudioTimestampGap: true,
       accurateSeek: true,
       seekType: "range",
       lazyLoad: true,
-      lazyLoadMaxDuration: 60, 
+      lazyLoadMaxDuration: 60,
       lazyLoadRecoverDuration: 30,
     };
 

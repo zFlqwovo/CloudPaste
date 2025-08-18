@@ -104,17 +104,33 @@ export function useFetchText() {
           可信度: `${detectionResult.confidence}%`,
           检测方法: detectionResult.method || "智能检测",
           所有候选: detectionResult.allResults?.slice(0, 3).map((r) => `${r.encoding}(${r.confidence}%)`) || [],
+          文件大小: detectionResult.fullFileSize ? `${(detectionResult.fullFileSize / 1024).toFixed(1)}KB` : "未知",
         });
       } else {
         console.warn(" 编码检测失败，使用默认编码 utf-8:", detectionResult.error);
       }
 
-      // 使用检测到的编码获取文本
-      const encoding = detectionResult.encoding || "utf-8";
-      const fetchResult = await fetchAndDecodeText(url, encoding, {
-        ...options,
-        signal, // 传递取消信号
-      });
+      // 如果编码检测已经返回了完整的原始数据，直接使用
+      let fetchResult;
+      if (detectionResult.success && detectionResult.rawBuffer) {
+        // 使用编码检测时已下载的数据，避免重复下载
+        const encoding = detectionResult.encoding || "utf-8";
+        const decodeResult = await decodeText(detectionResult.rawBuffer, encoding);
+
+        fetchResult = {
+          ...decodeResult,
+          fileSize: detectionResult.fullFileSize || detectionResult.rawBuffer.byteLength,
+          rawBuffer: detectionResult.rawBuffer,
+          url,
+        };
+      } else {
+        // 降级：使用原有的下载方式
+        const encoding = detectionResult.encoding || "utf-8";
+        fetchResult = await fetchAndDecodeText(url, encoding, {
+          ...options,
+          signal, // 传递取消信号
+        });
+      }
 
       if (fetchResult.success) {
         textContent.value = cleanText(fetchResult.text, {
@@ -206,7 +222,6 @@ export function useFetchText() {
           removeNullBytes: true,
           normalizeLineEndings: true,
         });
-
 
         return {
           success: true,
