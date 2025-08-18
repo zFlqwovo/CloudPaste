@@ -89,8 +89,8 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
       // 使用统一API函数
       const getDirectoryList = api.fs.getDirectoryList;
 
-      // 调用API获取目录内容
-      const response = await getDirectoryList(normalizedPath);
+      // 调用API获取目录内容，传递refresh选项
+      const response = await getDirectoryList(normalizedPath, { refresh: force });
 
       if (response.success) {
         directoryData.value = response.data;

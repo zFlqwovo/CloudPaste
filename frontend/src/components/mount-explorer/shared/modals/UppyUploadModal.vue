@@ -248,6 +248,9 @@ import "@uppy/url/dist/style.min.css";
 import { S3Adapter } from "../../../../composables/uppy/S3Adapter.js";
 import ServerResumePlugin from "../../../../composables/uppy/ServerResumePlugin.js";
 
+// 导入API配置
+import { getFullApiUrl } from "../../../../api/config.js";
+
 // 导入插件管理器
 import { createUppyPluginManager } from "../../../../composables/uppy/UppyPluginManager.js";
 
@@ -444,7 +447,7 @@ const configureUploadMethod = () => {
 
     uppyInstance.use(XHRUpload, {
       id: "XHRUpload",
-      endpoint: "/api/fs/upload", // TODO: 移到配置层
+      endpoint: getFullApiUrl("/fs/upload"), //TODO: 移到配置层
       method: "POST",
       formData: true,
       fieldName: "file",

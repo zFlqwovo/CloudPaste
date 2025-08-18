@@ -97,12 +97,13 @@ export class S3StorageDriver extends BaseDriver {
       await updateMountLastUsed(db, mount.id);
     }
 
-    // 委托给目录操作模块
+    // 委托给目录操作模块，传递所有选项参数
     return await this.directoryOps.listDirectory(s3SubPath, {
       mount,
       subPath, // 使用正确的子路径用于缓存键生成
       path,
       db,
+      ...options,
     });
   }
 

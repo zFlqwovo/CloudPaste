@@ -23,9 +23,11 @@ export class FileSystem {
    * @param {string} path - 目录路径
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
+   * @param {Object} options - 选项参数
+   * @param {boolean} options.refresh - 是否强制刷新，跳过缓存
    * @returns {Promise<Object>} 目录内容
    */
-  async listDirectory(path, userIdOrInfo, userType) {
+  async listDirectory(path, userIdOrInfo, userType, options = {}) {
     const { driver, mount, subPath } = await this.mountManager.getDriverByPath(path, userIdOrInfo, userType);
 
     // 检查驱动是否支持读取能力
@@ -35,11 +37,12 @@ export class FileSystem {
       });
     }
 
-    // 调用驱动的listDirectory方法
+    // 调用驱动的listDirectory方法，传递选项参数
     return await driver.listDirectory(path, {
       mount,
       subPath,
       db: this.mountManager.db,
+      ...options,
     });
   }
 

@@ -210,9 +210,15 @@ fsRoutes.options("/api/fs/multipart/part", (c) => {
 fsRoutes.get("/api/fs/list", authGateway.requireMount(), unifiedFsAuthMiddleware, async (c) => {
   const db = c.env.DB;
   const path = c.req.query("path") || "/";
+  const refresh = c.req.query("refresh") === "true";
   const userInfo = c.get("userInfo");
   const { userIdOrInfo, userType } = getServiceParams(userInfo);
   const encryptionSecret = c.env.ENCRYPTION_SECRET;
+
+  // 调试日志：记录refresh参数
+  if (refresh) {
+    console.log("[后端路由] 收到强制刷新请求:", { path, refresh });
+  }
 
   try {
     // 对于API密钥用户，检查请求路径是否在基本路径权限范围内
@@ -244,8 +250,8 @@ fsRoutes.get("/api/fs/list", authGateway.requireMount(), unifiedFsAuthMiddleware
     const mountManager = new MountManager(db, encryptionSecret);
     const fileSystem = new FileSystem(mountManager);
 
-    // 调用FileSystem的listDirectory方法
-    const result = await fileSystem.listDirectory(path, userIdOrInfo, userType);
+    // 调用FileSystem的listDirectory方法，传递refresh选项
+    const result = await fileSystem.listDirectory(path, userIdOrInfo, userType, { refresh });
 
     return c.json({
       code: ApiStatus.SUCCESS,

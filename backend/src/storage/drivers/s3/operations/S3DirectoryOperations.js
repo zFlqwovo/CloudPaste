@@ -100,15 +100,16 @@ export class S3DirectoryOperations {
    * 列出目录内容
    * @param {string} s3SubPath - S3子路径
    * @param {Object} options - 选项参数
+   * @param {boolean} options.refresh - 是否强制刷新，跳过缓存
    * @returns {Promise<Object>} 目录内容
    */
   async listDirectory(s3SubPath, options = {}) {
-    const { mount, subPath, db } = options;
+    const { mount, subPath, db, refresh = false } = options;
 
     return handleFsError(
       async () => {
-        // 检查缓存
-        if (mount.cache_ttl > 0) {
+        // 只有在非强制刷新时才检查缓存
+        if (!refresh && mount.cache_ttl > 0) {
           const cachedResult = directoryCacheManager.get(mount.id, subPath);
           if (cachedResult && cachedResult.items) {
             // 检查缓存是否包含文件夹大小信息（新版本缓存）
@@ -123,6 +124,7 @@ export class S3DirectoryOperations {
             }
           }
         }
+
 
         // 构造返回结果结构
         const result = {

@@ -13,10 +13,16 @@ import { S3MultipartUploader } from "./S3MultipartUploader.js";
 /**
  * 获取目录列表
  * @param {string} path 请求路径
+ * @param {Object} options 选项参数
+ * @param {boolean} options.refresh 是否强制刷新，跳过缓存
  * @returns {Promise<Object>} 目录列表响应对象
  */
-export async function getDirectoryList(path) {
-  return get("/fs/list", { params: { path } });
+export async function getDirectoryList(path, options = {}) {
+  const params = { path };
+  if (options.refresh) {
+    params.refresh = "true";
+  }
+  return get("/fs/list", { params });
 }
 
 /**
