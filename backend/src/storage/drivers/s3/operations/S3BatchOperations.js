@@ -1005,7 +1005,7 @@ export class S3BatchOperations {
         await updateMountLastUsed(db, mount.id);
 
         // 清除缓存
-        await clearCache({ mountId: mount.id });
+        await clearDirectoryCache({ mountId: mount.id });
 
         return {
           success: true,
