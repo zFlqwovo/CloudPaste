@@ -233,6 +233,7 @@ export default {
       processedItems: "Processed items: {current}/{total}",
       success: "Success: {count}",
       failed: "Failed: {count}",
+      skipped: "Skipped: {count}",
       partialComplete: "Partial Complete",
       copyTask: "Copy Task",
       uploadTask: "Upload Task",

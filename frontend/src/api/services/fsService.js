@@ -581,6 +581,12 @@ export async function performClientSideCopy(options) {
     let targetMountId = null;
 
     for (const result of copyResult.crossStorageResults) {
+      // 检查是否为跳过的项目
+      if (result.status === "skipped" || result.skipped === true) {
+        console.log(`[客户端复制] 跳过已存在的文件: ${result.source} -> ${result.target}`);
+        continue; // 跳过已存在的文件，不添加到复制列表
+      }
+
       if (result.isDirectory && result.items && result.items.length > 0) {
         // 目录复制：将 items 数组中的文件添加到复制列表，并添加必要的元数据
         const itemsWithMetadata = result.items.map((item) => {
@@ -627,7 +633,23 @@ export async function performClientSideCopy(options) {
       }
     }
 
+    // 统计跳过的文件数量
+    const skippedCount = copyResult.crossStorageResults.filter((result) => result.status === "skipped" || result.skipped === true).length;
+
     if (allCopyItems.length === 0) {
+      // 如果所有文件都被跳过
+      if (skippedCount > 0) {
+        return {
+          success: true,
+          message: "FILE_COPY_SUCCESS",
+          data: {
+            crossStorage: true, // 标记为跨存储复制
+            skipped: skippedCount,
+            success: 0,
+            failed: 0,
+          },
+        };
+      }
       throw new Error("没有找到需要复制的文件");
     }
 
@@ -696,8 +718,11 @@ export async function performClientSideCopy(options) {
 
       return {
         success: true,
-        message: "跨存储复制完成",
-        data: commitResult.data,
+        message: "FILE_COPY_SUCCESS",
+        data: {
+          ...commitResult.data,
+          crossStorage: true, // 标记为跨存储复制
+        },
       };
     }
 
@@ -783,8 +808,14 @@ export async function performClientSideCopy(options) {
 
     return {
       success: true,
-      message: `批量跨存储复制完成，共处理 ${completedItems} 个文件`,
-      data: commitResult.data,
+      message: "FILE_COPY_SUCCESS",
+      data: {
+        ...commitResult.data,
+        crossStorage: true, // 标记为跨存储复制
+        skipped: skippedCount,
+        success: completedItems,
+        failed: 0,
+      },
     };
   } catch (error) {
     // 如果有正在进行的请求，尝试取消它们

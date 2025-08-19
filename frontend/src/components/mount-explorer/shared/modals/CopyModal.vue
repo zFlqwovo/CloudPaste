@@ -679,7 +679,16 @@ const handleCopyCompletion = (taskManager, taskId, response) => {
 
   const successCount = Array.isArray(data.success) ? data.success.length : data.success || 0;
   const failedCount = Array.isArray(data.failed) ? data.failed.length : data.failed || 0;
-  const totalProcessed = successCount + failedCount;
+  const skippedCount = data.skipped || 0;
+  const totalProcessed = successCount + failedCount + skippedCount;
+
+  // 根据操作类型生成统一的消息
+  let operationMessage;
+  if (data.crossStorage === true || data.requiresClientSideCopy === true) {
+    operationMessage = "跨存储复制完成";
+  } else {
+    operationMessage = "同存储复制完成";
+  }
 
   // 准备任务详情
   const taskDetails = {
@@ -687,7 +696,8 @@ const handleCopyCompletion = (taskManager, taskId, response) => {
     processed: totalProcessed,
     successCount,
     failedCount,
-    message: response.message === "FILE_COPY_SUCCESS" ? t("mount.taskManager.copyStarted", { count: successCount, path: currentPath.value }) : response.message,
+    skippedCount,
+    message: operationMessage,
   };
 
   // 如果是跨S3复制，添加相关信息
@@ -715,12 +725,13 @@ const handleCopyCompletion = (taskManager, taskId, response) => {
   // 注意：模态框已经在任务创建时关闭，这里只需要触发目录刷新
   emit("copy-complete", {
     success: response.success,
-    message: response.success ? t("mount.taskManager.copyStarted", { count: successCount, path: currentPath.value }) : response.message,
+    message: response.success ? operationMessage : response.message,
     targetPath: currentPath.value,
     taskId: taskId,
     showTaskManager: true,
     successCount,
     failedCount,
+    skippedCount,
     modalAlreadyClosed: true, // 标记模态框已经关闭
   });
 };

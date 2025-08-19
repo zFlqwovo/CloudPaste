@@ -320,8 +320,12 @@ export class S3BatchOperations {
         // 同存储复制
         const copyResult = await this._handleSameStorageCopy(db, sourcePath, targetPath, sourceMount, targetMount, sourceSubPath, targetSubPath);
 
-        // 所有复制都被视为成功（包括自动重命名的情况）
-        result.success++;
+        // 根据复制结果更新统计
+        if (copyResult.status === "skipped" || copyResult.skipped === true) {
+          result.skipped++;
+        } else {
+          result.success++;
+        }
         result.details.push(copyResult);
       } catch (error) {
         console.error(`复制失败:`, error);
@@ -390,42 +394,22 @@ export class S3BatchOperations {
    * @private
    */
   async _copyFile(s3Config, s3SourcePath, s3TargetPath, sourcePath, targetPath, db = null) {
-    // 实现自动重命名逻辑
-    let finalS3TargetPath = s3TargetPath;
-    let finalTargetPath = targetPath;
-    let wasRenamed = false;
-
-    // 根据系统设置决定冲突处理策略
-    const database = db || this.db;
-    let useRandomSuffix = false;
-
-    if (database) {
-      try {
-        useRandomSuffix = await shouldUseRandomSuffix(database);
-      } catch (error) {
-        console.warn("获取文件命名策略失败，使用默认覆盖模式:", error);
-        useRandomSuffix = false;
-      }
+    // 检查目标文件是否已存在，如果存在则跳过
+    if (await this._checkItemExists(s3Config.bucket_name, s3TargetPath)) {
+      console.log(`[S3BatchOps] 同存储复制目标文件已存在，跳过: ${sourcePath} -> ${targetPath}`);
+      return {
+        source: sourcePath,
+        target: targetPath,
+        status: "skipped",
+        skipped: true,
+        message: "文件已存在，跳过复制",
+      };
     }
-
-    if (useRandomSuffix) {
-      // 随机后缀模式：检查冲突，如果存在则添加随机后缀
-      if (await this._checkItemExists(s3Config.bucket_name, finalS3TargetPath)) {
-        const { baseName: s3BaseName, extension: s3Ext, directory: s3Dir } = this._parseFileName(s3TargetPath);
-        const { baseName: logicalBaseName, extension: logicalExt, directory: logicalDir } = this._parseFileName(targetPath);
-
-        const shortId = generateShortId();
-        finalS3TargetPath = `${s3Dir}${s3BaseName}-${shortId}${s3Ext}`;
-        finalTargetPath = `${logicalDir}${logicalBaseName}-${shortId}${logicalExt}`;
-        wasRenamed = true;
-      }
-    }
-    // 覆盖模式：不检查冲突，直接使用原始路径覆盖
 
     // 检查目标父目录是否存在（对于文件复制）
-    if (finalS3TargetPath.includes("/")) {
+    if (s3TargetPath.includes("/")) {
       // 对于文件，获取其所在目录
-      const parentPath = finalS3TargetPath.substring(0, finalS3TargetPath.lastIndexOf("/") + 1);
+      const parentPath = s3TargetPath.substring(0, s3TargetPath.lastIndexOf("/") + 1);
 
       // 添加验证：确保parentPath不为空
       if (parentPath && parentPath.trim() !== "") {
@@ -459,7 +443,7 @@ export class S3BatchOperations {
     const copyParams = {
       Bucket: s3Config.bucket_name,
       CopySource: encodeURIComponent(s3Config.bucket_name + "/" + s3SourcePath),
-      Key: finalS3TargetPath,
+      Key: s3TargetPath,
     };
 
     const copyCommand = new CopyObjectCommand(copyParams);
@@ -467,15 +451,13 @@ export class S3BatchOperations {
 
     // 更新父目录的修改时间
     const rootPrefix = s3Config.root_prefix ? (s3Config.root_prefix.endsWith("/") ? s3Config.root_prefix : s3Config.root_prefix + "/") : "";
-    await updateParentDirectoriesModifiedTime(this.s3Client, s3Config.bucket_name, finalS3TargetPath, rootPrefix);
+    await updateParentDirectoriesModifiedTime(this.s3Client, s3Config.bucket_name, s3TargetPath, rootPrefix);
 
     return {
       source: sourcePath,
-      target: finalTargetPath,
+      target: targetPath,
       status: "success",
-      message: wasRenamed ? `文件已重命名为 ${finalTargetPath.split("/").pop()} 并复制成功` : "文件复制成功",
-      renamed: wasRenamed,
-      originalTarget: targetPath,
+      message: "文件复制成功",
     };
   }
 
@@ -518,21 +500,24 @@ export class S3BatchOperations {
               // 检查目标文件是否已存在
               if (skipExisting) {
                 try {
-                  const headParams = {
+                  const listParams = {
                     Bucket: bucketName,
-                    Key: targetKey,
+                    Prefix: targetKey,
+                    MaxKeys: 1,
                   };
-                  const headCommand = new HeadObjectCommand(headParams);
-                  await s3Client.send(headCommand);
+                  const listCommand = new ListObjectsV2Command(listParams);
+                  const listResponse = await s3Client.send(listCommand);
 
-                  // 文件已存在，跳过
-                  result.skipped++;
-                  continue;
-                } catch (error) {
-                  if (error.$metadata?.httpStatusCode !== 404) {
-                    throw error;
+                  // 检查是否找到精确匹配的对象
+                  const exactMatch = listResponse.Contents?.find((item) => item.Key === targetKey);
+                  if (exactMatch) {
+                    // 文件已存在，跳过
+                    result.skipped++;
+                    console.log(`[S3BatchOps] 文件已存在，跳过复制: ${sourceKey} -> ${targetKey}`);
+                    continue;
                   }
-                  // 404表示文件不存在，可以继续复制
+                } catch (error) {
+                  // ListObjects失败，继续复制
                 }
               }
 
@@ -833,6 +818,28 @@ export class S3BatchOperations {
           // 创建目标存储的S3客户端用于检查文件存在性
           const targetS3Client = await createS3Client(targetS3Config, this.encryptionSecret);
 
+          // 检查目标文件是否已存在（支持skipExisting逻辑）
+          try {
+            const targetExists = await this._checkItemExistsWithClient(targetS3Client, targetS3Config.bucket_name, s3TargetPath);
+            if (targetExists) {
+              console.log(`[S3BatchOps] 跨存储复制目标文件已存在，跳过: ${sourcePath} -> ${targetPath}`);
+              return {
+                crossStorage: true,
+                isDirectory: false,
+                source: sourcePath,
+                target: targetPath,
+                status: "skipped",
+                skipped: true,
+                sourceMount: sourceMount.id,
+                targetMount: targetMount.id,
+                message: "目标文件已存在，跳过跨存储复制",
+              };
+            }
+          } catch (error) {
+            console.warn(`[S3BatchOps] 检查目标文件存在性失败，继续复制: ${error.message}`);
+            // 检查失败时继续复制，避免因为权限问题阻止正常操作
+          }
+
           // 根据系统设置决定冲突处理策略
           const database = db || this.db;
           let useRandomSuffix = false;
@@ -1028,18 +1035,20 @@ export class S3BatchOperations {
    */
   async _checkS3ObjectExists(bucketName, key) {
     try {
-      const headParams = {
+      const listParams = {
         Bucket: bucketName,
-        Key: key,
+        Prefix: key,
+        MaxKeys: 1,
       };
-      const headCommand = new HeadObjectCommand(headParams);
-      await this.s3Client.send(headCommand);
-      return true;
+
+      const listCommand = new ListObjectsV2Command(listParams);
+      const listResponse = await this.s3Client.send(listCommand);
+
+      // 检查是否找到精确匹配的对象
+      const exactMatch = listResponse.Contents?.find((item) => item.Key === key);
+      return !!exactMatch;
     } catch (error) {
-      if (error.$metadata && error.$metadata.httpStatusCode === 404) {
-        return false;
-      }
-      throw error;
+      return false;
     }
   }
 
@@ -1070,17 +1079,20 @@ export class S3BatchOperations {
    */
   async _checkItemExists(bucketName, key) {
     try {
-      const headCommand = new HeadObjectCommand({
+      const listParams = {
         Bucket: bucketName,
-        Key: key,
-      });
-      await this.s3Client.send(headCommand);
-      return true;
+        Prefix: key,
+        MaxKeys: 1,
+      };
+
+      const listCommand = new ListObjectsV2Command(listParams);
+      const listResponse = await this.s3Client.send(listCommand);
+
+      // 检查是否找到精确匹配的对象
+      const exactMatch = listResponse.Contents?.find((item) => item.Key === key);
+      return !!exactMatch;
     } catch (error) {
-      if (error.$metadata && error.$metadata.httpStatusCode === 404) {
-        return false;
-      }
-      throw error;
+      return false;
     }
   }
 
@@ -1196,17 +1208,20 @@ export class S3BatchOperations {
    */
   async _checkItemExistsWithClient(s3Client, bucketName, key) {
     try {
-      const headCommand = new HeadObjectCommand({
+      const listParams = {
         Bucket: bucketName,
-        Key: key,
-      });
-      await s3Client.send(headCommand);
-      return true;
+        Prefix: key,
+        MaxKeys: 1,
+      };
+
+      const listCommand = new ListObjectsV2Command(listParams);
+      const listResponse = await s3Client.send(listCommand);
+
+      // 检查是否找到精确匹配的对象
+      const exactMatch = listResponse.Contents?.find((item) => item.Key === key);
+      return !!exactMatch;
     } catch (error) {
-      if (error.$metadata && error.$metadata.httpStatusCode === 404) {
-        return false;
-      }
-      throw error;
+      return false;
     }
   }
 

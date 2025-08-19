@@ -211,6 +211,7 @@ export default {
       processedItems: "处理项目: {current}/{total}",
       success: "成功: {count}",
       failed: "失败: {count}",
+      skipped: "跳过: {count}",
       partialComplete: "部分完成",
       copyTask: "复制任务",
       uploadTask: "上传任务",
