@@ -62,7 +62,12 @@ export async function findMountPointByPath(db, path, userIdOrInfo, userType) {
     // 如果请求路径完全匹配挂载点或者是挂载点的子路径
     if (path === mountPath || path === mountPath + "/" || path.startsWith(mountPath + "/")) {
       let subPath = path.substring(mountPath.length);
-      if (!subPath.startsWith("/")) {
+
+      // 特殊处理：当路径完全等于挂载点路径时，subPath为空字符串
+      // 这种情况下应该返回根路径"/"，表示挂载点的根目录
+      if (subPath === "") {
+        subPath = "/";
+      } else if (!subPath.startsWith("/")) {
         subPath = "/" + subPath;
       }
 
@@ -121,7 +126,10 @@ export async function findMountPointByPathWithApiKey(db, path, apiKeyInfo) {
     // 如果请求路径完全匹配挂载点或者是挂载点的子路径
     if (path === mountPath || path === mountPath + "/" || path.startsWith(mountPath + "/")) {
       let subPath = path.substring(mountPath.length);
-      if (!subPath.startsWith("/")) {
+
+      if (subPath === "") {
+        subPath = "/";
+      } else if (!subPath.startsWith("/")) {
         subPath = "/" + subPath;
       }
 
@@ -213,7 +221,10 @@ export async function findMountPointByPathForProxy(db, path) {
       }
 
       let subPath = path.substring(mountPath.length);
-      if (!subPath.startsWith("/")) {
+
+      if (subPath === "") {
+        subPath = "/";
+      } else if (!subPath.startsWith("/")) {
         subPath = "/" + subPath;
       }
 
