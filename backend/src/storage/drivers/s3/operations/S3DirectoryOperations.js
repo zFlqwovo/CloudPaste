@@ -7,6 +7,7 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus, FILE_TYPES, FILE_TYPE_NAMES } from "../../../../constants/index.js";
 import { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { checkDirectoryExists, updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
+import { isMountRootPath } from "../utils/S3PathUtils.js";
 import { directoryCacheManager, clearDirectoryCache } from "../../../../cache/index.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { GetFileType, getFileTypeName } from "../../../../utils/fileTypeDetector.js";
@@ -107,163 +108,163 @@ export class S3DirectoryOperations {
     const { mount, subPath, db, refresh = false } = options;
 
     return handleFsError(
-        async () => {
-          // 只有在非强制刷新时才检查缓存
-          if (!refresh && mount.cache_ttl > 0) {
-            const cachedResult = directoryCacheManager.get(mount.id, subPath);
-            if (cachedResult && cachedResult.items) {
-              // 检查缓存是否包含文件夹大小信息（新版本缓存）
-              const hasDirectorySizes = cachedResult.items.some((item) => item.isDirectory && !item.isVirtual && typeof item.size === "number");
-              const hasOnlyFiles = cachedResult.items.every((item) => !item.isDirectory);
+      async () => {
+        // 只有在非强制刷新时才检查缓存
+        if (!refresh && mount.cache_ttl > 0) {
+          const cachedResult = directoryCacheManager.get(mount.id, subPath);
+          if (cachedResult && cachedResult.items) {
+            // 检查缓存是否包含文件夹大小信息（新版本缓存）
+            const hasDirectorySizes = cachedResult.items.some((item) => item.isDirectory && !item.isVirtual && typeof item.size === "number");
+            const hasOnlyFiles = cachedResult.items.every((item) => !item.isDirectory);
 
-              if (hasDirectorySizes || hasOnlyFiles) {
-                console.log(`目录缓存命中: ${mount.id}/${subPath}`);
-                return cachedResult;
-              } else {
-                console.log(`跳过旧版本缓存（缺少文件夹大小信息）: ${mount.id}/${subPath}`);
-              }
+            if (hasDirectorySizes || hasOnlyFiles) {
+              console.log(`目录缓存命中: ${mount.id}/${subPath}`);
+              return cachedResult;
+            } else {
+              console.log(`跳过旧版本缓存（缺少文件夹大小信息）: ${mount.id}/${subPath}`);
             }
           }
+        }
 
-          // 构造返回结果结构
-          const result = {
-            path: mount.mount_path + subPath,
-            type: "directory",
-            isRoot: false,
-            isVirtual: false,
-            mount_id: mount.id,
-            storage_type: mount.storage_type,
-            items: [],
-          };
+        // 构造返回结果结构
+        const result = {
+          path: mount.mount_path + subPath,
+          type: "directory",
+          isRoot: false,
+          isVirtual: false,
+          mount_id: mount.id,
+          storage_type: mount.storage_type,
+          items: [],
+        };
 
-          // 处理root_prefix
-          const rootPrefix = this.config.root_prefix ? (this.config.root_prefix.endsWith("/") ? this.config.root_prefix : this.config.root_prefix + "/") : "";
+        // 处理root_prefix
+        const rootPrefix = this.config.root_prefix ? (this.config.root_prefix.endsWith("/") ? this.config.root_prefix : this.config.root_prefix + "/") : "";
 
-          let fullPrefix = rootPrefix;
+        let fullPrefix = rootPrefix;
 
-          // 添加s3SubPath (如果不是'/')
-          if (s3SubPath && s3SubPath !== "/") {
-            fullPrefix += s3SubPath;
-          }
+        // 添加s3SubPath (如果不是'/')
+        if (s3SubPath && s3SubPath !== "/") {
+          fullPrefix += s3SubPath;
+        }
 
-          // 确保前缀总是以斜杠结尾 (如果不为空)
-          if (fullPrefix && !fullPrefix.endsWith("/")) {
-            fullPrefix += "/";
-          }
+        // 确保前缀总是以斜杠结尾 (如果不为空)
+        if (fullPrefix && !fullPrefix.endsWith("/")) {
+          fullPrefix += "/";
+        }
 
-          // 列出S3对象
-          const listParams = {
-            Bucket: this.config.bucket_name,
-            Prefix: fullPrefix,
-            Delimiter: "/",
-            MaxKeys: 1000,
-          };
+        // 列出S3对象
+        const listParams = {
+          Bucket: this.config.bucket_name,
+          Prefix: fullPrefix,
+          Delimiter: "/",
+          MaxKeys: 1000,
+        };
 
-          const listCommand = new ListObjectsV2Command(listParams);
-          const response = await this.s3Client.send(listCommand);
+        const listCommand = new ListObjectsV2Command(listParams);
+        const response = await this.s3Client.send(listCommand);
 
-          // 处理公共前缀（目录）
-          if (response.CommonPrefixes) {
-            const prefixLength = fullPrefix.length;
+        // 处理公共前缀（目录）
+        if (response.CommonPrefixes) {
+          const prefixLength = fullPrefix.length;
 
-            for (const prefix of response.CommonPrefixes) {
-              const prefixKey = prefix.Prefix;
-              const relativePath = prefixKey.substring(prefixLength);
-              const dirName = relativePath.replace(/\/$/, "");
+          for (const prefix of response.CommonPrefixes) {
+            const prefixKey = prefix.Prefix;
+            const relativePath = prefixKey.substring(prefixLength);
+            const dirName = relativePath.replace(/\/$/, "");
 
-              if (dirName) {
-                // 获取目录的真实修改时间和大小
-                let directoryModified = new Date().toISOString();
-                let directorySize = 0;
+            if (dirName) {
+              // 获取目录的真实修改时间和大小
+              let directoryModified = new Date().toISOString();
+              let directorySize = 0;
 
-                try {
-                  directoryModified = await this.getS3DirectoryModifiedTime(this.s3Client, this.config.bucket_name, prefixKey);
-                  directorySize = await this.getS3DirectorySize(this.s3Client, this.config.bucket_name, prefixKey);
-                } catch (error) {
-                  console.warn(`获取目录信息失败:`, error);
-                }
-
-                // 构建目录路径 - 确保路径正确拼接，避免双斜杠
-                const separator = subPath.endsWith("/") ? "" : "/";
-                const dirPath = mount.mount_path + subPath + separator + dirName + "/";
-
-                result.items.push({
-                  name: dirName,
-                  path: dirPath,
-                  isDirectory: true,
-                  isVirtual: false,
-                  size: directorySize,
-                  modified: directoryModified,
-                  type: FILE_TYPES.FOLDER, // 目录类型常量 (1)
-                  typeName: FILE_TYPE_NAMES[FILE_TYPES.FOLDER], // "folder"
-                });
-              }
-            }
-          }
-
-          // 处理内容（文件）
-          if (response.Contents) {
-            const prefixLength = fullPrefix.length;
-
-            for (const content of response.Contents) {
-              const key = content.Key;
-
-              // 跳过作为目录标记的对象
-              if (key === fullPrefix || key === fullPrefix + "/") {
-                continue;
+              try {
+                directoryModified = await this.getS3DirectoryModifiedTime(this.s3Client, this.config.bucket_name, prefixKey);
+                directorySize = await this.getS3DirectorySize(this.s3Client, this.config.bucket_name, prefixKey);
+              } catch (error) {
+                console.warn(`获取目录信息失败:`, error);
               }
 
-              // 从S3 key中提取相对路径和名称
-              const relativePath = key.substring(prefixLength);
-
-              // 跳过嵌套在子目录中的文件
-              if (relativePath.includes("/")) {
-                continue;
-              }
-
-              // 跳过空文件名
-              if (!relativePath) {
-                continue;
-              }
-
-              // 构建子项路径 - 确保路径正确拼接，避免双斜杠
+              // 构建目录路径 - 确保路径正确拼接，避免双斜杠
               const separator = subPath.endsWith("/") ? "" : "/";
-              const itemPath = mount.mount_path + subPath + separator + relativePath;
-              const fileType = await GetFileType(relativePath, db);
-              const fileTypeName = await getFileTypeName(relativePath, db);
+              const dirPath = mount.mount_path + subPath + separator + dirName + "/";
 
               result.items.push({
-                name: relativePath,
-                path: itemPath,
-                isDirectory: false,
-                size: content.Size,
-                modified: content.LastModified ? content.LastModified.toISOString() : new Date().toISOString(),
-                etag: content.ETag ? content.ETag.replace(/"/g, "") : undefined,
-                type: fileType, // 整数类型常量 (0-6)
-                typeName: fileTypeName, // 类型名称（用于调试）
+                name: dirName,
+                path: dirPath,
+                isDirectory: true,
+                isVirtual: false,
+                size: directorySize,
+                modified: directoryModified,
+                type: FILE_TYPES.FOLDER, // 目录类型常量 (1)
+                typeName: FILE_TYPE_NAMES[FILE_TYPES.FOLDER], // "folder"
               });
             }
           }
+        }
 
-          // 按名称排序
-          result.items.sort((a, b) => {
-            if (a.isDirectory && !b.isDirectory) return -1;
-            if (!a.isDirectory && b.isDirectory) return 1;
-            return a.name.localeCompare(b.name);
-          });
+        // 处理内容（文件）
+        if (response.Contents) {
+          const prefixLength = fullPrefix.length;
 
-          // 缓存结果
-          if (mount.cache_ttl > 0) {
-            directoryCacheManager.set(mount.id, subPath, result, mount.cache_ttl);
-            console.log(`目录内容已缓存: ${mount.id}/${subPath}, TTL: ${mount.cache_ttl}秒`);
+          for (const content of response.Contents) {
+            const key = content.Key;
+
+            // 跳过作为目录标记的对象
+            if (key === fullPrefix || key === fullPrefix + "/") {
+              continue;
+            }
+
+            // 从S3 key中提取相对路径和名称
+            const relativePath = key.substring(prefixLength);
+
+            // 跳过嵌套在子目录中的文件
+            if (relativePath.includes("/")) {
+              continue;
+            }
+
+            // 跳过空文件名
+            if (!relativePath) {
+              continue;
+            }
+
+            // 构建子项路径 - 确保路径正确拼接，避免双斜杠
+            const separator = subPath.endsWith("/") ? "" : "/";
+            const itemPath = mount.mount_path + subPath + separator + relativePath;
+            const fileType = await GetFileType(relativePath, db);
+            const fileTypeName = await getFileTypeName(relativePath, db);
+
+            result.items.push({
+              name: relativePath,
+              path: itemPath,
+              isDirectory: false,
+              size: content.Size,
+              modified: content.LastModified ? content.LastModified.toISOString() : new Date().toISOString(),
+              etag: content.ETag ? content.ETag.replace(/"/g, "") : undefined,
+              type: fileType, // 整数类型常量 (0-6)
+              typeName: fileTypeName, // 类型名称（用于调试）
+            });
           }
+        }
 
-          // 目录列表操作完成，无需额外的业务逻辑处理
+        // 按名称排序
+        result.items.sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
 
-          return result;
-        },
-        "列出目录",
-        "列出目录失败"
+        // 缓存结果
+        if (mount.cache_ttl > 0) {
+          directoryCacheManager.set(mount.id, subPath, result, mount.cache_ttl);
+          console.log(`目录内容已缓存: ${mount.id}/${subPath}, TTL: ${mount.cache_ttl}秒`);
+        }
+
+        // 目录列表操作完成，无需额外的业务逻辑处理
+
+        return result;
+      },
+      "列出目录",
+      "列出目录失败"
     );
   }
 
@@ -277,26 +278,37 @@ export class S3DirectoryOperations {
     const { mount, subPath, path } = options;
 
     return handleFsError(
-        async () => {
-          // nginx风格的递归创建功能：自动创建所有需要的中间目录
-          // 参考nginx WebDAV模块的create_full_put_path功能
-          console.log(`开始递归创建目录: ${s3SubPath}`);
-          await this._ensureParentDirectoriesExist(s3SubPath);
-
-          // 清除缓存，因为目录结构已变更
-          if (mount && mount.id && subPath !== "/") {
-            await clearDirectoryCache({ mountId: mount.id });
-            console.log(`已清理挂载点 ${mount.id} 的缓存`);
-          }
-
+      async () => {
+        // 特殊处理：如果s3SubPath为挂载点根目录，直接返回成功
+        // 因为挂载点根目录在逻辑上总是存在的，不需要在S3中创建
+        if (isMountRootPath(s3SubPath)) {
+          console.log(`跳过创建挂载点根目录（逻辑上总是存在）: "${s3SubPath}"`);
           return {
             success: true,
             path: path,
-            message: "目录创建成功",
+            message: "挂载点根目录总是存在",
           };
-        },
-        "创建目录",
-        "创建目录失败"
+        }
+
+        // nginx风格的递归创建功能：自动创建所有需要的中间目录
+        // 参考nginx WebDAV模块的create_full_put_path功能
+        console.log(`开始递归创建目录: ${s3SubPath}`);
+        await this._ensureParentDirectoriesExist(s3SubPath);
+
+        // 清除缓存，因为目录结构已变更
+        if (mount && mount.id && subPath !== "/") {
+          await clearDirectoryCache({ mountId: mount.id });
+          console.log(`已清理挂载点 ${mount.id} 的缓存`);
+        }
+
+        return {
+          success: true,
+          path: path,
+          message: "目录创建成功",
+        };
+      },
+      "创建目录",
+      "创建目录失败"
     );
   }
 
@@ -306,12 +318,6 @@ export class S3DirectoryOperations {
    * @private
    */
   async _ensureParentDirectoriesExist(s3SubPath) {
-    // 特殊处理：如果s3SubPath为空字符串（挂载点根目录），直接返回成功
-    if (!s3SubPath || s3SubPath.trim() === "") {
-      console.log(`跳过处理挂载点根目录（S3不支持空Key）: "${s3SubPath}"`);
-      return;
-    }
-
     const pathParts = s3SubPath.split("/").filter(Boolean);
 
     // 如果是根目录或只有一级目录，不需要检查父目录
@@ -340,9 +346,9 @@ export class S3DirectoryOperations {
    * @private
    */
   async _createSingleDirectory(s3SubPath) {
-    // 特殊处理：如果s3SubPath为空字符串（挂载点根目录），直接返回成功
+    // 特殊处理：如果s3SubPath为挂载点根目录，直接返回成功
     // 因为S3中不能创建空Key的对象，而挂载点根目录在逻辑上总是存在的
-    if (!s3SubPath || s3SubPath.trim() === "") {
+    if (isMountRootPath(s3SubPath)) {
       console.log(`跳过创建挂载点根目录（S3不支持空Key）: "${s3SubPath}"`);
       return {
         success: true,

@@ -1,7 +1,6 @@
 /**
  * WebDAV工具函数
  */
-import { enhancedPathSecurity } from "../../storage/fs/utils/PathResolver.js";
 
 /**
  * 解析目标路径
@@ -31,16 +30,24 @@ export function parseDestinationPath(destination) {
     destPath = destPath.substring(4); // 移除"/dav"前缀
   }
 
-  // 使用增强的路径安全检查
-  const securityResult = enhancedPathSecurity(destPath, {
-    allowDotDot: false,
-    strictCharCheck: true,
-  });
-
-  if (securityResult.error) {
-    console.warn(`WebDAV安全警告: ${securityResult.error}`);
+  // WebDAV路径安全检查
+  if (!destPath) {
     return null;
   }
 
-  return securityResult.path;
+  // 基本路径遍历防护
+  if (destPath.includes("..")) {
+    console.warn(`WebDAV安全警告: 路径包含非法的父目录引用(..)`);
+    return null;
+  }
+
+  // 规范化路径，移除多余的斜杠
+  destPath = destPath.replace(/\/+/g, "/");
+
+  // 确保路径以斜杠开始
+  if (!destPath.startsWith("/")) {
+    destPath = "/" + destPath;
+  }
+
+  return destPath;
 }

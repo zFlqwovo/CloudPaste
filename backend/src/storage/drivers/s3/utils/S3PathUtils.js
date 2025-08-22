@@ -7,11 +7,10 @@
 /**
  * 规范化S3子路径
  * @param {string} subPath - 子路径
- * @param {Object} s3Config - S3配置
  * @param {boolean} asDirectory - 是否作为目录处理
  * @returns {string} 规范化的S3子路径
  */
-export function normalizeS3SubPath(subPath, s3Config, asDirectory = false) {
+export function normalizeS3SubPath(subPath, asDirectory = false) {
   // 规范化S3子路径，移除开头的斜杠
   let s3SubPath = subPath.startsWith("/") ? subPath.substring(1) : subPath;
 
@@ -32,4 +31,13 @@ export function normalizeS3SubPath(subPath, s3Config, asDirectory = false) {
   // 在getS3DirectoryListing中会将s3SubPath与root_prefix组合
 
   return s3SubPath;
+}
+
+/**
+ * 检查S3子路径是否为挂载点根目录（空字符串）
+ * @param {string} s3SubPath - S3子路径
+ * @returns {boolean} 是否为挂载点根目录
+ */
+export function isMountRootPath(s3SubPath) {
+  return !s3SubPath || s3SubPath.trim() === "";
 }

@@ -179,7 +179,7 @@ export async function createS3DirectoryMarker(s3Client, bucketName, directoryPat
     const putParams = {
       Bucket: bucketName,
       Key: s3Key,
-      Body: Buffer.from("", "utf-8"), 
+      Body: Buffer.from("", "utf-8"),
       ContentType: "application/x-directory",
       Metadata: {
         "last-modified": new Date().toISOString(),

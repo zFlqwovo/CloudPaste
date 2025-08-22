@@ -7,6 +7,30 @@
 import { DbTables } from "../../../constants/index.js";
 import { PROXY_CONFIG } from "../../../constants/proxy.js";
 import { RepositoryFactory } from "../../../repositories/index.js";
+import { normalizePath } from "./PathResolver.js";
+
+/**
+ * 规范化挂载路径格式（内部函数）
+ * @param {string} mountPath - 挂载路径
+ * @returns {string} 规范化的挂载路径
+ */
+function normalizeMountPath(mountPath) {
+  return mountPath.startsWith("/") ? mountPath : "/" + mountPath;
+}
+
+/**
+ * 计算子路径（内部函数）
+ * @param {string} fullPath - 完整路径
+ * @param {string} mountPath - 挂载路径
+ * @returns {string} 子路径
+ */
+function calculateSubPath(fullPath, mountPath) {
+  let subPath = fullPath.substring(mountPath.length);
+  if (subPath && !subPath.startsWith("/")) {
+    subPath = "/" + subPath;
+  }
+  return subPath;
+}
 
 /**
  * 根据请求路径查找对应的挂载点和子路径
@@ -18,7 +42,7 @@ import { RepositoryFactory } from "../../../repositories/index.js";
  */
 export async function findMountPointByPath(db, path, userIdOrInfo, userType) {
   // 规范化路径
-  path = path.startsWith("/") ? path : "/" + path;
+  path = normalizePath(path);
 
   // 处理根路径
   if (path === "/" || path === "//") {
@@ -57,19 +81,11 @@ export async function findMountPointByPath(db, path, userIdOrInfo, userType) {
 
   // 查找匹配的挂载点
   for (const mount of mounts) {
-    const mountPath = mount.mount_path.startsWith("/") ? mount.mount_path : "/" + mount.mount_path;
+    const mountPath = normalizeMountPath(mount.mount_path);
 
     // 如果请求路径完全匹配挂载点或者是挂载点的子路径
     if (path === mountPath || path === mountPath + "/" || path.startsWith(mountPath + "/")) {
-      let subPath = path.substring(mountPath.length);
-
-      // 特殊处理：当路径完全等于挂载点路径时，subPath为空字符串
-      // 这种情况下应该返回根路径"/"，表示挂载点的根目录
-      if (subPath === "") {
-        subPath = "/";
-      } else if (!subPath.startsWith("/")) {
-        subPath = "/" + subPath;
-      }
+      const subPath = calculateSubPath(path, mountPath);
 
       return {
         mount,
@@ -98,7 +114,7 @@ export async function findMountPointByPath(db, path, userIdOrInfo, userType) {
  */
 export async function findMountPointByPathWithApiKey(db, path, apiKeyInfo) {
   // 规范化路径
-  path = path.startsWith("/") ? path : "/" + path;
+  path = normalizePath(path);
 
   // 处理根路径
   if (path === "/" || path === "//") {
@@ -121,17 +137,11 @@ export async function findMountPointByPathWithApiKey(db, path, apiKeyInfo) {
 
   // 查找匹配的挂载点
   for (const mount of mounts) {
-    const mountPath = mount.mount_path.startsWith("/") ? mount.mount_path : "/" + mount.mount_path;
+    const mountPath = normalizeMountPath(mount.mount_path);
 
     // 如果请求路径完全匹配挂载点或者是挂载点的子路径
     if (path === mountPath || path === mountPath + "/" || path.startsWith(mountPath + "/")) {
-      let subPath = path.substring(mountPath.length);
-
-      if (subPath === "") {
-        subPath = "/";
-      } else if (!subPath.startsWith("/")) {
-        subPath = "/" + subPath;
-      }
+      const subPath = calculateSubPath(path, mountPath);
 
       return {
         mount,
@@ -176,7 +186,7 @@ export async function updateMountLastUsed(db, mountId) {
  */
 export async function findMountPointByPathForProxy(db, path) {
   // 规范化路径
-  path = path.startsWith("/") ? path : "/" + path;
+  path = normalizePath(path);
 
   // 处理根路径
   if (path === "/" || path === "//") {
@@ -211,7 +221,7 @@ export async function findMountPointByPathForProxy(db, path) {
 
   // 查找匹配的挂载点
   for (const mount of mounts) {
-    const mountPath = mount.mount_path.startsWith("/") ? mount.mount_path : "/" + mount.mount_path;
+    const mountPath = normalizeMountPath(mount.mount_path);
 
     // 如果请求路径完全匹配挂载点或者是挂载点的子路径
     if (path === mountPath || path === mountPath + "/" || path.startsWith(mountPath + "/")) {
@@ -220,13 +230,7 @@ export async function findMountPointByPathForProxy(db, path) {
         continue; // 跳过未启用代理的挂载点
       }
 
-      let subPath = path.substring(mountPath.length);
-
-      if (subPath === "") {
-        subPath = "/";
-      } else if (!subPath.startsWith("/")) {
-        subPath = "/" + subPath;
-      }
+      const subPath = calculateSubPath(path, mountPath);
 
       return {
         mount,

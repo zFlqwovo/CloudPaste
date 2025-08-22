@@ -130,7 +130,7 @@ export class S3BatchOperations {
         const isDirectory = path.endsWith("/");
 
         // 规范化S3子路径
-        const s3SubPath = normalizeS3SubPath(subPath, s3Config, isDirectory);
+        const s3SubPath = normalizeS3SubPath(subPath, isDirectory);
 
         if (isDirectory) {
           // 对于目录，需要递归删除所有内容
@@ -354,8 +354,8 @@ export class S3BatchOperations {
     }
 
     const isDirectory = sourcePath.endsWith("/");
-    const s3SourcePath = normalizeS3SubPath(sourceSubPath, sourceS3Config, isDirectory);
-    const s3TargetPath = normalizeS3SubPath(targetSubPath, targetS3Config, isDirectory);
+    const s3SourcePath = normalizeS3SubPath(sourceSubPath, isDirectory);
+    const s3TargetPath = normalizeS3SubPath(targetSubPath, isDirectory);
 
     // 检查源路径是否存在
     try {
@@ -718,8 +718,8 @@ export class S3BatchOperations {
         const isDirectory = sourcePath.endsWith("/");
 
         // 规范化S3子路径
-        const s3SourcePath = normalizeS3SubPath(sourceSubPath, sourceS3Config, isDirectory);
-        const s3TargetPath = normalizeS3SubPath(targetSubPath, targetS3Config, isDirectory);
+        const s3SourcePath = normalizeS3SubPath(sourceSubPath, isDirectory);
+        const s3TargetPath = normalizeS3SubPath(targetSubPath, isDirectory);
 
         // 检查源路径是否存在
         try {

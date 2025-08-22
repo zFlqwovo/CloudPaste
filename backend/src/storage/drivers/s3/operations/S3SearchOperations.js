@@ -59,7 +59,7 @@ export class S3SearchOperations {
 
           if (normalizedSearchPath.startsWith(mountPath)) {
             const subPath = normalizedSearchPath.substring(mountPath.length) || "/";
-            searchPrefix = normalizeS3SubPath(subPath, this.config, true);
+            searchPrefix = normalizeS3SubPath(subPath, true);
           }
         }
 
@@ -178,9 +178,9 @@ export class S3SearchOperations {
       size: item.Size,
       modified: item.LastModified,
       isDirectory: false,
-      mimetype: getEffectiveMimeType(null, fileName), 
-      type: fileType, 
-      typeName: fileTypeName, 
+      mimetype: getEffectiveMimeType(null, fileName),
+      type: fileType,
+      typeName: fileTypeName,
       mount_id: mount.id,
       mount_name: mount.name,
       storage_type: mount.storage_type,
