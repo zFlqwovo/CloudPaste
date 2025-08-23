@@ -65,7 +65,7 @@ app.use("*", async (c, next) => {
       credentials: true,
     });
 
-    await corsMiddleware(c, next);
+    return await corsMiddleware(c, next);
   }
 });
 
