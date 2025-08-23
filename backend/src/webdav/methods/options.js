@@ -1,8 +1,7 @@
 import { createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
 
 /**
- * 处理WebDAV OPTIONS请求
- * 符合RFC 4918标准，支持CORS预检和WebDAV功能发现
+ * 处理WebDAV OPTIONS请求 - WebDAV能力发现
  * @param {Object} c - Hono上下文
  * @param {string} path - 请求路径
  * @param {string|Object} userId - 用户ID或信息
@@ -12,61 +11,24 @@ import { createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.j
  */
 export async function handleOptions(c, path, userId, userType, db) {
   try {
-    // 检测是否为CORS预检请求
-    const isCorsPreflightRequest = detectCorsPreflightRequest(c);
-
-    if (isCorsPreflightRequest) {
-      return handleCorsPreflightRequest(c);
-    }
-
-    // WebDAV OPTIONS请求需要认证和权限检查
+    // 处理WebDAV能力发现请求
     return await handleWebDAVOptionsRequest(c, path, userId, userType, db);
   } catch (error) {
-    console.error("OPTIONS请求处理失败:", error);
-    return createWebDAVErrorResponse("OPTIONS请求处理失败", 500, false);
+    console.error("WebDAV OPTIONS请求处理失败:", error);
+    return createWebDAVErrorResponse("WebDAV OPTIONS请求处理失败", 500, false);
   }
-}
-
-/**
- * 检测是否为CORS预检请求
- * @param {Object} c - Hono上下文
- * @returns {boolean} 是否为CORS预检请求
- */
-function detectCorsPreflightRequest(c) {
-  const origin = c.req.header("Origin");
-  const accessControlRequestMethod = c.req.header("Access-Control-Request-Method");
-
-  // CORS预检请求的特征：有Origin头且有Access-Control-Request-Method头
-  return !!(origin && accessControlRequestMethod);
-}
-
-/**
- * 处理CORS预检请求
- * @param {Object} c - Hono上下文
- * @returns {Response} CORS预检响应
- */
-function handleCorsPreflightRequest(c) {
-  console.log("处理CORS预检请求");
-
-  return new Response(null, {
-    status: 204, // No Content
-    headers: addCorsHeaders({
-      "Content-Length": "0",
-      "Content-Type": "text/plain",
-    }),
-  });
 }
 
 /**
  * 处理WebDAV OPTIONS请求
  * @param {Object} c - Hono上下文
  * @param {string} path - 请求路径
- * @param {string|Object} userId - 用户ID或信息
+ * @param {string|Object} _userId - 用户ID或信息（OPTIONS请求不需要）
  * @param {string} userType - 用户类型
- * @param {D1Database} db - 数据库实例
+ * @param {D1Database} _db - 数据库实例（OPTIONS请求不需要）
  * @returns {Response} WebDAV OPTIONS响应
  */
-async function handleWebDAVOptionsRequest(c, path, userId, userType, db) {
+async function handleWebDAVOptionsRequest(c, path, _userId, userType, _db) {
   // 检测支持的WebDAV功能
   const capabilities = detectWebDAVCapabilities();
 
@@ -203,7 +165,7 @@ function buildWebDAVResponseHeaders(supportedMethods, davLevel, clientInfo) {
     // 标准WebDAV头
     DAV: davLevel,
     Allow: supportedMethods.join(", "),
-    Public: supportedMethods.join(", "), // 一些客户端使用Public而不是Allow
+    Public: supportedMethods.join(", "),
     "Content-Length": "0",
     "Content-Type": "text/plain",
 

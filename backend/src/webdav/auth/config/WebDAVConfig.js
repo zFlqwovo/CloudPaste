@@ -3,6 +3,11 @@
  */
 
 /**
+ * WebDAV基础路径 - 标准配置
+ */
+export const WEBDAV_BASE_PATH = "/dav";
+
+/**
  * WebDAV核心配置
  */
 export const WEBDAV_CONFIG = {
@@ -11,7 +16,7 @@ export const WEBDAV_CONFIG = {
 
   // 路径配置
   PATH: {
-    PREFIX: "/dav",
+    PREFIX: WEBDAV_BASE_PATH,
     MAX_LENGTH: 2048,
   },
 

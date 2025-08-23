@@ -2,9 +2,11 @@
  * WebDAV工具函数
  */
 
+import { WEBDAV_BASE_PATH } from "../auth/config/WebDAVConfig.js";
+
 /**
  * 解析目标路径
- * WebDAV特有功能：处理WebDAV的Destination头，包含WebDAV特有的路径前缀处理
+ * WebDAV特有功能：处理WebDAV的Destination头
  * @param {string} destination - 目标路径头
  * @returns {string|null} 规范化的目标路径或null（如果无效）
  */
@@ -23,11 +25,16 @@ export function parseDestinationPath(destination) {
     destPath = destination;
   }
 
-  // 处理WebDAV路径前缀
-  if (destPath.startsWith("/dav/")) {
-    destPath = destPath.substring(4); // 移除"/dav"前缀
-  } else if (destPath.startsWith("/dav")) {
-    destPath = destPath.substring(4); // 移除"/dav"前缀
+  // 处理WebDAV路径前缀 - 静态配置
+  if (WEBDAV_BASE_PATH === "/") {
+    // 根路径配置：不需要移除前缀
+  } else {
+    // 子路径配置
+    if (destPath.startsWith(WEBDAV_BASE_PATH + "/")) {
+      destPath = destPath.substring(WEBDAV_BASE_PATH.length); // 移除前缀
+    } else if (destPath === WEBDAV_BASE_PATH) {
+      destPath = destPath.substring(WEBDAV_BASE_PATH.length); // 移除前缀
+    }
   }
 
   // WebDAV路径安全检查

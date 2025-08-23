@@ -2,8 +2,10 @@
  * WebDAV通用协议检测器
  */
 
+import { WEBDAV_BASE_PATH } from "../config/WebDAVConfig.js";
+
 /**
- * WebDAV协议特征常量
+ * WebDAV协议特征
  */
 const WEBDAV_FEATURES = {
   // WebDAV HTTP方法 (权重: 3 - 最高优先级)
@@ -13,7 +15,7 @@ const WEBDAV_FEATURES = {
   HEADERS: ["dav", "depth", "destination", "if", "lock-token", "overwrite"],
 
   // WebDAV路径模式 (权重: 1)
-  PATH_PATTERNS: ["/dav"],
+  PATH_PATTERNS: [WEBDAV_BASE_PATH],
 
   // WebDAV Content-Type (权重: 1)
   CONTENT_TYPES: ["text/xml", "application/xml"],
@@ -137,7 +139,11 @@ export class WebDAVDetector {
   hasWebDAVPath(request) {
     if (!request.url) return false;
 
-    return this.features.PATH_PATTERNS.some((pattern) => request.url.startsWith(pattern));
+    // 精确匹配WebDAV路径，避免误判（如"/davfolder"不应被识别为WebDAV路径）
+    return this.features.PATH_PATTERNS.some((pattern) => {
+      const url = request.url;
+      return url === pattern || url.startsWith(pattern + "/");
+    });
   }
 
   /**
@@ -217,6 +223,3 @@ export function isWebDAVRequest(request) {
   const detector = createWebDAVDetector();
   return detector.detectWebDAVRequest(request);
 }
-
-// 导出常量供外部使用
-export { WEBDAV_FEATURES };

@@ -143,7 +143,7 @@ export async function handleWebDAV(c) {
     throw error;
   }
 
-  // 获取认证上下文（已在上面获取）
+  // 获取数据库实例
   const db = c.env.DB;
 
   try {

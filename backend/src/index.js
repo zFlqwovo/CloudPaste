@@ -26,37 +26,48 @@ const app = new Hono();
 
 // 注册中间件
 app.use("*", logger());
-app.use(
-  "*",
-  cors({
-    // 在使用credentials时，origin不能是'*'，需要指定具体域名
-    // 对于开发环境，可以使用函数动态返回请求的origin
-    origin: (origin) => {
-      // 允许任何origin发送的请求，但返回实际的origin而不是'*'
-      // 这是为了支持credentials: true的情况
-      return origin || "*";
-    },
-    allowHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-API-KEY",
-      "Depth",
-      "Destination",
-      "Overwrite",
-      "If-Match",
-      "If-None-Match",
-      "If-Modified-Since",
-      "If-Unmodified-Since",
-      "Lock-Token",
-      "Content-Length", // 添加Content-Length头
-      "X-Requested-With", // 添加X-Requested-With头，支持AJAX请求
-    ],
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK", "HEAD"],
-    exposeHeaders: ["ETag", "Content-Length", "Content-Disposition", "Content-Range", "Accept-Ranges"],
-    maxAge: 86400,
-    credentials: true, // 允许携带凭证
-  })
-);
+// 导入WebDAV配置
+import { WEBDAV_BASE_PATH } from "./webdav/auth/config/WebDAVConfig.js";
+
+// 统一CORS中间件
+app.use("*", async (c, next) => {
+  const isWebDAVPath = c.req.path === WEBDAV_BASE_PATH || c.req.path.startsWith(WEBDAV_BASE_PATH + "/");
+
+  if (c.req.method === "OPTIONS" && isWebDAVPath) {
+    // WebDAV OPTIONS请求跳过CORS自动处理，进入WebDAV认证流程
+    console.log("WebDAV OPTIONS请求，进入认证流程:", c.req.path);
+    await next();
+    return;
+  } else {
+    // 其他请求使用标准CORS处理
+    const corsMiddleware = cors({
+      origin: (origin) => {
+        return origin || "*";
+      },
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-API-KEY",
+        "Depth",
+        "Destination",
+        "Overwrite",
+        "If-Match",
+        "If-None-Match",
+        "If-Modified-Since",
+        "If-Unmodified-Since",
+        "Lock-Token",
+        "Content-Length",
+        "X-Requested-With",
+      ],
+      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK", "HEAD"],
+      exposeHeaders: ["ETag", "Content-Length", "Content-Disposition", "Content-Range", "Accept-Ranges"],
+      maxAge: 86400,
+      credentials: true,
+    });
+
+    await corsMiddleware(c, next);
+  }
+});
 
 // 注册路由
 app.route("/", adminRoutes);

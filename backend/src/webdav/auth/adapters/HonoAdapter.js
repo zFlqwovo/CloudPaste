@@ -92,7 +92,7 @@ export class HonoAdapter extends BaseAdapter {
    */
   setAuthContext(c, authResult) {
     try {
-      // 设置用户信息 - 修复：为API密钥用户传递完整的用户信息对象
+      // 设置用户信息 - 为API密钥用户传递完整的用户信息对象
       if (authResult.userType === "apiKey" && authResult.authResult.keyInfo) {
         // API密钥用户：传递完整的用户信息对象
         c.set("userId", {

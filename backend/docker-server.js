@@ -291,7 +291,15 @@ webdavConfig.SUPPORTED_METHODS.forEach((method) => {
 
 // 1. 基础中间件 - CORS和HTTP方法处理
 // ==========================================
-server.use(cors(corsOptions));
+// 智能CORS处理：跳过WebDAV OPTIONS请求，让后续中间件处理
+server.use((req, res, next) => {
+  // 对于WebDAV路径的OPTIONS请求，跳过CORS自动处理
+  if (req.method === "OPTIONS" && (req.path === "/dav" || req.path.startsWith("/dav/"))) {
+    return next();
+  }
+  // 其他请求使用标准CORS处理
+  cors(corsOptions)(req, res, next);
+});
 server.use(methodOverride("X-HTTP-Method-Override"));
 server.use(methodOverride("X-HTTP-Method"));
 server.use(methodOverride("X-Method-Override"));
@@ -299,16 +307,25 @@ server.disable("x-powered-by");
 
 // WebDAV基础方法支持 - 使用统一配置
 server.use((req, res, next) => {
-  if (req.path.startsWith("/dav")) {
+  if (req.path === "/dav" || req.path.startsWith("/dav/")) {
     res.setHeader("Access-Control-Allow-Methods", webdavConfig.SUPPORTED_METHODS.join(","));
     res.setHeader("Allow", webdavConfig.SUPPORTED_METHODS.join(","));
 
-    // 对于OPTIONS请求，直接响应以支持预检请求
+    // 区分CORS预检请求和WebDAV OPTIONS请求
     if (req.method === "OPTIONS") {
-      // 添加WebDAV特定的响应头
-      res.setHeader("DAV", webdavConfig.PROTOCOL.RESPONSE_HEADERS.DAV);
-      res.setHeader("MS-Author-Via", webdavConfig.PROTOCOL.RESPONSE_HEADERS["MS-Author-Via"]);
-      return res.status(204).end();
+      // 检查是否为CORS预检请求
+      const isCORSPreflight = req.headers.origin && req.headers["access-control-request-method"];
+
+      if (isCORSPreflight) {
+        // CORS预检请求：在Express层直接处理
+        return res.status(204).end();
+      } else {
+        // WebDAV OPTIONS请求：传递给Hono层处理认证和能力发现
+        // 添加WebDAV特定的响应头（为了兼容性）
+        res.setHeader("DAV", webdavConfig.PROTOCOL.RESPONSE_HEADERS.DAV);
+        res.setHeader("MS-Author-Via", webdavConfig.PROTOCOL.RESPONSE_HEADERS["MS-Author-Via"]);
+        // 继续传递给Hono层处理
+      }
     }
   }
   next();
@@ -382,7 +399,7 @@ server.use((req, res, next) => {
 server.use(
   express.raw({
     type: ["application/xml", "text/xml", "application/octet-stream"],
-    limit: "5gb", 
+    limit: "5gb",
     verify: (req, res, buf, encoding) => {
       // 对于WebDAV方法，特别是MKCOL，记录详细信息以便调试
       if ((req.method === "MKCOL" || req.method === "PUT") && buf && buf.length > 10 * 1024 * 1024) {
@@ -478,7 +495,7 @@ server.use(
 // WebDAV请求日志记录
 server.use((req, res, next) => {
   // 仅记录关键WebDAV操作，减少不必要的日志
-  if (["MKCOL", "COPY", "MOVE", "DELETE", "PUT"].includes(req.method) && req.path.startsWith("/dav")) {
+  if (["MKCOL", "COPY", "MOVE", "DELETE", "PUT"].includes(req.method) && (req.path === "/dav" || req.path.startsWith("/dav/"))) {
     logMessage("debug", `关键WebDAV请求: ${req.method} ${req.path}`);
   }
 

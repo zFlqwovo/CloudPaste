@@ -12,7 +12,7 @@ import { createWorkersAdapter, createWorkersWebDAVHandler } from "./adapters/Wor
 import { createExpressAdapter, createExpressWebDAVMiddleware } from "./adapters/ExpressAdapter.js";
 import { validateConfig } from "./config/WebDAVConfig.js";
 
-export { WebDAVDetector, createWebDAVDetector, isWebDAVRequest, WEBDAV_FEATURES } from "./core/WebDAVDetector.js";
+export { WebDAVDetector, createWebDAVDetector, isWebDAVRequest } from "./core/WebDAVDetector.js";
 export { WebDAVAuth, createWebDAVAuth, AuthResultType } from "./core/WebDAVAuth.js";
 export { WebDAVPermissionChecker, createWebDAVPermissionChecker, PermissionCheckResult } from "./core/PermissionChecker.js";
 export { WebDAVAuthCache, createWebDAVAuthCache } from "./core/AuthCache.js";
