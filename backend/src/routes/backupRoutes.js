@@ -82,10 +82,16 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
     // 获取当前管理员ID（用于合并模式下的admin_id映射）
     const currentAdminId = authGateway.utils.getUserId(c);
 
+    // 获取额外的还原选项
+    const skipIntegrityCheck = formData.get("skipIntegrityCheck") === "true";
+    const preserveTimestamps = formData.get("preserveTimestamps") === "true";
+
     // 执行还原
     const result = await backupService.restoreBackup(backupData, {
       mode,
       currentAdminId,
+      skipIntegrityCheck,
+      preserveTimestamps,
     });
 
     return c.json({
