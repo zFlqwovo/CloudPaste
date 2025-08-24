@@ -131,8 +131,8 @@ export class BackupService {
 
     let { data } = backupData;
 
-    // 在合并模式下进行 admin_id 映射
-    if (mode === "merge" && currentAdminId) {
+    // 进行 admin_id 映射（覆盖和合并模式）
+    if (currentAdminId && (mode === "merge" || mode === "overwrite")) {
       data = this.mapAdminIds(data, currentAdminId);
     }
 
@@ -420,7 +420,7 @@ export class BackupService {
   mapAdminIds(data, currentAdminId) {
     const mappedData = { ...data };
 
-    console.log(`[BackupService] 合并模式：映射 admin_id 到当前管理员 ${currentAdminId}`);
+    console.log(`[BackupService] 映射 admin_id 到当前管理员 ${currentAdminId}`);
 
     // 处理 s3_configs 表
     if (mappedData.s3_configs) {
