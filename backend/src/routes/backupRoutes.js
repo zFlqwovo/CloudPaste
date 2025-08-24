@@ -79,8 +79,14 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
 
     const backupService = new BackupService(c.env.DB);
 
+    // 获取当前管理员ID（用于合并模式下的admin_id映射）
+    const currentAdminId = authGateway.utils.getUserId(c);
+
     // 执行还原
-    const result = await backupService.restoreBackup(backupData, { mode });
+    const result = await backupService.restoreBackup(backupData, {
+      mode,
+      currentAdminId,
+    });
 
     return c.json({
       code: ApiStatus.SUCCESS,

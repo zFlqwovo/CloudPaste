@@ -78,15 +78,23 @@ export class BackupService {
    * 还原备份
    * @param {Object} backupData - 备份数据
    * @param {Object} options - 还原选项
+   * @param {string} options.mode - 还原模式 ('overwrite' | 'merge')
+   * @param {string} options.currentAdminId - 当前管理员ID（合并模式下用于映射admin_id）
    * @returns {Object} 还原结果
    */
   async restoreBackup(backupData, options = {}) {
-    const { mode = "overwrite" } = options;
+    const { mode = "overwrite", currentAdminId } = options;
 
     // 验证备份数据
     this.validateBackupData(backupData);
 
-    const { data } = backupData;
+    let { data } = backupData;
+
+    // 在合并模式下进行 admin_id 映射
+    if (mode === "merge" && currentAdminId) {
+      data = this.mapAdminIds(data, currentAdminId);
+    }
+
     const tables = Object.keys(data);
 
     // 验证表是否存在
@@ -221,6 +229,63 @@ export class BackupService {
     }
 
     return results;
+  }
+
+  /**
+   * 在合并模式下映射 admin_id 到当前管理员
+   * @param {Object} data - 备份数据
+   * @param {string} currentAdminId - 当前管理员ID
+   * @returns {Object} 映射后的数据
+   */
+  mapAdminIds(data, currentAdminId) {
+    const mappedData = { ...data };
+
+    console.log(`[BackupService] 合并模式：映射 admin_id 到当前管理员 ${currentAdminId}`);
+
+    // 处理 s3_configs 表
+    if (mappedData.s3_configs) {
+      const originalCount = mappedData.s3_configs.length;
+      mappedData.s3_configs = mappedData.s3_configs.map((record) => ({
+        ...record,
+        admin_id: currentAdminId,
+      }));
+      console.log(`[BackupService] 映射 s3_configs 表：${originalCount} 条记录的 admin_id 已更新`);
+    }
+
+    // 处理 storage_mounts 表
+    if (mappedData.storage_mounts) {
+      const originalCount = mappedData.storage_mounts.length;
+      mappedData.storage_mounts = mappedData.storage_mounts.map((record) => ({
+        ...record,
+        created_by: currentAdminId,
+      }));
+      console.log(`[BackupService] 映射 storage_mounts 表：${originalCount} 条记录的 created_by 已更新`);
+    }
+
+    // 处理 files 表
+    if (mappedData.files) {
+      const originalCount = mappedData.files.length;
+      mappedData.files = mappedData.files.map((record) => ({
+        ...record,
+        created_by: currentAdminId,
+      }));
+      console.log(`[BackupService] 映射 files 表：${originalCount} 条记录的 created_by 已更新`);
+    }
+
+    // 处理 pastes 表
+    if (mappedData.pastes) {
+      const originalCount = mappedData.pastes.length;
+      mappedData.pastes = mappedData.pastes.map((record) => ({
+        ...record,
+        created_by: currentAdminId,
+      }));
+      console.log(`[BackupService] 映射 pastes 表：${originalCount} 条记录的 created_by 已更新`);
+    }
+
+    // 注意：不处理 api_keys 表，因为API密钥是独立的用户身份
+    // 注意：不处理 admin_tokens 表，因为令牌应该跟随对应的管理员
+
+    return mappedData;
   }
 
   /**
