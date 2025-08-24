@@ -3,9 +3,10 @@
  * 删除文件/目录的锁定
  */
 
-import { getLockManager } from "../utils/LockManager.js";
+import { lockManager } from "../utils/LockManager.js";
 import { parseLockTokenHeader } from "../utils/lockUtils.js";
-import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 
 /**
  * 处理UNLOCK请求
@@ -36,9 +37,6 @@ export async function handleUnlock(c, path, userId, userType, db) {
 
     console.log(`UNLOCK请求 - 路径: ${path}, 令牌: ${token}`);
 
-    // 获取锁定管理器实例
-    const lockManager = getLockManager();
-
     // 直接通过令牌获取锁定信息（更健壮的方式）
     const lockInfo = lockManager.getLockByToken(token);
     if (!lockInfo) {
@@ -57,7 +55,7 @@ export async function handleUnlock(c, path, userId, userType, db) {
     if (userType === "admin") {
       expectedOwner = `admin:${userId}`;
     } else if (userType === "apiKey" && typeof userId === "object") {
-      expectedOwner = `apikey:${userId.name || userId.id}`;
+      expectedOwner = `apiKey:${userId.name || userId.id}`;
     }
 
     // 注意：这里不强制验证所有权，因为锁令牌本身就是权限证明
@@ -78,8 +76,10 @@ export async function handleUnlock(c, path, userId, userType, db) {
     // 返回204 No Content
     return new Response(null, {
       status: 204,
-      headers: addCorsHeaders({
-        DAV: "1, 2",
+      headers: getStandardWebDAVHeaders({
+        customHeaders: {
+          DAV: "1, 2",
+        },
       }),
     });
   } catch (error) {

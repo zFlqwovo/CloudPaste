@@ -1,5 +1,5 @@
 /**
- * WebDAV路由定义 - 支持配置化路径
+ * WebDAV路由定义
  */
 import { Hono } from "hono";
 import { webdavAuthMiddleware, handleWebDAV } from "../webdav/index.js";
@@ -10,7 +10,7 @@ import { createErrorResponse } from "../utils/common.js";
 // 创建WebDAV路由处理程序
 const webdavRoutes = new Hono();
 
-// WebDAV认证中间件应用到WebDAV路径
+// WebDAV认证和权限检查
 webdavRoutes.use(WEBDAV_BASE_PATH, webdavAuthMiddleware);
 webdavRoutes.use(`${WEBDAV_BASE_PATH}/*`, webdavAuthMiddleware);
 

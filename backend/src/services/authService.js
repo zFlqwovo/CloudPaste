@@ -52,6 +52,20 @@ export class AuthResult {
   }
 
   /**
+   * 获取用户类型
+   * WebDAV认证需要的方法
+   */
+  getUserType() {
+    if (this._isAdmin) {
+      return "admin";
+    }
+    if (this.keyInfo) {
+      return "apiKey";
+    }
+    return "unknown";
+  }
+
+  /**
    * 检查是否有任一权限
    * 网关权限验证需要的方法
    */
@@ -259,16 +273,22 @@ export class AuthService {
       return new AuthResult();
     }
 
+    let result;
     switch (type) {
       case "bearer":
-        return await this.validateAdminAuth(token);
+        result = await this.validateAdminAuth(token);
+        break;
       case "apikey":
-        return await this.validateApiKeyAuth(token);
+        result = await this.validateApiKeyAuth(token);
+        break;
       case "basic":
-        return await this.validateBasicAuth(token);
+        result = await this.validateBasicAuth(token);
+        break;
       default:
-        return new AuthResult();
+        result = new AuthResult();
     }
+
+    return result;
   }
 
   /**

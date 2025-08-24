@@ -4,9 +4,10 @@
  * 遵循RFC 4918标准，支持exclusive write locks
  */
 
-import { getLockManager } from "../utils/LockManager.js";
+import { lockManager } from "../utils/LockManager.js";
 import { parseLockXML, parseTimeoutHeader, parseDepthHeader, buildLockResponseXML, hasLockConflict } from "../utils/lockUtils.js";
-import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 
@@ -37,7 +38,7 @@ export async function handleLock(c, path, userId, userType, db) {
     if (userType === "admin") {
       owner = `admin:${userId}`;
     } else if (userType === "apiKey" && typeof userId === "object") {
-      owner = `apikey:${userId.name || userId.id}`;
+      owner = `apiKey:${userId.name || userId.id}`;
     }
 
     // 获取请求体
@@ -68,11 +69,8 @@ export async function handleLock(c, path, userId, userType, db) {
 
     console.log("解析的LOCK请求:", lockRequest);
 
-    // 获取锁定管理器实例
-    const lockManager = getLockManager();
-
     // 检查现有锁定
-    const existingLock = lockManager.getLock(path);
+    const existingLock = lockManager.getLockByPath(path);
     if (existingLock) {
       // 检查锁定冲突
       if (hasLockConflict(existingLock, lockRequest.scope)) {
@@ -100,10 +98,12 @@ export async function handleLock(c, path, userId, userType, db) {
 
     return new Response(responseXML, {
       status: 200,
-      headers: addCorsHeaders({
-        "Content-Type": "application/xml; charset=utf-8",
-        "Lock-Token": `<${lockInfo.token}>`,
-        DAV: "1, 2",
+      headers: getStandardWebDAVHeaders({
+        customHeaders: {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Lock-Token": `<${lockInfo.token}>`,
+          DAV: "1, 2",
+        },
       }),
     });
   } catch (error) {
@@ -130,9 +130,6 @@ async function handleLockRefresh(c, path, ifHeader, timeoutSeconds) {
   }
 
   const token = tokenMatch[1];
-
-  // 获取锁定管理器实例
-  const lockManager = getLockManager();
 
   // 刷新锁定
   const refreshedLock = lockManager.refreshLock(token, timeoutSeconds);

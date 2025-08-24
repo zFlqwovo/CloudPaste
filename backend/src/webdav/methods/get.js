@@ -5,7 +5,8 @@
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { addWebDAVHeaders, getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 
 /**
@@ -156,9 +157,11 @@ export async function handleGet(c, path, userId, userType, db) {
 
       return new Response(null, {
         status: 302,
-        headers: addCorsHeaders({
-          Location: presignedResult.presignedUrl,
-          "Cache-Control": "no-cache",
+        headers: getStandardWebDAVHeaders({
+          customHeaders: {
+            Location: presignedResult.presignedUrl,
+            "Cache-Control": "no-cache",
+          },
         }),
       });
     } else {
@@ -166,7 +169,7 @@ export async function handleGet(c, path, userId, userType, db) {
       console.log(`WebDAV GET - 使用代理模式: ${path}`);
       const fileResponse = await fileSystem.downloadFile(path, fileName, c.req, userId, userType);
 
-      // 更新响应头以包含WebDAV特有的头信息和CORS头部
+      // 更新响应头以包含WebDAV特有的头信息
       const updatedHeaders = new Headers(fileResponse.headers);
       updatedHeaders.set("Content-Type", contentType);
       updatedHeaders.set("Last-Modified", lastModifiedStr);
@@ -176,16 +179,13 @@ export async function handleGet(c, path, userId, userType, db) {
       updatedHeaders.set("Accept-Ranges", "bytes");
       updatedHeaders.set("Cache-Control", "max-age=3600");
 
-      // 添加CORS头部
-      const corsHeaders = addCorsHeaders({});
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        updatedHeaders.set(key, value);
-      });
-
-      return new Response(fileResponse.body, {
+      // 创建响应并添加WebDAV标准头部
+      const response = new Response(fileResponse.body, {
         status: fileResponse.status,
         headers: updatedHeaders,
       });
+
+      return addWebDAVHeaders(response);
     }
   } catch (error) {
     // 使用统一的错误处理

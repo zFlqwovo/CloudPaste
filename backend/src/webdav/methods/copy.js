@@ -4,10 +4,11 @@
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { parseDestinationPath } from "../utils/webdavUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
-import { getLockManager } from "../utils/LockManager.js";
+import { lockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
 
 /**
@@ -216,9 +217,6 @@ export async function handleCopy(c, path, userId, userType, db) {
       return createWebDAVErrorResponse("无效的Destination头", 400, false);
     }
 
-    // 获取锁定管理器实例
-    const lockManager = getLockManager();
-
     // 检查目标路径的锁定状态（COPY操作会在目标位置创建新资源）
     const lockConflict = checkLockPermission(lockManager, destPath, ifHeader, "COPY");
     if (lockConflict) {
@@ -307,9 +305,11 @@ export async function handleCopy(c, path, userId, userType, db) {
           // 返回标准WebDAV成功响应
           return new Response(null, {
             status: 201, // Created - 跨存储复制总是创建新文件
-            headers: addCorsHeaders({
-              "Content-Type": "text/plain",
-              "Content-Length": "0",
+            headers: getStandardWebDAVHeaders({
+              customHeaders: {
+                "Content-Type": "text/plain",
+                "Content-Length": "0",
+              },
             }),
           });
         } else {
@@ -359,9 +359,11 @@ export async function handleCopy(c, path, userId, userType, db) {
 
     return new Response(null, {
       status: statusCode,
-      headers: addCorsHeaders({
-        "Content-Type": "text/plain",
-        "Content-Length": "0",
+      headers: getStandardWebDAVHeaders({
+        customHeaders: {
+          "Content-Type": "text/plain",
+          "Content-Length": "0",
+        },
       }),
     });
   } catch (error) {

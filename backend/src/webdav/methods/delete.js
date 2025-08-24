@@ -4,9 +4,10 @@
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
-import { getLockManager } from "../utils/LockManager.js";
+import { lockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
 
 /**
@@ -19,9 +20,6 @@ import { checkLockPermission } from "../utils/lockUtils.js";
  */
 export async function handleDelete(c, path, userId, userType, db) {
   try {
-    // 获取锁定管理器实例
-    const lockManager = getLockManager();
-
     // 检查锁定状态
     const ifHeader = c.req.header("If");
     const lockConflict = checkLockPermission(lockManager, path, ifHeader, "DELETE");
@@ -29,7 +27,9 @@ export async function handleDelete(c, path, userId, userType, db) {
       console.log(`WebDAV DELETE - 锁定冲突: ${path}`);
       return new Response(lockConflict.message, {
         status: lockConflict.status,
-        headers: addCorsHeaders({ "Content-Type": "text/plain" }),
+        headers: getStandardWebDAVHeaders({
+          customHeaders: { "Content-Type": "text/plain" },
+        }),
       });
     }
 
@@ -40,7 +40,9 @@ export async function handleDelete(c, path, userId, userType, db) {
     if (pathParts.length === 1) {
       return new Response("不能删除挂载点根目录", {
         status: 405, // Method Not Allowed
-        headers: addCorsHeaders({ "Content-Type": "text/plain" }),
+        headers: getStandardWebDAVHeaders({
+          customHeaders: { "Content-Type": "text/plain" },
+        }),
       });
     }
 
@@ -88,9 +90,11 @@ export async function handleDelete(c, path, userId, userType, db) {
     // 返回成功响应（符合WebDAV DELETE标准）
     return new Response(null, {
       status: 204, // No Content
-      headers: addCorsHeaders({
-        "Content-Type": "text/plain",
-        "Content-Length": "0",
+      headers: getStandardWebDAVHeaders({
+        customHeaders: {
+          "Content-Type": "text/plain",
+          "Content-Length": "0",
+        },
       }),
     });
   } catch (error) {

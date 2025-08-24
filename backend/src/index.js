@@ -32,10 +32,11 @@ import { WEBDAV_BASE_PATH } from "./webdav/auth/config/WebDAVConfig.js";
 // 统一CORS中间件
 app.use("*", async (c, next) => {
   const isWebDAVPath = c.req.path === WEBDAV_BASE_PATH || c.req.path.startsWith(WEBDAV_BASE_PATH + "/");
+  const isRootPath = c.req.path === "/";
 
-  if (c.req.method === "OPTIONS" && isWebDAVPath) {
-    // WebDAV OPTIONS请求跳过CORS自动处理，进入WebDAV认证流程
-    console.log("WebDAV OPTIONS请求，进入认证流程:", c.req.path);
+  if (c.req.method === "OPTIONS" && (isWebDAVPath || isRootPath)) {
+    // WebDAV OPTIONS请求和根路径OPTIONS请求跳过CORS自动处理
+    console.log("WebDAV OPTIONS请求:", c.req.method, c.req.path);
     await next();
     return;
   } else {
@@ -67,6 +68,26 @@ app.use("*", async (c, next) => {
 
     return await corsMiddleware(c, next);
   }
+});
+
+// 根路径WebDAV OPTIONS兼容性处理器
+// 为1Panel等客户端提供WebDAV能力发现支持
+// 必须在其他路由注册之前，确保优先匹配
+app.options("/", (c) => {
+  // 返回标准WebDAV能力声明，与/dav路径保持一致
+  const headers = {
+    Allow: "OPTIONS, PROPFIND, GET, HEAD, PUT, DELETE, MKCOL, COPY, MOVE, LOCK, UNLOCK, PROPPATCH",
+    DAV: "1, 2",
+    "MS-Author-Via": "DAV",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS, PROPFIND, GET, HEAD, PUT, DELETE, MKCOL, COPY, MOVE, LOCK, UNLOCK, PROPPATCH",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, Depth, Destination, If, Lock-Token, Overwrite, X-Custom-Auth-Key",
+    "Access-Control-Expose-Headers": "DAV, Lock-Token, MS-Author-Via",
+    "Access-Control-Max-Age": "86400",
+  };
+
+  console.log("根路径WebDAV OPTIONS请求 - 客户端兼容性支持");
+  return new Response("", { status: 200, headers });
 });
 
 // 注册路由

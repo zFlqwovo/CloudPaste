@@ -108,7 +108,7 @@ async function performAuthentication(c) {
     const authHeader = c.req.header("Authorization");
     authResult = await authService.authenticate(authHeader);
 
-    // 如果标准认证失败，尝试自定义授权头（向后兼容）
+    // 如果标准认证失败，尝试自定义授权头
     if (!authResult.isAuthenticated) {
       const customAuthKey = c.req.header("X-Custom-Auth-Key");
       if (customAuthKey) {
@@ -248,6 +248,17 @@ const gatewayUtils = {
       return null;
     }
     return authResult.isAdmin() ? "admin" : "apikey";
+  },
+
+  /**
+   * 获取用户类型（类型系统用）
+   */
+  getUserType: (c) => {
+    const authResult = c.get("authResult");
+    if (!authResult || !authResult.isAuthenticated) {
+      return null;
+    }
+    return authResult.getUserType();
   },
 
   /**
@@ -486,3 +497,8 @@ authGateway.utils = gatewayUtils;
  * 创建认证服务实例
  */
 authGateway.createAuthService = createAuthService;
+
+/**
+ * 执行认证处理 - 供WebDAV等协议层调用
+ */
+authGateway.performAuth = performAuthentication;

@@ -7,9 +7,10 @@
 
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
-import { createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
-import { getLockManager } from "../utils/LockManager.js";
+import { lockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
 import { parseDestinationPath } from "../utils/webdavUtils.js";
 
@@ -204,8 +205,7 @@ export async function handleMove(c, path, userId, userType, db) {
 
     console.log(`WebDAV MOVE - 请求头部: Destination=${destination}, Overwrite=${overwrite}, Depth=${depth}`);
 
-    // 获取锁定管理器实例
-    const lockManager = getLockManager();
+    // 检查锁定状态
 
     // 检查源路径的锁定状态（MOVE操作会删除源资源）
     const sourceLockConflict = checkLockPermission(lockManager, path, ifHeader, "MOVE");
@@ -226,22 +226,14 @@ export async function handleMove(c, path, userId, userType, db) {
       return createWebDAVErrorResponse("MOVE操作只支持Depth: infinity", 412, false);
     }
 
-    // 4. 解析目标路径（与COPY方法完全一致）
-    let destPath;
-    try {
-      const destUrl = new URL(destination);
-      destPath = decodeURIComponent(destUrl.pathname);
-
-      // 移除WebDAV前缀，获取实际文件路径
-      if (destPath.startsWith("/dav/")) {
-        destPath = destPath.substring(4); // 移除"/dav"前缀
-      }
-
-      console.log(`WebDAV MOVE - 目标路径: ${destPath}`);
-    } catch (error) {
-      console.error(`WebDAV MOVE - 无效的Destination URL: ${destination}`, error);
+    // 4. 解析目标路径
+    const destPath = parseDestinationPath(destination);
+    if (!destPath) {
+      console.error(`WebDAV MOVE - 无效的Destination URL: ${destination}`);
       return createWebDAVErrorResponse("无效的Destination URL", 400, false);
     }
+
+    console.log(`WebDAV MOVE - 目标路径: ${destPath}`);
 
     // 5. 验证源路径和目标路径不能相同（RFC 4918标准）
     if (path === destPath) {
@@ -379,9 +371,11 @@ export async function handleMove(c, path, userId, userType, db) {
       console.log(`WebDAV MOVE - 移动成功（覆盖现有资源）: ${path} -> ${destPath}`);
       return new Response(null, {
         status: 204, // No Content
-        headers: addCorsHeaders({
-          "Content-Type": "text/plain",
-          "Content-Length": "0",
+        headers: getStandardWebDAVHeaders({
+          customHeaders: {
+            "Content-Type": "text/plain",
+            "Content-Length": "0",
+          },
         }),
       });
     } else {
@@ -389,10 +383,12 @@ export async function handleMove(c, path, userId, userType, db) {
       console.log(`WebDAV MOVE - 移动成功（创建新资源）: ${path} -> ${destPath}`);
       return new Response(null, {
         status: 201, // Created
-        headers: addCorsHeaders({
-          "Content-Type": "text/plain",
-          "Content-Length": "0",
-          Location: destination, // RFC 4918建议包含Location头部
+        headers: getStandardWebDAVHeaders({
+          customHeaders: {
+            "Content-Type": "text/plain",
+            "Content-Length": "0",
+            Location: destination,
+          },
         }),
       });
     }

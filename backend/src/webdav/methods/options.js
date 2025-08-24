@@ -1,18 +1,20 @@
-import { createWebDAVErrorResponse, addCorsHeaders } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
+import { WEBDAV_CONFIG } from "../auth/config/WebDAVConfig.js";
 
 /**
  * 处理WebDAV OPTIONS请求 - WebDAV能力发现
  * @param {Object} c - Hono上下文
  * @param {string} path - 请求路径
- * @param {string|Object} userId - 用户ID或信息
- * @param {string} userType - 用户类型
+ * @param {string|Object} userId - 用户ID或信息（OPTIONS请求可能为undefined）
+ * @param {string} userType - 用户类型（OPTIONS请求可能为undefined）
  * @param {D1Database} db - 数据库实例
  * @returns {Response} HTTP响应
  */
 export async function handleOptions(c, path, userId, userType, db) {
   try {
-    // 处理WebDAV能力发现请求
-    return await handleWebDAVOptionsRequest(c, path, userId, userType, db);
+    // WebDAV能力发现请求处理
+    return await handleWebDAVOptionsRequest(c, path, userType);
   } catch (error) {
     console.error("WebDAV OPTIONS请求处理失败:", error);
     return createWebDAVErrorResponse("WebDAV OPTIONS请求处理失败", 500, false);
@@ -23,29 +25,24 @@ export async function handleOptions(c, path, userId, userType, db) {
  * 处理WebDAV OPTIONS请求
  * @param {Object} c - Hono上下文
  * @param {string} path - 请求路径
- * @param {string|Object} _userId - 用户ID或信息（OPTIONS请求不需要）
- * @param {string} userType - 用户类型
- * @param {D1Database} _db - 数据库实例（OPTIONS请求不需要）
+ * @param {string} userType - 用户类型（可能为undefined）
  * @returns {Response} WebDAV OPTIONS响应
  */
-async function handleWebDAVOptionsRequest(c, path, _userId, userType, _db) {
-  // 检测支持的WebDAV功能
-  const capabilities = detectWebDAVCapabilities();
-
-  // 构建支持的方法列表
-  const supportedMethods = buildSupportedMethodsList(capabilities);
+function handleWebDAVOptionsRequest(c, path, userType) {
+  // 构建静态的WebDAV方法列表
+  const allowedMethods = buildStaticAllowMethods();
 
   // 构建DAV合规级别
-  const davLevel = buildDAVComplianceLevel(capabilities);
+  const davLevel = buildDAVComplianceLevel();
 
   // 获取客户端信息
   const clientInfo = detectClientInfo(c);
 
   // 构建响应头
-  const headers = buildWebDAVResponseHeaders(supportedMethods, davLevel, clientInfo);
+  const headers = buildWebDAVResponseHeaders(allowedMethods, davLevel, clientInfo);
 
   // 记录日志
-  logOptionsRequest(c, path, userType, davLevel, supportedMethods);
+  logOptionsRequest(c, path, userType, davLevel, allowedMethods);
 
   return new Response(null, {
     status: 200,
@@ -54,86 +51,25 @@ async function handleWebDAVOptionsRequest(c, path, _userId, userType, _db) {
 }
 
 /**
- * 检测WebDAV功能支持
- * 符合RFC 4918标准：OPTIONS应该返回服务器支持的功能，而不是用户特定的权限
- * @returns {Object} 功能支持信息
+ * 构建静态的WebDAV方法列表
+ * 返回WebDAVConfig中定义的所有支持方法
+ * @returns {string[]} 允许的方法列表
  */
-function detectWebDAVCapabilities() {
-  // 返回服务器实际支持的功能，不基于用户权限
-  const capabilities = {
-    // 基础WebDAV功能（Class 1）
-    basicWebDAV: true,
-    propfind: true,
-    get: true,
-    put: true,
-    delete: true,
-    mkcol: true,
-    copy: true,
-    move: true,
-
-    // 锁定功能（Class 2）
-    locking: true, // 我们已经实现了完整的LOCK/UNLOCK
-
-    // 属性修改功能（Class 3）
-    proppatch: false, // 当前返回405 Method Not Allowed
-
-    // 扩展功能
-    versioning: false,
-    acl: false,
-    quota: false,
-  };
-
-  return capabilities;
+function buildStaticAllowMethods() {
+  // 返回WebDAV配置中定义的所有支持方法
+  return [...WEBDAV_CONFIG.METHODS];
 }
 
 /**
- * 构建支持的方法列表
- * @param {Object} capabilities - 功能支持信息
- * @returns {string[]} 支持的HTTP方法列表
- */
-function buildSupportedMethodsList(capabilities) {
-  const methods = ["OPTIONS", "HEAD"]; // 基础方法
-
-  if (capabilities.get) methods.push("GET");
-  if (capabilities.put) methods.push("PUT");
-  if (capabilities.delete) methods.push("DELETE");
-  if (capabilities.mkcol) methods.push("MKCOL");
-  if (capabilities.copy) methods.push("COPY");
-  if (capabilities.move) methods.push("MOVE");
-  if (capabilities.propfind) methods.push("PROPFIND");
-  if (capabilities.proppatch) methods.push("PROPPATCH");
-  if (capabilities.locking) {
-    methods.push("LOCK");
-    methods.push("UNLOCK");
-  }
-
-  return methods;
-}
-
-/**
- * 构建DAV合规级别
- * @param {Object} capabilities - 功能支持信息
+ * 构建DAV合规级别 - 简化版本
  * @returns {string} DAV合规级别字符串
  */
-function buildDAVComplianceLevel(capabilities) {
-  const levels = [];
-
-  // Class 1: 基础WebDAV功能
-  if (capabilities.basicWebDAV) {
-    levels.push("1");
-  }
-
-  // Class 2: 锁定功能
-  if (capabilities.locking) {
-    levels.push("2");
-  }
-
-  // Class 3: 属性修改功能
-  if (capabilities.proppatch) {
-    levels.push("3");
-  }
-
-  return levels.join(",");
+function buildDAVComplianceLevel() {
+  // CloudPaste支持WebDAV Class 1和Class 2
+  // Class 1: 基础WebDAV功能（PROPFIND, GET, PUT, DELETE, MKCOL, COPY, MOVE）
+  // Class 2: 锁定功能（LOCK, UNLOCK）
+  // Class 3: 属性修改（PROPPATCH）当前返回405，不支持
+  return "1, 2";
 }
 
 /**
@@ -155,56 +91,51 @@ function detectClientInfo(c) {
 
 /**
  * 构建WebDAV响应头
- * @param {string[]} supportedMethods - 支持的方法列表
+ * @param {string[]} allowedMethods - 允许的方法列表
  * @param {string} davLevel - DAV合规级别
  * @param {Object} clientInfo - 客户端信息
  * @returns {Object} 响应头对象
  */
-function buildWebDAVResponseHeaders(supportedMethods, davLevel, clientInfo) {
-  const baseHeaders = {
-    // 标准WebDAV头
-    DAV: davLevel,
-    Allow: supportedMethods.join(", "),
-    Public: supportedMethods.join(", "),
-    "Content-Length": "0",
-    "Content-Type": "text/plain",
-
-    // 服务器信息
-    Server: "CloudPaste-WebDAV/1.0",
-
-    // 标准HTTP头
-    "Accept-Ranges": "bytes",
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    Pragma: "no-cache",
-    Expires: "0",
-
-    // 安全头
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-  };
-
-  // 客户端特定头（保持兼容性）
+function buildWebDAVResponseHeaders(allowedMethods, davLevel, clientInfo) {
+  // 客户端特定头
+  const clientSpecificHeaders = {};
   if (clientInfo.isWindows) {
-    baseHeaders["MS-Author-Via"] = "DAV";
+    clientSpecificHeaders["MS-Author-Via"] = "DAV";
   }
-
   if (clientInfo.isMac) {
-    baseHeaders["X-DAV-Powered-By"] = "CloudPaste";
+    clientSpecificHeaders["X-DAV-Powered-By"] = "CloudPaste";
   }
 
-  // 使用统一的CORS头部添加函数
-  return addCorsHeaders(baseHeaders);
+  // 使用统一的WebDAV头部管理工具，覆盖默认的Allow头
+  return getStandardWebDAVHeaders({
+    customHeaders: {
+      DAV: davLevel,
+      Allow: allowedMethods.join(", "),
+      Public: allowedMethods.join(", "),
+      "Content-Length": "0",
+      "Content-Type": "text/plain",
+      Server: "CloudPaste-WebDAV/1.0",
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      ...clientSpecificHeaders,
+    },
+  });
 }
 
 /**
  * 记录OPTIONS请求日志
  * @param {Object} c - Hono上下文
  * @param {string} path - 请求路径
- * @param {string} userType - 用户类型
+ * @param {string} userType - 用户类型（可能为undefined）
  * @param {string} davLevel - DAV合规级别
- * @param {string[]} supportedMethods - 支持的方法列表
+ * @param {string[]} allowedMethods - 允许的方法列表
  */
-function logOptionsRequest(c, path, userType, davLevel, supportedMethods) {
+function logOptionsRequest(c, path, userType, davLevel, allowedMethods) {
   const userAgent = c.req.header("User-Agent") || "Unknown";
-  console.log(`WebDAV OPTIONS请求 - 路径: ${path}, 用户类型: ${userType}, DAV级别: ${davLevel}, 方法: ${supportedMethods.length}个, 客户端: ${userAgent.substring(0, 50)}`);
+  const authStatus = userType ? `认证用户(${userType})` : "未认证访问";
+  console.log(`WebDAV OPTIONS请求 - 路径: ${path}, 认证状态: ${authStatus}, DAV级别: ${davLevel}, 方法: ${allowedMethods.length}个, 客户端: ${userAgent.substring(0, 50)}`);
 }

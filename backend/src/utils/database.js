@@ -12,8 +12,8 @@ async function createPasteTables(db) {
 
   // 创建pastes表 - 存储文本分享数据
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.PASTES} (
         id TEXT PRIMARY KEY,
         slug TEXT UNIQUE NOT NULL,
@@ -28,13 +28,13 @@ async function createPasteTables(db) {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `
-      )
-      .run();
+    )
+    .run();
 
   // 创建文本密码表
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.PASTE_PASSWORDS} (
         paste_id TEXT PRIMARY KEY,
         plain_password TEXT NOT NULL,
@@ -43,8 +43,8 @@ async function createPasteTables(db) {
         FOREIGN KEY (paste_id) REFERENCES ${DbTables.PASTES}(id) ON DELETE CASCADE
       )
     `
-      )
-      .run();
+    )
+    .run();
 }
 
 /**
@@ -56,8 +56,8 @@ async function createAdminTables(db) {
 
   // 创建admins表 - 存储管理员信息
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.ADMINS} (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
@@ -66,13 +66,13 @@ async function createAdminTables(db) {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `
-      )
-      .run();
+    )
+    .run();
 
   // 创建admin_tokens表 - 存储管理员认证令牌
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.ADMIN_TOKENS} (
         token TEXT PRIMARY KEY,
         admin_id TEXT NOT NULL,
@@ -81,13 +81,13 @@ async function createAdminTables(db) {
         FOREIGN KEY (admin_id) REFERENCES ${DbTables.ADMINS}(id) ON DELETE CASCADE
       )
     `
-      )
-      .run();
+    )
+    .run();
 
   // 创建api_keys表 - 存储API密钥（位标志权限系统）
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.API_KEYS} (
         id TEXT PRIMARY KEY,
         name TEXT UNIQUE NOT NULL,
@@ -101,8 +101,8 @@ async function createAdminTables(db) {
         expires_at DATETIME NOT NULL
       )
     `
-      )
-      .run();
+    )
+    .run();
 }
 
 /**
@@ -114,8 +114,8 @@ async function createStorageTables(db) {
 
   // 创建s3_configs表 - 存储S3配置信息
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.S3_CONFIGS} (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -139,13 +139,13 @@ async function createStorageTables(db) {
         FOREIGN KEY (admin_id) REFERENCES ${DbTables.ADMINS}(id) ON DELETE CASCADE
       )
     `
-      )
-      .run();
+    )
+    .run();
 
   // 创建storage_mounts表 - 存储挂载配置
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.STORAGE_MOUNTS} (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -166,8 +166,8 @@ async function createStorageTables(db) {
         last_used DATETIME
       )
     `
-      )
-      .run();
+    )
+    .run();
 }
 
 /**
@@ -179,8 +179,8 @@ async function createFileTables(db) {
 
   // 创建files表 - 存储已上传文件的元数据（支持多存储类型）
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.FILES} (
         id TEXT PRIMARY KEY,
         slug TEXT UNIQUE NOT NULL,
@@ -211,13 +211,13 @@ async function createFileTables(db) {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `
-      )
-      .run();
+    )
+    .run();
 
   // 创建file_passwords表 - 存储文件密码
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.FILE_PASSWORDS} (
         file_id TEXT PRIMARY KEY,
         plain_password TEXT NOT NULL,
@@ -226,8 +226,8 @@ async function createFileTables(db) {
         FOREIGN KEY (file_id) REFERENCES ${DbTables.FILES}(id) ON DELETE CASCADE
       )
     `
-      )
-      .run();
+    )
+    .run();
 }
 
 /**
@@ -239,8 +239,8 @@ async function createSystemTables(db) {
 
   // 创建system_settings表 - 存储系统设置
   await db
-      .prepare(
-          `
+    .prepare(
+      `
       CREATE TABLE IF NOT EXISTS ${DbTables.SYSTEM_SETTINGS} (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
@@ -254,8 +254,8 @@ async function createSystemTables(db) {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `
-      )
-      .run();
+    )
+    .run();
 }
 
 // ==================== 索引创建 ====================
@@ -351,12 +351,12 @@ async function initDefaultSettings(db) {
 
     if (!existing) {
       await db
-          .prepare(
-              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags)
+        .prepare(
+          `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          )
-          .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.options || null, setting.sort_order, setting.flags)
-          .run();
+        )
+        .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.options || null, setting.sort_order, setting.flags)
+        .run();
     }
   }
 }
@@ -376,12 +376,12 @@ async function createDefaultAdmin(db) {
     const defaultPassword = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
 
     await db
-        .prepare(
-            `INSERT INTO ${DbTables.ADMINS} (id, username, password)
+      .prepare(
+        `INSERT INTO ${DbTables.ADMINS} (id, username, password)
          VALUES (?, ?, ?)`
-        )
-        .bind(adminId, "admin", defaultPassword)
-        .run();
+      )
+      .bind(adminId, "admin", defaultPassword)
+      .run();
 
     console.log("已创建默认管理员账户: admin/admin123");
   }
@@ -603,21 +603,21 @@ async function recordMigration(db, version) {
     if (version >= 12) {
       // 版本12及以后：使用新的表结构（包含type, group_id等字段）
       await db
-          .prepare(
-              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
+        .prepare(
+          `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
            VALUES (?, ?, ?, 'string', 99, 999, 1, ?)`
-          )
-          .bind(migrationKey, "completed", `Version ${version} migration completed`, now)
-          .run();
+        )
+        .bind(migrationKey, "completed", `Version ${version} migration completed`, now)
+        .run();
     } else {
       // 版本12之前：使用旧的表结构（只有基本字段）
       await db
-          .prepare(
-              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, updated_at)
+        .prepare(
+          `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, updated_at)
            VALUES (?, ?, ?, ?)`
-          )
-          .bind(migrationKey, "completed", `Version ${version} migration completed`, now)
-          .run();
+        )
+        .bind(migrationKey, "completed", `Version ${version} migration completed`, now)
+        .run();
     }
   } else {
     console.log(`迁移记录 ${migrationKey} 已存在，跳过插入`);
@@ -657,13 +657,13 @@ async function migrateFilesTableToMultiStorage(db) {
 
       // 迁移数据
       const updateResult = await db
-          .prepare(
-              `UPDATE ${DbTables.FILES}
+        .prepare(
+          `UPDATE ${DbTables.FILES}
            SET storage_config_id = s3_config_id, storage_type = 'S3'
            WHERE s3_config_id IS NOT NULL
              AND (storage_config_id IS NULL OR storage_type IS NULL)`
-          )
-          .run();
+        )
+        .run();
 
       console.log(`成功迁移 ${updateResult.changes || 0} 条files记录`);
     }
@@ -688,8 +688,8 @@ async function rebuildFilesTable(db) {
 
   // 创建新表结构
   await db
-      .prepare(
-          `CREATE TABLE ${DbTables.FILES}_new (
+    .prepare(
+      `CREATE TABLE ${DbTables.FILES}_new (
         id TEXT PRIMARY KEY,
         slug TEXT UNIQUE NOT NULL,
         filename TEXT NOT NULL,
@@ -710,20 +710,20 @@ async function rebuildFilesTable(db) {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
-      )
-      .run();
+    )
+    .run();
 
   // 复制数据到新表
   await db
-      .prepare(
-          `INSERT INTO ${DbTables.FILES}_new
+    .prepare(
+      `INSERT INTO ${DbTables.FILES}_new
        SELECT id, slug, filename, storage_config_id, storage_type, storage_path, file_path,
               mimetype, size, etag, remark, password, expires_at, max_views, views, use_proxy,
               created_by, created_at, updated_at
        FROM ${DbTables.FILES}
        WHERE storage_config_id IS NOT NULL AND storage_config_id != ''`
-      )
-      .run();
+    )
+    .run();
 
   // 删除旧表
   await db.prepare(`DROP TABLE ${DbTables.FILES}`).run();
@@ -763,8 +763,8 @@ async function migrateToBitFlagPermissions(db) {
 
       // 创建新表结构并迁移数据
       await db
-          .prepare(
-              `CREATE TABLE ${DbTables.API_KEYS}_new (
+        .prepare(
+          `CREATE TABLE ${DbTables.API_KEYS}_new (
           id TEXT PRIMARY KEY,
           name TEXT UNIQUE NOT NULL,
           key TEXT UNIQUE NOT NULL,
@@ -776,8 +776,8 @@ async function migrateToBitFlagPermissions(db) {
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           expires_at DATETIME NOT NULL
         )`
-          )
-          .run();
+        )
+        .run();
 
       // 迁移数据
       if (existingKeys.results && existingKeys.results.length > 0) {
@@ -792,24 +792,24 @@ async function migrateToBitFlagPermissions(db) {
           const role = permissions === 256 ? "GUEST" : "GENERAL";
 
           await db
-              .prepare(
-                  `INSERT INTO ${DbTables.API_KEYS}_new
+            .prepare(
+              `INSERT INTO ${DbTables.API_KEYS}_new
              (id, name, key, permissions, role, basic_path, is_guest, last_used, created_at, expires_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-              )
-              .bind(
-                  keyRecord.id,
-                  keyRecord.name,
-                  keyRecord.key,
-                  permissions,
-                  role,
-                  keyRecord.basic_path || "/",
-                  role === "GUEST" ? 1 : 0,
-                  keyRecord.last_used,
-                  keyRecord.created_at,
-                  keyRecord.expires_at
-              )
-              .run();
+            )
+            .bind(
+              keyRecord.id,
+              keyRecord.name,
+              keyRecord.key,
+              permissions,
+              role,
+              keyRecord.basic_path || "/",
+              role === "GUEST" ? 1 : 0,
+              keyRecord.last_used,
+              keyRecord.created_at,
+              keyRecord.expires_at
+            )
+            .run();
         }
       }
 
@@ -922,12 +922,12 @@ async function addPreviewSettings(db) {
     const existing = await db.prepare(`SELECT key FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = ?`).bind(setting.key).first();
     if (!existing) {
       await db
-          .prepare(
-              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
+        .prepare(
+          `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-          )
-          .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
-          .run();
+        )
+        .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
+        .run();
     }
   }
 }
@@ -957,12 +957,12 @@ async function addFileNamingStrategySetting(db) {
     ]);
 
     await db
-        .prepare(
-            `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
+      .prepare(
+        `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-        )
-        .bind("file_naming_strategy", "overwrite", "文件命名策略：覆盖模式使用原始文件名（可能冲突），随机后缀模式避免冲突且保持文件名可读性。", "select", 1, options, 4, 0)
-        .run();
+      )
+      .bind("file_naming_strategy", "overwrite", "文件命名策略：覆盖模式使用原始文件名（可能冲突），随机后缀模式避免冲突且保持文件名可读性。", "select", 1, options, 4, 0)
+      .run();
     console.log("成功添加文件命名策略设置");
   }
 }
@@ -977,12 +977,12 @@ async function addDefaultProxySetting(db) {
   const existing = await db.prepare(`SELECT key FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = ?`).bind("default_use_proxy").first();
   if (!existing) {
     await db
-        .prepare(
-            `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
+      .prepare(
+        `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-        )
-        .bind("default_use_proxy", "false", "文件管理的默认代理设置。启用后新上传文件默认使用Worker代理，禁用后默认使用直链。", "bool", 1, 5, 0)
-        .run();
+      )
+      .bind("default_use_proxy", "false", "文件管理的默认代理设置。启用后新上传文件默认使用Worker代理，禁用后默认使用直链。", "bool", 1, 5, 0)
+      .run();
   }
 }
 
@@ -1045,12 +1045,12 @@ async function addSiteSettings(db) {
     const existing = await db.prepare(`SELECT key FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = ?`).bind(setting.key).first();
     if (!existing) {
       await db
-          .prepare(
-              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
+        .prepare(
+          `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
          VALUES (?, ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)`
-          )
-          .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
-          .run();
+        )
+        .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
+        .run();
       console.log(`成功添加站点设置: ${setting.key}`);
     }
   }
@@ -1088,12 +1088,12 @@ async function addCustomContentSettings(db) {
     const existing = await db.prepare(`SELECT key FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = ?`).bind(setting.key).first();
     if (!existing) {
       await db
-          .prepare(
-              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
+        .prepare(
+          `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, options, sort_order, flags, updated_at)
          VALUES (?, ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)`
-          )
-          .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
-          .run();
+        )
+        .bind(setting.key, setting.value, setting.description, setting.type, setting.group_id, setting.sort_order, setting.flags)
+        .run();
       console.log(`成功添加自定义内容设置: ${setting.key}`);
     } else {
       console.log(`自定义内容设置 ${setting.key} 已存在，跳过添加`);
@@ -1120,13 +1120,13 @@ async function cleanupOldMigrationRecords(db, currentVersion) {
 
     if (deleteBeforeVersion > 0) {
       const deleteResult = await db
-          .prepare(
-              `DELETE FROM ${DbTables.SYSTEM_SETTINGS}
+        .prepare(
+          `DELETE FROM ${DbTables.SYSTEM_SETTINGS}
            WHERE key LIKE 'migration_%'
              AND CAST(SUBSTR(key, 11) AS INTEGER) < ?`
-          )
-          .bind(deleteBeforeVersion)
-          .run();
+        )
+        .bind(deleteBeforeVersion)
+        .run();
 
       console.log(`清理了 ${deleteResult.changes || 0} 条旧的迁移记录`);
     }
@@ -1205,21 +1205,21 @@ export async function checkAndInitDatabase(db) {
       const existingVersion = await db.prepare(`SELECT value FROM ${DbTables.SYSTEM_SETTINGS} WHERE key='schema_version'`).first();
       if (existingVersion) {
         await db
-            .prepare(
-                `UPDATE ${DbTables.SYSTEM_SETTINGS}
+          .prepare(
+            `UPDATE ${DbTables.SYSTEM_SETTINGS}
              SET value = ?, updated_at = ?
              WHERE key = 'schema_version'`
-            )
-            .bind(targetVersion.toString(), now)
-            .run();
+          )
+          .bind(targetVersion.toString(), now)
+          .run();
       } else {
         await db
-            .prepare(
-                `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
+          .prepare(
+            `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
              VALUES ('schema_version', ?, '数据库Schema版本号', 'string', 99, 1, 1, ?)`
-            )
-            .bind(targetVersion.toString(), now)
-            .run();
+          )
+          .bind(targetVersion.toString(), now)
+          .run();
       }
     }
 
@@ -1232,12 +1232,12 @@ export async function checkAndInitDatabase(db) {
         const now = new Date().toISOString();
         try {
           await db
-              .prepare(
-                  `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
+            .prepare(
+              `INSERT INTO ${DbTables.SYSTEM_SETTINGS} (key, value, description, type, group_id, sort_order, flags, updated_at)
                VALUES ('db_initialized', ?, '数据库初始化完成标记', 'bool', 99, 2, 1, ?)`
-              )
-              .bind("true", now)
-              .run();
+            )
+            .bind("true", now)
+            .run();
           console.log("设置数据库初始化标记");
         } catch (insertError) {
           // 如果插入失败（可能是因为记录已存在），检查是否确实存在

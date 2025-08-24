@@ -9,9 +9,10 @@ import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { getMimeTypeFromFilename } from "../../utils/fileUtils.js";
-import { getLockManager } from "../utils/LockManager.js";
+import { lockManager } from "../utils/LockManager.js";
 import { buildLockDiscoveryXML } from "../utils/lockUtils.js";
 import { WEBDAV_BASE_PATH } from "../auth/config/WebDAVConfig.js";
+import { getWebDAVMultiStatusHeaders } from "../utils/headerUtils.js";
 
 // 导入虚拟目录处理函数
 import { isVirtualPath, getVirtualDirectoryListing } from "../../storage/fs/utils/VirtualDirectory.js";
@@ -156,7 +157,6 @@ function extractPropertyName(xmlTag) {
  */
 function getAllProperties(item, path) {
   const isDirectory = item.isDirectory || false;
-  const lockManager = getLockManager();
 
   return {
     resourcetype: {
@@ -194,7 +194,7 @@ function getAllProperties(item, path) {
     lockdiscovery: {
       value: (() => {
         // 获取当前路径的锁定信息
-        const lockInfo = lockManager.getLock(item.path || path);
+        const lockInfo = lockManager.getLockByPath(item.path || path);
         return buildLockDiscoveryXML(lockInfo);
       })(),
       status: PropertyStatus.OK,
@@ -681,10 +681,7 @@ async function handleVirtualDirectoryPropfind(mounts, path, basicPath, requestIn
 
     return new Response(xml, {
       status: 207, // Multi-Status
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        DAV: "1, 2",
-      },
+      headers: getWebDAVMultiStatusHeaders(),
     });
   } catch (error) {
     console.error("处理虚拟目录PROPFIND失败:", error);
@@ -779,10 +776,7 @@ async function handleStoragePropfind(fileSystem, path, requestInfo, userIdOrInfo
 
     return new Response(xml, {
       status: 207, // Multi-Status
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        DAV: "1, 2",
-      },
+      headers: getWebDAVMultiStatusHeaders(),
     });
   } catch (error) {
     console.error("处理存储PROPFIND失败:", error);
