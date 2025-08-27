@@ -133,8 +133,7 @@
    - `S3_BUCKET_NAME`
    - `S3_ENDPOINT`
 
-**以下教程可能过时 具体参考： [Cloudpaste在线部署文档](https://doc.cloudpaste.qzz.io)**
-
+**以下教程可能过时 具体参考： [Cloudpaste 在线部署文档](https://doc.cloudpaste.qzz.io)**
 
 <details>
 <summary><b>👉 查看完整部署教程</b></summary>
@@ -875,7 +874,7 @@ location /dav {
 
 3. **⚠️⚠️ Webdav 上传问题**:
 
-   - Worker部署的webdav上传大小可能受限于CF的CDN限制 100MB左右，导致报错413
+   - Worker 部署的 webdav 上传大小可能受限于 CF 的 CDN 限制 100MB 左右，导致报错 413
    - 对于 Docker 部署，只需注意 nginx 代理配置，上传模式任意。
 
 </details>
@@ -953,18 +952,37 @@ location /dav {
 
 ```
 CloudPaste/
-├── frontend/                # 前端 Vue.js 应用
-│   ├── src/                 # 源代码
-│   │   ├── components/      # Vue 组件
-│   │   ├── api/             # API 客户端和服务
-│   │   ├── i18n/            # 国际化资源文件
-│   │   ├── utils/           # 工具函数
-│   │   └── assets/          # 静态资源
-│   └── ...
-└── backend/                 # Cloudflare Workers 后端
-    ├── worker.js            # 主要 Worker 文件
-    ├── schema.sql           # D1 数据库模式
-    └── ...
+├── frontend/                    # 前端 Vue.js 应用
+│   ├── src/
+│   │   ├── api/                 # API 客户端和服务层
+│   │   ├── components/          # Vue 组件
+│   │   ├── composables/         # Vue 3 组合式 API
+│   │   ├── stores/              # Pinia 状态管理
+│   │   ├── views/               # 页面视图
+│   │   ├── router/              # Vue Router 配置
+│   │   ├── i18n/                # 国际化资源文件
+│   │   ├── utils/               # 工具函数
+│   │   └── assets/              # 静态资源
+│   └── package.json
+├── backend/                     # Cloudflare Workers 后端
+│   ├── src/
+│   │   ├── routes/              # API 路由层
+│   │   ├── services/            # 业务逻辑层
+│   │   ├── storage/             # 存储抽象层（S3 驱动、挂载点管理）
+│   │   ├── middlewares/         # 中间件层
+│   │   ├── webdav/              # WebDAV 协议实现
+│   │   ├── repositories/        # 数据访问层
+│   │   ├── cache/               # 缓存管理系统
+│   │   ├── constants/           # 常量定义
+│   │   └── utils/               # 工具函数
+│   ├── workers.js                # Cloudflare Workers 入口文件
+│   ├── schema.sql               # D1 数据库架构定义
+│   ├── wrangler.toml            # Cloudflare Workers 配置
+│   └── package.json
+├── docker/                      # Docker 部署配置
+├── Api-doc.md                   # 完整 API 文档
+├── Api-s3_direct.md             # S3 直传 API 文档
+└── README.md                    # 项目说明文档
 ```
 
 ### 自定义 Docker 构建
@@ -1045,16 +1063,20 @@ Apache License 2.0
 本项目使用 Apache License 2.0 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
 
 ## ❤️ 贡献
+
 - **赞助**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~
+
+    ![image.png](./images/PayQrcode.png)
 
   <a href="https://afdian.com/a/drag0n"><img width="200" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt=""></a>
 
-- **赞助者**：非常感谢以下赞助者对本项目的支持！！
+  - **赞助者**：非常感谢以下赞助者对本项目的支持！！
 
-   [![赞助者](https://afdian.730888.xyz/image)](https://afdian.com/a/drag0n)
+    [![赞助者](https://afdian.730888.xyz/image)](https://afdian.com/a/drag0n)
 
 - **Contributors**：感谢以下贡献者对本项目的无私贡献！
-  [![Contributors](https://contrib.rocks/image?repo=ling-drag0n/CloudPaste)](https://github.com/ling-drag0n/CloudPaste/graphs/contributors)
+  
+    [![Contributors](https://contrib.rocks/image?repo=ling-drag0n/CloudPaste)](https://github.com/ling-drag0n/CloudPaste/graphs/contributors)
 
 ## Star History
 
