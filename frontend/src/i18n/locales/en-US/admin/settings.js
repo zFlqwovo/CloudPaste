@@ -88,7 +88,7 @@ export default {
       title: "WebDAV Upload Settings",
       description: "Configure WebDAV client upload processing method",
       uploadModeLabel: "WebDAV Upload Mode",
-      uploadModeHint: "Select the upload processing method for the WebDAV client. For worker deployment, it is recommended to use only the direct upload mode.",
+      uploadModeHint: "Select the upload processing method for the WebDAV client.",
       modes: {
         direct: "Direct Upload",
         multipart: "Multipart Upload",

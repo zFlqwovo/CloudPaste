@@ -875,7 +875,7 @@ location /dav {
 
 3. **⚠️⚠️ Webdav 上传问题**:
 
-   - Worker部署的建议使用直传模式（理论单次最高5GB），避免使用分片（受CPU限制）
+   - Worker部署的webdav上传大小可能受限于CF的CDN限制 100MB左右，导致报错413
    - 对于 Docker 部署，只需注意 nginx 代理配置，上传模式任意。
 
 </details>

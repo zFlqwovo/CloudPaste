@@ -39,19 +39,20 @@ API 密钥由管理员在后台创建，使用位标志权限系统，支持以�
 
 - **1 (TEXT)**: 文本分享权限 - 允许创建、查看、修改和删除文本分享
 - **2 (FILE_SHARE)**: 文件分享权限 - 允许创建和管理文件分享链接
-- **4 (MOUNT_VIEW)**: 挂载页查看权限 - 允许浏览挂载页内容
-- **8 (MOUNT_UPLOAD)**: 上传权限 - 允许上传文件和创建目录
-- **16 (MOUNT_COPY)**: 复制权限 - 允许复制文件和目录
-- **32 (MOUNT_RENAME)**: 重命名权限 - 允许重命名文件和目录
-- **64 (MOUNT_DELETE)**: 删除权限 - 允许删除文件和目录
-- **128 (WEBDAV_READ)**: WebDAV 读取权限 - 允许通过 WebDAV 读取文件（GET、PROPFIND 等）
-- **256 (WEBDAV_MANAGE)**: WebDAV 管理权限 - 允许通过 WebDAV 管理文件（PUT、DELETE、MKCOL 等）
+- **256 (MOUNT_VIEW)**: 挂载页查看权限 - 允许浏览挂载页内容
+- **512 (MOUNT_UPLOAD)**: 上传权限 - 允许上传文件和创建目录
+- **1024 (MOUNT_COPY)**: 复制权限 - 允许复制文件和目录
+- **2048 (MOUNT_RENAME)**: 重命名权限 - 允许重命名文件和目录
+- **4096 (MOUNT_DELETE)**: 删除权限 - 允许删除文件和目录
+- **65536 (WEBDAV_READ)**: WebDAV 读取权限 - 允许通过 WebDAV 读取文件（GET、PROPFIND 等）
+- **131072 (WEBDAV_MANAGE)**: WebDAV 管理权限 - 允许通过 WebDAV 管理文件（PUT、DELETE、MKCOL 等）
 
 **权限组合示例：**
 
-- `7` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+4) - 基础查看权限
-- `15` = 基础权限 + MOUNT_UPLOAD (1+2+4+8) - 包含上传权限
-- `511` = 所有权限 (1+2+4+8+16+32+64+128+256) - 完整权限
+- `259` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+256) - 基础查看权限
+- `771` = 基础权限 + MOUNT_UPLOAD (1+2+256+512) - 包含上传权限
+- `7939` = 除 WebDAV 外的所有权限 (1+2+256+512+1024+2048+4096) - 挂载页完整权限
+- `198915` = 所有权限 (1+2+256+512+1024+2048+4096+65536+131072) - 完整权限
 
 **路径限制：**
 
@@ -129,7 +130,7 @@ X-Custom-Auth-Key: <api_key>
       "code": 200,
       "message": "获取版本信息成功",
       "data": {
-        "version": "0.6.5",
+        "version": "0.8.1",
         "name": "cloudpaste-api",
         "environment": "Docker",
         "storage": "SQLite",
@@ -147,7 +148,7 @@ X-Custom-Auth-Key: <api_key>
 - `GET /api/admin/settings`
 
   - 描述：获取系统设置（支持按分组查询或获取所有分组）
-  - 授权：需要管理员令牌
+  - 授权：无需授权（公开访问）
   - 查询参数：
     - `group` - 分组 ID（可选）：1=全局设置，3=WebDAV 设置
     - `metadata` - 是否包含元数据（可选，默认 true）
@@ -293,13 +294,29 @@ X-Custom-Auth-Key: <api_key>
     {
       "content": "要分享的文本内容", // 必填
       "remark": "备注信息", // 可选
-      "expiresAt": "2023-12-31T23:59:59Z", // 可选，过期时间
-      "maxViews": 100, // 可选，最大查看次数
+      "expires_at": "2023-12-31T23:59:59Z", // 可选，过期时间
+      "max_views": 100, // 可选，最大查看次数
       "password": "访问密码", // 可选
       "slug": "custom-slug" // 可选，自定义短链接
     }
     ```
   - 响应：创建的文本分享信息，包含访问链接
+    ```json
+    {
+      "code": 200,
+      "message": "文本分享创建成功",
+      "data": {
+        "id": "123",
+        "slug": "abc123",
+        "url": "https://example.com/p/abc123",
+        "expires_at": "2023-12-31T23:59:59Z",
+        "max_views": 100,
+        "views": 0,
+        "has_password": true
+      },
+      "success": true
+    }
+    ```
 
 - `GET /api/paste/:slug`
 
@@ -366,7 +383,7 @@ X-Custom-Auth-Key: <api_key>
   - 描述：更新文本信息（统一接口）
   - 授权：需要管理员令牌或有文本权限的 API 密钥
   - 参数：slug - 文本短链接
-  - 请求体：可包含 remark, expiresAt, maxViews, password 等字段
+  - 请求体：可包含 remark, expires_at, max_views, password 等字段
   - 响应：更新后的文本信息，API 密钥用户只能更新自己创建的文本
 
 #### 管理员专用接口
@@ -400,7 +417,13 @@ X-Custom-Auth-Key: <api_key>
       "size": 1024, // 可选，文件大小（字节）
       "mimetype": "image/jpeg", // 可选，MIME类型
       "path": "custom/path/", // 可选，自定义路径
-      "slug": "custom-slug" // 可选，自定义短链接
+      "slug": "custom-slug", // 可选，自定义短链接
+      "override": true, // 可选，是否覆盖已存在文件
+      "remark": "文件备注", // 可选，文件备注信息
+      "password": "访问密码", // 可选，文件访问密码
+      "expires_in": 168, // 可选，过期时间（小时）
+      "max_views": 100, // 可选，最大查看次数
+      "use_proxy": false // 可选，是否使用代理访问
     }
     ```
   - 响应：包含上传 URL 和文件信息
@@ -413,15 +436,12 @@ X-Custom-Auth-Key: <api_key>
     ```json
     {
       "file_id": "文件ID", // 必填
-      "etag": "文件ETag", // 必填，S3返回的ETag
-      "size": 1024, // 必填，文件实际大小（字节）
-      "remark": "文件说明", // 可选
-      "password": "文件密码", // 可选
-      "expiresAt": "2023-12-31T23:59:59Z", // 可选，过期时间
-      "maxDownloads": 10 // 可选，最大下载次数
+      "etag": "文件ETag", // 可选，S3返回的ETag（某些S3兼容服务可能无法提供）
+      "size": 1024 // 可选，文件实际大小（字节）
     }
     ```
   - 响应：文件提交结果
+  - **重要说明**：业务参数（remark、password、expires_in、max_views 等）应该在 presign 阶段传递，commit 阶段只负责确认上传完成
 
 - `GET /api/file-download/:slug`
 
@@ -604,6 +624,17 @@ X-Custom-Auth-Key: <api_key>
     }
     ```
   - 响应：登录令牌和管理员信息
+    ```json
+    {
+      "code": 200,
+      "message": "登录成功",
+      "data": {
+        "username": "admin",
+        "token": "abc123def456...",
+        "expiresAt": "2025-01-28T10:30:45.123Z"
+      }
+    }
+    ```
 
 - `POST /api/admin/logout`
 
@@ -633,11 +664,7 @@ X-Custom-Auth-Key: <api_key>
     ```json
     {
       "code": 200,
-      "message": "管理员令牌验证成功",
-      "data": {
-        "valid": true,
-        "adminId": "管理员ID"
-      },
+      "message": "令牌有效",
       "success": true
     }
     ```
@@ -646,28 +673,7 @@ X-Custom-Auth-Key: <api_key>
 
   - 描述：测试 API 密钥有效性
   - 授权：需要有效的 API 密钥
-  - 响应：API 密钥验证状态和权限信息
-    ```json
-    {
-      "code": 200,
-      "message": "API密钥验证成功",
-      "data": {
-        "name": "密钥名称",
-        "basic_path": "/",
-        "permissions": {
-          "text": true,
-          "file": false,
-          "mount": true
-        },
-        "key_info": {
-          "id": "密钥ID",
-          "name": "密钥名称",
-          "basic_path": "/"
-        }
-      },
-      "success": true
-    }
-    ```
+  - 响应：API 密钥验证状态和权限信息（详见下方完整示例）
 
 - `GET /api/admin/dashboard/stats`
   - 描述：获取管理员仪表盘统计数据
@@ -732,16 +738,16 @@ X-Custom-Auth-Key: <api_key>
   - 权限位标志说明：
     - `1` (TEXT) - 文本分享权限
     - `2` (FILE_SHARE) - 文件分享权限
-    - `4` (MOUNT_VIEW) - 挂载页查看权限
-    - `8` (MOUNT_UPLOAD) - 上传权限
-    - `16` (MOUNT_COPY) - 复制权限
-    - `32` (MOUNT_RENAME) - 重命名权限
-    - `64` (MOUNT_DELETE) - 删除权限
-    - `128` (WEBDAV_READ) - WebDAV 读取权限
-    - `256` (WEBDAV_MANAGE) - WebDAV 管理权限
+    - `256` (MOUNT_VIEW) - 挂载页查看权限
+    - `512` (MOUNT_UPLOAD) - 上传权限
+    - `1024` (MOUNT_COPY) - 复制权限
+    - `2048` (MOUNT_RENAME) - 重命名权限
+    - `4096` (MOUNT_DELETE) - 删除权限
+    - `65536` (WEBDAV_READ) - WebDAV 读取权限
+    - `131072` (WEBDAV_MANAGE) - WebDAV 管理权限
   - 示例权限组合：
-    - `7` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+4)
-    - `511` = 所有权限 (1+2+4+8+16+32+64+128+256)
+    - `259` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+256)
+    - `198915` = 所有权限 (1+2+256+512+1024+2048+4096+65536+131072)
   - 响应：新创建的 API 密钥信息，包含完整的密钥值（仅在创建时返回）
 
 - `PUT /api/admin/api-keys/:id`
@@ -782,7 +788,7 @@ X-Custom-Auth-Key: <api_key>
         "basic_path": "/",
         "permissions": {
           "text": true,
-          "file": true,
+          "file_share": true,
           "mount_view": true,
           "mount_upload": false,
           "mount_copy": false,
@@ -795,7 +801,7 @@ X-Custom-Auth-Key: <api_key>
           "id": "密钥ID",
           "name": "密钥名称",
           "basic_path": "/",
-          "permissions": 7,
+          "permissions": 259,
           "role": "GENERAL",
           "is_guest": false
         }
@@ -876,15 +882,9 @@ X-Custom-Auth-Key: <api_key>
   - 请求体：
     ```json
     {
-      "mountId": "挂载点ID", // 可选，清理特定挂载点的目录缓存
-      "s3ConfigId": "S3配置ID", // 可选，清理特定S3配置相关的缓存
-      "cacheType": "all", // 可选，缓存类型：all（默认）、directory、s3Url、search
-      "searchScope": {
-        // 可选，搜索缓存清理范围（仅当cacheType包含search时有效）
-        "mountId": "挂载点ID", // 可选，清理特定挂载点的搜索缓存
-        "userId": "用户ID", // 可选，清理特定用户的搜索缓存
-        "userType": "admin" // 可选，用户类型：admin、apikey
-      }
+      "mountId": "挂载点ID", // 可选，清理特定挂载点的缓存
+      "s3ConfigId": "S3配置ID" // 可选，清理特定S3配置相关的缓存
+      // 注意：如果两个参数都不提供，将清理所有缓存（目录、S3URL、搜索）
     }
     ```
   - 响应：清理结果
@@ -894,11 +894,6 @@ X-Custom-Auth-Key: <api_key>
       "message": "缓存清理成功，共清理 75 项",
       "data": {
         "clearedCount": 75,
-        "details": {
-          "directory": 50,
-          "s3Url": 15,
-          "search": 10
-        },
         "timestamp": "2023-05-01T12:00:00Z"
       },
       "success": true
@@ -942,13 +937,17 @@ X-Custom-Auth-Key: <api_key>
     ```json
     {
       "name": "挂载点名称", // 必填
-      "type": "s3", // 必填，挂载类型，如s3,webdav等
-      "s3_config_id": "S3配置ID", // 当type=s3时必填
-      "config": {
-        // 其他配置信息，根据挂载类型不同而变化
-        "path": "基础路径",
-        "read_only": false
-      }
+      "storage_type": "S3", // 必填，存储类型：S3、WebDAV等
+      "storage_config_id": "S3配置ID", // 当storage_type=S3时必填
+      "mount_path": "/mount-path", // 必填，挂载路径
+      "remark": "挂载点备注", // 可选
+      "is_active": true, // 可选，是否启用，默认true
+      "sort_order": 0, // 可选，排序顺序，默认0
+      "cache_ttl": 300, // 可选，缓存TTL（秒），默认300
+      "web_proxy": false, // 可选，是否启用Web代理，默认false
+      "webdav_policy": "302_redirect", // 可选，WebDAV策略，默认302_redirect
+      "enable_sign": false, // 可选，是否启用签名，默认false
+      "sign_expires": null // 可选，签名过期时间
     }
     ```
   - 响应：新创建的挂载点信息
@@ -1102,10 +1101,10 @@ X-Custom-Auth-Key: <api_key>
   - 请求体：
     ```json
     {
-      "path": "上传目标路径", // 必填，包含文件名
+      "path": "上传目标路径", // 必填，目标目录路径
+      "fileName": "文件名.jpg", // 必填，文件名
       "contentType": "文件MIME类型", // 可选，默认为application/octet-stream
-      "fileSize": 1024000, // 可选，文件大小（字节）
-      "mountId": "挂载点ID" // 可选，不指定则使用默认挂载点
+      "fileSize": 1024000 // 可选，文件大小（字节）
     }
     ```
   - 响应：包含预签名 URL 和上传配置的对象
@@ -1118,11 +1117,9 @@ X-Custom-Auth-Key: <api_key>
   - 请求体：
     ```json
     {
-      "path": "上传目标路径", // 必填
-      "uploadId": "上传ID", // 可选，分片上传时需要
-      "etag": "文件ETag", // 可选，服务器返回的ETag
-      "size": 1024000, // 可选，文件大小（字节）
-      "mountId": "挂载点ID" // 可选，不指定则使用默认挂载点
+      "targetPath": "上传目标路径", // 必填，完整的文件路径
+      "mountId": "挂载点ID", // 必填，挂载点ID
+      "fileSize": 1024000 // 可选，文件大小（字节）
     }
     ```
   - 响应：文件上传完成状态和文件信息

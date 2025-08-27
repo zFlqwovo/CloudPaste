@@ -874,7 +874,7 @@ location /dav {
 
 3. **⚠️⚠️ WebDAV Upload Issues**:
 
-   - For Worker deployment, it is recommended to use direct transfer mode (theoretical maximum of 5GB per transfer) and avoid using fragmentation (limited by CPU).
+   - The upload size for webdav deployed by Workers may be limited by CF's CDN restrictions to around 100MB, resulting in a 413 error.
    - For Docker deployments, just pay attention to the nginx proxy configuration, any upload mode is acceptable
 
 </details>

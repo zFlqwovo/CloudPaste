@@ -87,7 +87,7 @@ export default {
       title: "WebDAV上传设置",
       description: "配置WebDAV客户端的上传处理方式",
       uploadModeLabel: "WebDAV上传模式",
-      uploadModeHint: "选择WebDAV客户端的上传处理方式，worker部署的建议只使用直接上传模式",
+      uploadModeHint: "选择WebDAV客户端的上传处理方式",
       modes: {
         direct: "直接上传",
         multipart: "分片上传",
