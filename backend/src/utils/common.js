@@ -183,9 +183,10 @@ export function getSafeFileName(fileName) {
  * @param {D1Database} db - D1数据库实例
  * @param {string} customSlug - 自定义slug
  * @param {boolean} override - 是否覆盖已存在的slug
+ * @param {Object} overrideContext - 覆盖操作的上下文信息（当override=true时需要）
  * @returns {Promise<string>} 生成的唯一slug
  */
-export async function generateUniqueFileSlug(db, customSlug = null, override = false) {
+export async function generateUniqueFileSlug(db, customSlug = null, override = false, overrideContext = null) {
   // 动态导入DbTables以避免循环依赖
   const { DbTables } = await import("../constants/index.js");
 
@@ -198,12 +199,14 @@ export async function generateUniqueFileSlug(db, customSlug = null, override = f
     }
 
     // 检查slug是否已存在
-    const existingFile = await db.prepare(`SELECT id FROM ${DbTables.FILES} WHERE slug = ?`).bind(customSlug).first();
+    const existingFile = await db.prepare(`SELECT * FROM ${DbTables.FILES} WHERE slug = ?`).bind(customSlug).first();
 
-    // 如果存在并且不覆盖，抛出错误；否则允许使用
+    // 如果存在并且不覆盖，抛出错误
     if (existingFile && !override) {
       throw new Error("链接后缀已被占用，请使用其他链接后缀");
     } else if (existingFile && override) {
+      // 处理文件覆盖逻辑
+      await handleFileOverride(existingFile, overrideContext);
       console.log(`允许覆盖已存在的链接后缀: ${customSlug}`);
     }
 
@@ -226,4 +229,66 @@ export async function generateUniqueFileSlug(db, customSlug = null, override = f
   }
 
   throw new Error("无法生成唯一链接后缀，请稍后再试");
+}
+
+/**
+ * 处理文件覆盖逻辑的辅助函数
+ * @private
+ */
+async function handleFileOverride(existingFile, overrideContext) {
+  if (!overrideContext) {
+    throw new Error("覆盖操作需要提供上下文信息");
+  }
+
+  const { userIdOrInfo, userType, encryptionSecret, repositoryFactory } = overrideContext;
+
+  console.log(`覆盖模式：删除已存在的文件记录 Slug: ${existingFile.slug}`);
+
+  // 检查当前用户是否为文件创建者
+  const currentCreator = userType === "admin" ? userIdOrInfo : `apikey:${userIdOrInfo}`;
+  if (existingFile.created_by !== currentCreator) {
+    console.log(`覆盖操作被拒绝：用户 ${currentCreator} 尝试覆盖 ${existingFile.created_by} 创建的文件`);
+    const { HTTPException } = await import("hono/http-exception");
+    const { ApiStatus } = await import("../constants/index.js");
+    throw new HTTPException(ApiStatus.FORBIDDEN, {
+      message: "您无权覆盖其他用户创建的文件",
+    });
+  }
+
+  try {
+    const fileRepository = repositoryFactory.getFileRepository();
+
+    // 获取S3配置以便删除实际文件（仅对S3存储类型）
+    if (existingFile.storage_type === "S3" && existingFile.storage_config_id) {
+      const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
+      const s3Config = await s3ConfigRepository.findById(existingFile.storage_config_id);
+
+      if (s3Config) {
+        const { deleteFileFromS3 } = await import("../utils/s3Utils.js");
+        const deleteResult = await deleteFileFromS3(s3Config, existingFile.storage_path, encryptionSecret);
+        if (deleteResult) {
+          console.log(`成功从S3删除文件: ${existingFile.storage_path}`);
+        } else {
+          console.warn(`无法从S3删除文件: ${existingFile.storage_path}，但将继续删除数据库记录`);
+        }
+      }
+    }
+
+    // 删除旧文件的数据库记录
+    await fileRepository.deleteFile(existingFile.id);
+
+    // 删除关联的密码记录（如果有）
+    await fileRepository.deleteFilePasswordRecord(existingFile.id);
+
+    // 清除与文件相关的缓存（仅对S3存储类型）
+    if (existingFile.storage_type === "S3" && existingFile.storage_config_id) {
+      const { clearDirectoryCache } = await import("../cache/index.js");
+      // 需要传递db参数，从repositoryFactory获取
+      const db = repositoryFactory.db || repositoryFactory._db;
+      await clearDirectoryCache({ db, s3ConfigId: existingFile.storage_config_id });
+    }
+  } catch (deleteError) {
+    console.error(`删除旧文件记录时出错: ${deleteError.message}`);
+    // 继续流程，不中断上传
+  }
 }

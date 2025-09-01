@@ -50,9 +50,9 @@ export class S3UploadOperations {
         const fileName = file.name;
         let finalS3Path;
 
-        // 检查s3SubPath是否已经包含完整的文件路径
-        // 如果s3SubPath以文件名结尾，说明它已经是完整的文件路径，直接使用
-        if (s3SubPath && s3SubPath.endsWith(fileName)) {
+        // 智能检查s3SubPath是否已经包含完整的文件路径
+        const { isCompleteFilePath } = await import("../utils/S3PathUtils.js");
+        if (s3SubPath && isCompleteFilePath(s3SubPath, fileName)) {
           // s3SubPath已经包含完整的文件路径，直接使用
           finalS3Path = s3SubPath;
         } else {
@@ -129,7 +129,9 @@ export class S3UploadOperations {
       async () => {
         // 构建最终的S3路径
         let finalS3Path;
-        if (s3SubPath && s3SubPath.endsWith(filename)) {
+        // 智能检查s3SubPath是否已经包含完整的文件路径
+        const { isCompleteFilePath } = await import("../utils/S3PathUtils.js");
+        if (s3SubPath && isCompleteFilePath(s3SubPath, filename)) {
           finalS3Path = s3SubPath;
         } else if (s3SubPath && !s3SubPath.endsWith("/")) {
           finalS3Path = s3SubPath + "/" + filename;
@@ -372,8 +374,9 @@ export class S3UploadOperations {
         // 构建最终的S3路径
         let finalS3Path;
 
-        // 检查s3SubPath是否已经包含完整的文件路径
-        if (s3SubPath && s3SubPath.endsWith(fileName)) {
+        // 智能检查s3SubPath是否已经包含完整的文件路径
+        const { isCompleteFilePath } = await import("../utils/S3PathUtils.js");
+        if (s3SubPath && isCompleteFilePath(s3SubPath, fileName)) {
           // s3SubPath已经是完整的文件路径，直接使用
           finalS3Path = s3SubPath;
         } else if (s3SubPath && !s3SubPath.endsWith("/")) {
@@ -457,8 +460,9 @@ export class S3UploadOperations {
         // 构建最终的S3路径
         let finalS3Path;
 
-        // 检查s3SubPath是否已经包含完整的文件路径
-        if (s3SubPath && s3SubPath.endsWith(fileName)) {
+        // 智能检查s3SubPath是否已经包含完整的文件路径
+        const { isCompleteFilePath } = await import("../utils/S3PathUtils.js");
+        if (s3SubPath && isCompleteFilePath(s3SubPath, fileName)) {
           // s3SubPath已经是完整的文件路径，直接使用
           finalS3Path = s3SubPath;
         } else if (s3SubPath && !s3SubPath.endsWith("/")) {
@@ -545,7 +549,11 @@ export class S3UploadOperations {
       async () => {
         // 构建最终的S3路径（包含文件名）
         let finalS3Path;
-        if (s3SubPath && !s3SubPath.endsWith("/")) {
+        // 智能检查s3SubPath是否已经包含完整的文件路径
+        const { isCompleteFilePath } = await import("../utils/S3PathUtils.js");
+        if (s3SubPath && isCompleteFilePath(s3SubPath, fileName)) {
+          finalS3Path = s3SubPath;
+        } else if (s3SubPath && !s3SubPath.endsWith("/")) {
           finalS3Path = s3SubPath + "/" + fileName;
         } else {
           finalS3Path = s3SubPath + fileName;
@@ -636,43 +644,66 @@ export class S3UploadOperations {
   async listMultipartParts(s3SubPath, uploadId, options = {}) {
     const { maxParts = 1000, partNumberMarker } = options;
 
-    return handleFsError(
-      async () => {
-        const listCommand = new ListPartsCommand({
-          Bucket: this.config.bucket_name,
-          Key: s3SubPath,
-          UploadId: uploadId,
-          MaxParts: maxParts,
-          PartNumberMarker: partNumberMarker,
-        });
+    try {
+      const listCommand = new ListPartsCommand({
+        Bucket: this.config.bucket_name,
+        Key: s3SubPath,
+        UploadId: uploadId,
+        MaxParts: maxParts,
+        PartNumberMarker: partNumberMarker,
+      });
 
-        const response = await this.s3Client.send(listCommand);
+      const response = await this.s3Client.send(listCommand);
 
-        // 格式化响应数据
-        const parts = (response.Parts || []).map((part) => ({
-          partNumber: part.PartNumber,
-          lastModified: part.LastModified,
-          etag: part.ETag,
-          size: part.Size,
-        }));
+      // 格式化响应数据
+      const parts = (response.Parts || []).map((part) => ({
+        partNumber: part.PartNumber,
+        lastModified: part.LastModified,
+        etag: part.ETag,
+        size: part.Size,
+      }));
 
+      return {
+        success: true,
+        parts: parts,
+        bucket: response.Bucket,
+        key: response.Key,
+        uploadId: response.UploadId,
+        partNumberMarker: response.PartNumberMarker,
+        nextPartNumberMarker: response.NextPartNumberMarker,
+        maxParts: response.MaxParts,
+        isTruncated: response.IsTruncated,
+        storageClass: response.StorageClass,
+        owner: response.Owner,
+      };
+    } catch (error) {
+      // 特殊处理NoSuchUpload错误 - 这是S3生命周期策略清理导致的正常业务场景
+      if (error.name === "NoSuchUpload" || (error.message && error.message.includes("The specified multipart upload does not exist"))) {
+        console.log(`[S3UploadOperations] NoSuchUpload - uploadId已被S3生命周期策略清理: ${uploadId}`);
+
+        // 返回空分片列表，这是正常的业务场景，不应该报错
         return {
           success: true,
-          parts: parts,
-          bucket: response.Bucket,
-          key: response.Key,
-          uploadId: response.UploadId,
-          partNumberMarker: response.PartNumberMarker,
-          nextPartNumberMarker: response.NextPartNumberMarker,
-          maxParts: response.MaxParts,
-          isTruncated: response.IsTruncated,
-          storageClass: response.StorageClass,
-          owner: response.Owner,
+          parts: [],
+          bucket: this.config.bucket_name,
+          key: s3SubPath,
+          uploadId: uploadId,
+          partNumberMarker: partNumberMarker,
+          nextPartNumberMarker: null,
+          maxParts: maxParts,
+          isTruncated: false,
+          storageClass: null,
+          owner: null,
+          uploadNotFound: true,
+          message: "多部分上传已被S3生命周期策略清理",
         };
-      },
-      "列出已上传的分片",
-      "列出已上传的分片失败"
-    );
+      }
+
+      // 其他错误继续抛出
+      throw new HTTPException(ApiStatus.INTERNAL_ERROR, {
+        message: error.message || "列出已上传的分片失败",
+      });
+    }
   }
 
   /**

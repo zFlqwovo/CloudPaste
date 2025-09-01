@@ -2,7 +2,6 @@
  * 文件分享服务层
  * 负责文件分享相关的所有业务逻辑
  * 包括：系统限制检查、存储空间检查、文件记录管理、权限验证等
- * 参考FileService.js的设计模式
  */
 
 import { HTTPException } from "hono/http-exception";
@@ -229,13 +228,20 @@ export class FileShareService {
    * @private
    */
   async _createFileRecord(filename, options) {
-    const { storageConfigId, userIdOrInfo, userType, slug, override, customPath, remark, password, expires_in, max_views, use_proxy, config, fileSize } = options;
+    const { storageConfigId, userIdOrInfo, userType, slug, override, customPath, remark, password, expires_in, max_views, use_proxy, config, fileSize, original_filename } =
+      options;
 
     const fileId = generateFileId();
-    const uniqueSlug = await generateUniqueFileSlug(this.db, slug, override === "true");
+
+    const uniqueSlug = await generateUniqueFileSlug(this.db, slug, override, {
+      userIdOrInfo,
+      userType,
+      encryptionSecret: this.encryptionSecret,
+      repositoryFactory: this.repositoryFactory,
+    });
 
     // 生成存储路径
-    const storagePath = await this._generateStoragePath(filename, customPath, userIdOrInfo, userType, config);
+    const storagePath = await this._generateStoragePath(filename, customPath, userIdOrInfo, userType, config, original_filename);
     const contentType = getMimeTypeFromFilename(filename);
 
     // 处理密码
@@ -307,10 +313,189 @@ export class FileShareService {
   }
 
   /**
+   * 直接上传接口
+   * @param {string} filename - 文件名
+   * @param {ArrayBuffer} fileContent - 文件内容
+   * @param {number} fileSize - 文件大小
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @param {Object} params - 所有参数
+   * @returns {Promise<Object>} 核心上传结果
+   */
+  async uploadDirectComplete(filename, fileContent, fileSize, userIdOrInfo, userType, params) {
+    let fileRecord = null;
+    let config = null;
+
+    try {
+      // 1. 获取或选择S3配置
+      config = await this._resolveS3Config(params.s3_config_id, userIdOrInfo, userType);
+
+      // 2. 系统检查
+      await this._checkSystemUploadLimit(fileSize);
+      await this._checkStorageSpace(config, config.id, fileSize);
+
+      // 3. 创建文件记录
+      fileRecord = await this._createFileRecord(filename, {
+        storageConfigId: config.id,
+        userIdOrInfo,
+        userType,
+        slug: params.slug,
+        override: params.override,
+        customPath: params.path,
+        remark: params.remark,
+        password: params.password,
+        expires_in: params.expires_in,
+        max_views: params.max_views,
+        use_proxy: params.use_proxy,
+        config,
+        fileSize,
+        original_filename: params.original_filename,
+      });
+
+      // 4. 上传文件
+      const mockFile = {
+        name: filename,
+        size: fileSize,
+        arrayBuffer: async () => fileContent,
+      };
+
+      const uploadResult = await this.shareSystem.uploadFileWithConfig(fileRecord.storagePath, mockFile, config, {
+        userIdOrInfo,
+        userType,
+      });
+
+      // 5. 更新文件记录
+      const fileRepository = this.repositoryFactory.getFileRepository();
+      await fileRepository.updateFile(fileRecord.fileId, {
+        etag: uploadResult.etag,
+        updated_at: new Date().toISOString(),
+      });
+
+      // 6. 获取最终文件记录
+      const finalFileRecord = await fileRepository.findById(fileRecord.fileId);
+
+      // 7. 执行清理工作
+      await this._postCommitCleanup(finalFileRecord, config);
+
+      // 8. 返回核心数据，让路由层构建响应
+      return {
+        fileRecord: finalFileRecord,
+        config,
+        uploadResult,
+      };
+    } catch (error) {
+      // 清理失败的文件记录
+      if (fileRecord) {
+        try {
+          const fileRepository = this.repositoryFactory.getFileRepository();
+          await fileRepository.deleteFile(fileRecord.fileId);
+        } catch (cleanupError) {
+          console.warn("清理失败的文件记录时出错:", cleanupError);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 解析S3配置
+   * @private
+   */
+  async _resolveS3Config(s3ConfigId, userIdOrInfo, userType) {
+    const repositoryFactory = new RepositoryFactory(this.db);
+    const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
+    const isAdmin = userType === "admin";
+
+    // 如果指定了配置ID
+    if (s3ConfigId) {
+      if (userType === "apikey") {
+        // API密钥用户只能使用公开配置
+        const config = await s3ConfigRepository.findPublicById(s3ConfigId);
+        if (!config) {
+          throw new Error("API密钥用户只能使用公开的S3配置或默认配置");
+        }
+        return config;
+      } else {
+        // 管理员用户
+        return await this._getStorageConfigWithPermissionCheck(s3ConfigId, userIdOrInfo, userType);
+      }
+    }
+
+    // 没有指定配置ID，获取默认配置
+    const { DbTables } = await import("../constants/index.js");
+
+    if (isAdmin) {
+      // 管理员用户 - 获取该管理员的默认配置
+      const defaultConfig = await this.db
+        .prepare(
+          `
+        SELECT * FROM ${DbTables.S3_CONFIGS}
+        WHERE admin_id = ? AND is_default = 1
+        LIMIT 1
+      `
+        )
+        .bind(userIdOrInfo)
+        .first();
+
+      if (defaultConfig) {
+        return defaultConfig;
+      }
+
+      // 没有默认配置，获取任意配置
+      const anyConfig = await this.db
+        .prepare(
+          `
+        SELECT * FROM ${DbTables.S3_CONFIGS}
+        WHERE admin_id = ?
+        LIMIT 1
+      `
+        )
+        .bind(userIdOrInfo)
+        .first();
+
+      if (!anyConfig) {
+        throw new Error("您的账户下没有可用的S3配置，请先创建配置或指定有效的S3配置ID");
+      }
+      return anyConfig;
+    } else {
+      // API密钥用户 - 获取公开的默认配置
+      const defaultConfig = await this.db
+        .prepare(
+          `
+        SELECT * FROM ${DbTables.S3_CONFIGS}
+        WHERE is_public = 1 AND is_default = 1
+        LIMIT 1
+      `
+        )
+        .first();
+
+      if (defaultConfig) {
+        return defaultConfig;
+      }
+
+      // 没有默认配置，获取任意公开配置
+      const anyPublicConfig = await this.db
+        .prepare(
+          `
+        SELECT * FROM ${DbTables.S3_CONFIGS}
+        WHERE is_public = 1
+        LIMIT 1
+      `
+        )
+        .first();
+
+      if (!anyPublicConfig) {
+        throw new Error("系统中没有公开可用的S3配置，请联系管理员设置公开配置或指定有效的S3配置ID");
+      }
+      return anyPublicConfig;
+    }
+  }
+
+  /**
    * 生成存储路径
    * @private
    */
-  async _generateStoragePath(filename, customPath, userIdOrInfo, userType, config) {
+  async _generateStoragePath(filename, customPath, userIdOrInfo, userType, config, original_filename) {
     // 处理默认文件夹路径
     const folderPath = config.default_folder ? (config.default_folder.endsWith("/") ? config.default_folder : config.default_folder + "/") : "";
 
@@ -321,8 +506,15 @@ export class FileShareService {
       targetDirectory = folderPath + normalizedCustomPath;
     }
 
-    // 根据系统设置决定文件命名策略
-    const useRandomSuffix = await shouldUseRandomSuffix(this.db);
+    // 根据系统设置或用户参数决定文件命名策略
+    let useRandomSuffix;
+    if (original_filename !== undefined) {
+      // 用户明确指定了是否使用原始文件名（仅用于直接上传接口）
+      useRandomSuffix = !original_filename;
+    } else {
+      // 使用系统设置
+      useRandomSuffix = await shouldUseRandomSuffix(this.db);
+    }
 
     const { name: baseName, ext: fileExt } = getFileNameAndExt(filename);
     const safeFileName = getSafeFileName(baseName);

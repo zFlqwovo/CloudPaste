@@ -85,6 +85,33 @@ export class FileShareSystem {
   }
 
   /**
+   * 直接上传文件到存储（使用已验证的配置）
+   * @param {string} storagePath - 存储路径
+   * @param {File|Object} file - 文件对象或模拟文件对象
+   * @param {Object} config - 已验证的存储配置
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 上传结果
+   */
+  async uploadFileWithConfig(storagePath, file, config, options = {}) {
+    // 1. 创建存储驱动（使用已验证的配置）
+    const driver = await this._createDriver("S3", config);
+
+    // 2. 检查驱动是否支持写入能力（包含上传功能）
+    if (!driver.hasCapability(CAPABILITIES.WRITER)) {
+      throw new HTTPException(ApiStatus.NOT_IMPLEMENTED, {
+        message: `存储驱动 S3 不支持文件写入`,
+      });
+    }
+
+    // 3. 委托给驱动执行 - 纯粹的抽象层委托
+    return await driver.uploadFile(storagePath, file, {
+      subPath: storagePath,
+      useMultipart: false, // 直接上传模式
+      ...options,
+    });
+  }
+
+  /**
    * 初始化分片上传
    * @param {string} storagePath - 存储路径
    * @param {string} filename - 文件名
@@ -132,7 +159,7 @@ export class FileShareSystem {
       });
     }
 
-    // 3. 委托给驱动执行 
+    // 3. 委托给驱动执行
     return await driver.completeFrontendMultipartUpload(storagePath, {
       uploadId,
       parts,
@@ -160,7 +187,7 @@ export class FileShareSystem {
       });
     }
 
-    // 3. 委托给驱动执行 
+    // 3. 委托给驱动执行
     return await driver.abortFrontendMultipartUpload(storagePath, {
       uploadId,
       fileName: options.fileName,
