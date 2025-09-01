@@ -130,6 +130,7 @@ function getFileTypeByExtensionFallback(extension) {
     "py",
     "bat",
     "yml",
+    "yaml",
     "go",
     "sh",
     "c",

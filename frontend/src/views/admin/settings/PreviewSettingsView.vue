@@ -14,16 +14,16 @@
         <div class="space-y-4">
           <!-- 状态消息 -->
           <div
-            v-if="status.success"
-            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-            :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
+              v-if="status.success"
+              class="mb-4 rounded-lg p-4 border transition-colors duration-200"
+              :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
           >
             <div class="flex items-center">
               <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path
-                  fill-rule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clip-rule="evenodd"
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clip-rule="evenodd"
                 />
               </svg>
               {{ t("admin.preview.saveSuccess") }}
@@ -31,16 +31,16 @@
           </div>
 
           <div
-            v-if="status.error"
-            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-            :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
+              v-if="status.error"
+              class="mb-4 rounded-lg p-4 border transition-colors duration-200"
+              :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
           >
             <div class="flex items-center">
               <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path
-                  fill-rule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clip-rule="evenodd"
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clip-rule="evenodd"
                 />
               </svg>
               {{ status.error }}
@@ -54,11 +54,11 @@
                 {{ t("admin.preview.textTypesLabel") }}
               </label>
               <textarea
-                v-model="settings.preview_text_types"
-                :placeholder="t('admin.preview.textTypesPlaceholder')"
-                rows="3"
-                class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
-                :class="
+                  v-model="settings.preview_text_types"
+                  :placeholder="t('admin.preview.textTypesPlaceholder')"
+                  rows="3"
+                  class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
+                  :class="
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
@@ -75,11 +75,11 @@
                 {{ t("admin.preview.imageTypesLabel") }}
               </label>
               <textarea
-                v-model="settings.preview_image_types"
-                :placeholder="t('admin.preview.imageTypesPlaceholder')"
-                rows="3"
-                class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
-                :class="
+                  v-model="settings.preview_image_types"
+                  :placeholder="t('admin.preview.imageTypesPlaceholder')"
+                  rows="3"
+                  class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
+                  :class="
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
@@ -96,11 +96,11 @@
                 {{ t("admin.preview.videoTypesLabel") }}
               </label>
               <textarea
-                v-model="settings.preview_video_types"
-                :placeholder="t('admin.preview.videoTypesPlaceholder')"
-                rows="3"
-                class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
-                :class="
+                  v-model="settings.preview_video_types"
+                  :placeholder="t('admin.preview.videoTypesPlaceholder')"
+                  rows="3"
+                  class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
+                  :class="
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
@@ -117,11 +117,11 @@
                 {{ t("admin.preview.audioTypesLabel") }}
               </label>
               <textarea
-                v-model="settings.preview_audio_types"
-                :placeholder="t('admin.preview.audioTypesPlaceholder')"
-                rows="3"
-                class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
-                :class="
+                  v-model="settings.preview_audio_types"
+                  :placeholder="t('admin.preview.audioTypesPlaceholder')"
+                  rows="3"
+                  class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
+                  :class="
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
@@ -138,11 +138,11 @@
                 {{ t("admin.preview.officeTypesLabel") }}
               </label>
               <textarea
-                v-model="settings.preview_office_types"
-                :placeholder="t('admin.preview.officeTypesPlaceholder')"
-                rows="3"
-                class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
-                :class="
+                  v-model="settings.preview_office_types"
+                  :placeholder="t('admin.preview.officeTypesPlaceholder')"
+                  rows="3"
+                  class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
+                  :class="
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
@@ -159,11 +159,11 @@
                 {{ t("admin.preview.documentTypesLabel") }}
               </label>
               <textarea
-                v-model="settings.preview_document_types"
-                :placeholder="t('admin.preview.documentTypesPlaceholder')"
-                rows="3"
-                class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
-                :class="
+                  v-model="settings.preview_document_types"
+                  :placeholder="t('admin.preview.documentTypesPlaceholder')"
+                  rows="3"
+                  class="block w-full rounded border shadow-sm px-3 py-2 text-sm"
+                  :class="
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
@@ -177,11 +177,11 @@
             <!-- 操作按钮 -->
             <div class="flex justify-between items-center pt-6">
               <button
-                type="button"
-                @click="handleResetToDefaults"
-                :disabled="status.loading"
-                class="inline-flex items-center px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-colors"
-                :class="[
+                  type="button"
+                  @click="handleResetToDefaults"
+                  :disabled="status.loading"
+                  class="inline-flex items-center px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-colors"
+                  :class="[
                   status.loading ? 'opacity-50 cursor-not-allowed' : '',
                   darkMode
                     ? 'border-gray-600 text-gray-300 bg-gray-800 hover:bg-gray-700 hover:border-gray-500'
@@ -190,27 +190,27 @@
               >
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
                 {{ t("admin.preview.resetDefaults") }}
               </button>
 
               <button
-                type="submit"
-                :disabled="status.loading"
-                class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-colors"
-                :class="status.loading ? 'opacity-50 cursor-not-allowed' : ''"
+                  type="submit"
+                  :disabled="status.loading"
+                  class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-colors"
+                  :class="status.loading ? 'opacity-50 cursor-not-allowed' : ''"
               >
                 <svg v-if="status.loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
                 {{ status.loading ? t("admin.global.buttons.updating") : t("admin.global.buttons.updateSettings") }}
@@ -259,7 +259,7 @@ const settings = ref({
 // 默认设置
 const defaultSettings = {
   preview_text_types:
-    "txt,htm,html,xml,java,properties,sql,js,md,json,conf,ini,vue,php,py,bat,yml,go,sh,c,cpp,h,hpp,tsx,vtt,srt,ass,rs,lrc,dockerfile,makefile,gitignore,license,readme",
+      "txt,htm,html,xml,java,properties,sql,js,md,json,conf,ini,vue,php,py,bat,yml,yaml,go,sh,c,cpp,h,hpp,tsx,vtt,srt,ass,rs,lrc,dockerfile,makefile,gitignore,license,readme",
   preview_image_types: "jpg,tiff,jpeg,png,gif,bmp,svg,ico,swf,webp,avif",
   preview_video_types: "mp4,mkv,avi,mov,rmvb,webm,flv,m3u8,ts,m2ts",
   preview_audio_types: "mp3,flac,ogg,m4a,wav,opus,wma",
@@ -307,15 +307,15 @@ const handleSaveSettings = async (event) => {
   try {
     // 预览设置组，分组ID = 2
     const response = await api.system.updateGroupSettings(
-      2,
-      {
-        preview_text_types: settings.value.preview_text_types,
-        preview_image_types: settings.value.preview_image_types,
-        preview_video_types: settings.value.preview_video_types,
-        preview_audio_types: settings.value.preview_audio_types,
-        preview_office_types: settings.value.preview_office_types,
-      },
-      true
+        2,
+        {
+          preview_text_types: settings.value.preview_text_types,
+          preview_image_types: settings.value.preview_image_types,
+          preview_video_types: settings.value.preview_video_types,
+          preview_audio_types: settings.value.preview_audio_types,
+          preview_office_types: settings.value.preview_office_types,
+        },
+        true
     );
 
     if (response && response.success) {
