@@ -49,7 +49,7 @@
 
     <!-- 分享按钮 -->
     <button
-      @click="shareFile"
+      @click="openShareModal"
       class="action-button flex items-center justify-center px-4 py-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-600 hover:bg-green-700 text-white focus:ring-green-500 focus:ring-offset-white dark:focus:ring-offset-gray-800"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -121,6 +121,9 @@
       :action-handler="errorActionHandler"
       @close="closeErrorToast"
     />
+
+    <!-- 分享模态框 -->
+    <ShareModal :visible="showShareModal" :file-info="fileInfo" :dark-mode="darkMode" @close="closeShareModal" />
   </div>
 </template>
 
@@ -131,6 +134,7 @@ import { api } from "@/api";
 import { ApiStatus } from "../../api/ApiStatus";
 import { copyToClipboard } from "@/utils/clipboard";
 import ErrorToast from "../common/ErrorToast.vue";
+import ShareModal from "./ShareModal.vue";
 import { useAuthStore } from "@/stores/authStore.js";
 import { FileType } from "@/utils/fileTypes.js";
 
@@ -170,6 +174,9 @@ const deleting = ref(false);
 
 // 复制提示状态
 const showCopyToast = ref(false);
+
+// 分享模态框状态
+const showShareModal = ref(false);
 
 // 错误提示状态
 const showErrorToast = ref(false);
@@ -408,54 +415,17 @@ const downloadFile = () => {
 };
 
 /**
- * 分享文件链接
+ * 打开分享模态框
  */
-const shareFile = async () => {
-  // 构建当前页面的完整URL
-  const shareUrl = window.location.href;
-
-  // 尝试使用Web Share API
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: props.fileInfo.filename,
-        text: props.fileInfo.remark || `${t("fileView.actions.shareFileText")}：${props.fileInfo.filename}`,
-        url: shareUrl,
-      });
-      console.log("文件分享成功");
-    } catch (err) {
-      console.error("分享失败:", err);
-      fallbackShare(shareUrl);
-    }
-  } else {
-    // 如果Web Share API不可用，则回退到复制链接
-    fallbackShare(shareUrl);
-  }
+const openShareModal = () => {
+  showShareModal.value = true;
 };
 
 /**
- * 回退的分享方法（复制到剪贴板）
- * @param {string} url - 要分享的URL
+ * 关闭分享模态框
  */
-const fallbackShare = async (url) => {
-  try {
-    const success = await copyToClipboard(url);
-
-    if (success) {
-      // 显示复制成功提示
-      showCopyToast.value = true;
-      // 3秒后自动隐藏提示
-      setTimeout(() => {
-        showCopyToast.value = false;
-      }, 3000);
-    } else {
-      throw new Error(t("fileView.fileInfo.copyFailed"));
-    }
-  } catch (err) {
-    console.error("复制失败:", err);
-    // 如果复制失败，提示用户手动复制
-    showError(t("fileView.fileInfo.copyFailed"), `${t("fileView.actions.manualCopy")}：${url}`);
-  }
+const closeShareModal = () => {
+  showShareModal.value = false;
 };
 
 /**

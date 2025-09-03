@@ -55,7 +55,7 @@
         <FileViewInfo :fileInfo="fileInfo" :fileUrls="fileUrls" class="flex-1 flex flex-col" :darkMode="darkMode" />
 
         <!-- 文件操作按钮 -->
-        <FileViewActions :fileInfo="fileInfo" :fileUrls="fileUrls" @edit="openEditModal" @delete="handleFileDeleted" @refresh-file-info="refreshFileInfo" />
+        <FileViewActions :fileInfo="fileInfo" :fileUrls="fileUrls" :darkMode="darkMode" @edit="openEditModal" @delete="handleFileDeleted" @refresh-file-info="refreshFileInfo" />
       </div>
 
       <!-- 编辑模态框 (仅管理员可见) -->

@@ -63,6 +63,15 @@ export default {
       retry: "Retry",
       refresh: "Refresh",
       manualCopy: "Unable to copy automatically, please manually copy the link",
+      copyLink: "Copy Link",
+      copied: "Copied",
+      nativeShare: "Native Share",
+      shareToSocial: "Share to Social",
+      qrCode: "QR Code",
+      generating: "Generating...",
+      scanToShare: "Scan to share",
+      qrCodeError: "Generation Failed",
+      shareFileText: "Share file: {filename}",
     },
 
     // File preview

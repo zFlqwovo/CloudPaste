@@ -63,6 +63,15 @@ export default {
       retry: "重试",
       refresh: "刷新",
       manualCopy: "无法自动复制，请手动复制链接",
+      copyLink: "复制链接",
+      copied: "已复制",
+      nativeShare: "原生分享",
+      shareToSocial: "分享到社交平台",
+      qrCode: "二维码",
+      generating: "生成中...",
+      scanToShare: "扫码分享",
+      qrCodeError: "生成失败",
+      shareFileText: "分享文件：{filename}",
     },
 
     // 文件预览
