@@ -52,6 +52,9 @@ export default {
     logoutAuth: "退出认证",
     openMenu: "打开菜单",
     closeMenu: "关闭菜单",
+
+    collapse: "收缩侧边栏",
+    expand: "展开侧边栏",
     menuTitle: {
       admin: "管理面板",
       user: "用户面板",

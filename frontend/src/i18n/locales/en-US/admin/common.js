@@ -52,6 +52,9 @@ export default {
     logoutAuth: "Logout Auth",
     openMenu: "Open Menu",
     closeMenu: "Close Menu",
+
+    collapse: "Collapse Sidebar",
+    expand: "Expand Sidebar",
     menuTitle: {
       admin: "Admin Panel",
       user: "User Panel",
