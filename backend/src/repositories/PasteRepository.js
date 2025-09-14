@@ -463,7 +463,7 @@ export class PasteRepository extends BaseRepository {
     // 添加搜索条件 - 搜索链接标识、备注、内容
     if (search && search.trim()) {
       const searchPattern = `%${search.trim()}%`;
-      conditions.push("(slug LIKE ? OR remark LIKE ? OR SUBSTR(content, 1, 200) LIKE ?)");
+      conditions.push("(slug LIKE ? OR remark LIKE ? OR content LIKE ?)");
       queryParams.push(searchPattern, searchPattern, searchPattern);
       countParams.push(searchPattern, searchPattern, searchPattern);
     }
