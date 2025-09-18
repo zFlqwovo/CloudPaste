@@ -172,7 +172,7 @@ export default {
       urlAnalysisFailed: "URL analysis failed",
       negativeMaxViews: "Maximum views cannot be negative",
       getPresignedUrlFailed: "Failed to get presigned URL",
-      slugInvalid: "Custom link can only contain letters, numbers, hyphens and underscores",
+      slugInvalid: "Custom link can only contain letters, numbers, hyphens, underscores and dots",
       slugTooLong: "Custom link cannot exceed 50 characters",
       slugReserved: "This link is reserved by the system, please use another one",
       slugConflict: "Link suffix is already taken, please use another one",

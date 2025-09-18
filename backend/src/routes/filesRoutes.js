@@ -1,9 +1,8 @@
 import { Hono } from "hono";
-import { DbTables } from "../constants/index.js";
 import { ApiStatus } from "../constants/index.js";
 import { createErrorResponse } from "../utils/common.js";
 import { deleteFileFromS3 } from "../utils/s3Utils.js";
-import { hashPassword, verifyPassword } from "../utils/crypto.js";
+import { verifyPassword } from "../utils/crypto.js";
 import {
   generateFileDownloadUrl,
   getAdminFileList,
@@ -14,6 +13,7 @@ import {
   isFileAccessible,
   incrementAndCheckFileViews,
   getPublicFileInfo,
+  updateFile,
 } from "../services/fileService.js";
 import { clearDirectoryCache } from "../cache/index.js";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
@@ -488,106 +488,22 @@ app.put("/api/files/:id", unifiedAuth, async (c) => {
   const body = await c.req.json();
 
   try {
-    // 使用 FileRepository 检查文件是否存在
-    const repositoryFactory = new RepositoryFactory(db);
-    const fileRepository = repositoryFactory.getFileRepository();
-
-    let existingFile;
-
-    if (userType === "admin") {
-      // 管理员：可以更新任何文件
-      existingFile = await fileRepository.findById(id);
-      if (!existingFile) {
-        return c.json(createErrorResponse(ApiStatus.NOT_FOUND, "文件不存在"), ApiStatus.NOT_FOUND);
-      }
-    } else {
-      // API密钥用户：只能更新自己的文件
-      existingFile = await fileRepository.findOne(DbTables.FILES, {
-        id: id,
-        created_by: `apikey:${userId}`,
-      });
-      if (!existingFile) {
-        return c.json(createErrorResponse(ApiStatus.NOT_FOUND, "文件不存在或无权更新"), ApiStatus.NOT_FOUND);
-      }
-    }
-
-    // 构建更新数据对象
-    const updateData = {};
-
-    // 处理可更新的字段
-    if (body.remark !== undefined) {
-      updateData.remark = body.remark;
-    }
-
-    if (body.slug !== undefined) {
-      // 检查slug是否可用 (不与其他文件冲突)
-      let slugExistsCheck;
-      if (userType === "admin") {
-        slugExistsCheck = await fileRepository.findBySlug(body.slug);
-        if (slugExistsCheck && slugExistsCheck.id !== id) {
-          return c.json(createErrorResponse(ApiStatus.CONFLICT, "此链接后缀已被其他文件使用"), ApiStatus.CONFLICT);
-        }
-      } else {
-        slugExistsCheck = await fileRepository.findBySlugExcludingId(body.slug, id);
-        if (slugExistsCheck) {
-          return c.json(createErrorResponse(ApiStatus.CONFLICT, "此链接后缀已被其他文件使用"), ApiStatus.CONFLICT);
-        }
-      }
-      updateData.slug = body.slug;
-    }
-
-    // 处理过期时间
-    if (body.expires_at !== undefined) {
-      updateData.expires_at = body.expires_at;
-    }
-
-    // 处理Worker代理访问设置
-    if (body.use_proxy !== undefined) {
-      updateData.use_proxy = body.use_proxy ? 1 : 0;
-    }
-
-    // 处理最大查看次数
-    if (body.max_views !== undefined) {
-      updateData.max_views = body.max_views;
-      updateData.views = 0; // 当修改max_views时，重置views计数为0
-    }
-
-    // 处理密码变更
-    if (body.password !== undefined) {
-      if (body.password) {
-        // 设置新密码
-        const passwordHash = await hashPassword(body.password);
-        updateData.password = passwordHash;
-
-        // 使用 FileRepository 更新或插入明文密码
-        await fileRepository.upsertFilePasswordRecord(id, body.password);
-      } else {
-        // 明确提供了空密码，表示要清除密码
-        updateData.password = null;
-
-        // 使用 FileRepository 删除明文密码记录
-        await fileRepository.deleteFilePasswordRecord(id);
-      }
-    }
-
-    // 如果没有要更新的字段（API密钥用户需要检查）
-    if (userType === "apikey" && Object.keys(updateData).length === 0) {
-      return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "没有提供有效的更新字段"), ApiStatus.BAD_REQUEST);
-    }
-
-    // 添加更新时间
-    updateData.updated_at = new Date().toISOString();
-
-    // 使用 Repository 更新文件
-    await fileRepository.updateFile(id, updateData);
+    // 调用服务层处理更新逻辑
+    const result = await updateFile(db, id, body, { userType, userId });
 
     return c.json({
       code: ApiStatus.SUCCESS,
-      message: "文件元数据更新成功",
+      message: result.message,
       success: true,
     });
   } catch (error) {
     console.error("更新文件元数据错误:", error);
+
+    // 处理 HTTPException
+    if (error.status) {
+      return c.json(createErrorResponse(error.status, error.message), error.status);
+    }
+
     return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "更新文件元数据失败"), ApiStatus.INTERNAL_ERROR);
   }
 });

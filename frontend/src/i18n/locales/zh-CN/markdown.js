@@ -75,7 +75,7 @@ export default {
       corsImageError: "由于跨域限制，部分图片可能无法正确显示在导出图片中",
     },
     validation: {
-      slugInvalid: "链接后缀只能包含字母、数字、连字符和下划线",
+      slugInvalid: "链接后缀只能包含字母、数字、连字符、下划线和点号",
       slugTooLong: "链接后缀不能超过50个字符",
       slugReserved: "此链接后缀为系统保留，请使用其他后缀",
     },

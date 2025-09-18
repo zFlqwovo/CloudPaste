@@ -172,7 +172,7 @@ export default {
       urlAnalysisFailed: "URL分析失败",
       negativeMaxViews: "最大查看次数不能为负数",
       getPresignedUrlFailed: "获取预签名URL失败",
-      slugInvalid: "自定义链接只能包含字母、数字、连字符和下划线",
+      slugInvalid: "自定义链接只能包含字母、数字、连字符、下划线和点号",
       slugTooLong: "自定义链接不能超过50个字符",
       slugReserved: "此链接为系统保留，请使用其他链接",
       slugConflict: "链接后缀已被占用，请更换其他后缀",

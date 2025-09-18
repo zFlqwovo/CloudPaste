@@ -782,8 +782,8 @@ const validateCustomLink = () => {
     return true;
   }
 
-  // 验证格式：只允许字母、数字、连字符、下划线
-  const slugRegex = /^[a-zA-Z0-9_-]+$/;
+  // 验证格式：只允许字母、数字、连字符、下划线、点号
+  const slugRegex = /^[a-zA-Z0-9._-]+$/;
   if (!slugRegex.test(formData.slug)) {
     slugError.value = t("file.messages.slugInvalid");
     return false;

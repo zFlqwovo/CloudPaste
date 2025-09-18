@@ -179,6 +179,17 @@ export function getSafeFileName(fileName) {
 }
 
 /**
+ * 验证 slug 格式
+ * @param {string} slug - 要验证的 slug
+ * @returns {boolean} 是否有效
+ */
+export function validateSlugFormat(slug) {
+  if (!slug) return false;
+  const slugRegex = /^[a-zA-Z0-9._-]+$/;
+  return slugRegex.test(slug);
+}
+
+/**
  * 生成唯一的文件slug
  * @param {D1Database} db - D1数据库实例
  * @param {string} customSlug - 自定义slug
@@ -192,10 +203,9 @@ export async function generateUniqueFileSlug(db, customSlug = null, override = f
 
   // 如果提供了自定义slug，验证其格式并检查是否已存在
   if (customSlug) {
-    // 验证slug格式：只允许字母、数字、横杠和下划线
-    const slugFormatRegex = /^[a-zA-Z0-9_-]+$/;
-    if (!slugFormatRegex.test(customSlug)) {
-      throw new Error("链接后缀格式无效，只能使用字母、数字、下划线和横杠");
+    // 验证slug格式：只允许字母、数字、横杠、下划线和点号
+    if (!validateSlugFormat(customSlug)) {
+      throw new Error("链接后缀格式无效，只能使用字母、数字、下划线、横杠和点号");
     }
 
     // 检查slug是否已存在

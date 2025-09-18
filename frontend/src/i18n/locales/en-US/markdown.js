@@ -75,7 +75,7 @@ export default {
       corsImageError: "Due to CORS restrictions, some images may not display correctly in the exported image",
     },
     validation: {
-      slugInvalid: "Link suffix can only contain letters, numbers, hyphens and underscores",
+      slugInvalid: "Link suffix can only contain letters, numbers, hyphens, underscores and dots",
       slugTooLong: "Link suffix cannot exceed 50 characters",
       slugReserved: "This link suffix is reserved by the system, please use another one",
     },

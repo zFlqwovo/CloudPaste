@@ -130,7 +130,7 @@ const validateCustomLink = () => {
     return true;
   }
 
-  const slugRegex = /^[a-zA-Z0-9_-]+$/;
+  const slugRegex = /^[a-zA-Z0-9._-]+$/;
   if (!slugRegex.test(formData.customLink)) {
     slugError.value = t("markdown.validation.slugInvalid");
     emit("form-change", { ...formData, isValid: false });

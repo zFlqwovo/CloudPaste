@@ -1,5 +1,5 @@
 import { ApiStatus } from "../constants/index.js";
-import { generateRandomString, createErrorResponse } from "../utils/common.js";
+import { generateRandomString, createErrorResponse, validateSlugFormat } from "../utils/common.js";
 import { hashPassword, verifyPassword } from "../utils/crypto.js";
 import { HTTPException } from "hono/http-exception";
 import { RepositoryFactory } from "../repositories/index.js";
@@ -16,10 +16,9 @@ export async function generateUniqueSlug(db, customSlug = null) {
   const pasteRepository = repositoryFactory.getPasteRepository();
 
   if (customSlug) {
-    // 添加格式验证：只允许字母、数字、连字符、下划线
-    const slugRegex = /^[a-zA-Z0-9_-]+$/;
-    if (!slugRegex.test(customSlug)) {
-      throw new Error("链接后缀格式无效，只允许使用字母、数字、连字符(-)和下划线(_)");
+    // 添加格式验证：只允许字母、数字、连字符、下划线、点号
+    if (!validateSlugFormat(customSlug)) {
+      throw new Error("链接后缀格式无效，只允许使用字母、数字、连字符(-)、下划线(_)和点号(.)");
     }
 
     // 检查自定义slug是否已存在

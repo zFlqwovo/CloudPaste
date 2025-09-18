@@ -8,6 +8,10 @@ import { FileRepository, S3ConfigRepository } from "../repositories/index.js";
 import { StorageConfigUtils } from "../storage/utils/StorageConfigUtils.js";
 import { StorageFactory } from "../storage/factory/StorageFactory.js";
 import { GetFileType, getFileTypeName } from "../utils/fileTypeDetector.js";
+import { validateSlugFormat } from "../utils/common.js";
+import { hashPassword } from "../utils/crypto.js";
+import { HTTPException } from "hono/http-exception";
+import { ApiStatus, DbTables } from "../constants/index.js";
 
 export class FileService {
   /**
@@ -251,6 +255,147 @@ export class FileService {
    */
   async updateFileRecord(fileId, updateData) {
     return await this.fileRepository.updateFile(fileId, updateData);
+  }
+
+  /**
+   * 更新文件元数据（业务逻辑层）
+   * @param {string} fileId - 文件ID
+   * @param {Object} updateData - 更新数据
+   * @param {Object} userInfo - 用户信息
+   * @param {string} userInfo.userType - 用户类型 ("admin" | "apikey")
+   * @param {string} userInfo.userId - 用户ID
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateFile(fileId, updateData, userInfo) {
+    const { userType, userId } = userInfo;
+
+    // 检查文件是否存在并验证权限
+    let existingFile;
+    if (userType === "admin") {
+      // 管理员：可以更新任何文件
+      existingFile = await this.fileRepository.findById(fileId);
+      if (!existingFile) {
+        throw new HTTPException(ApiStatus.NOT_FOUND, { message: "文件不存在" });
+      }
+    } else {
+      // API密钥用户：只能更新自己的文件
+      existingFile = await this.fileRepository.findOne(DbTables.FILES, {
+        id: fileId,
+        created_by: `apikey:${userId}`,
+      });
+      if (!existingFile) {
+        throw new HTTPException(ApiStatus.NOT_FOUND, { message: "文件不存在或无权更新" });
+      }
+    }
+
+    // 构建更新数据对象
+    const finalUpdateData = {};
+
+    // 处理可更新的字段
+    if (updateData.remark !== undefined) {
+      finalUpdateData.remark = updateData.remark;
+    }
+
+    // 处理 slug 更新（包含格式校验和冲突检查）
+    if (updateData.slug !== undefined) {
+      await this._validateAndProcessSlug(updateData.slug, fileId, userType);
+      finalUpdateData.slug = updateData.slug;
+    }
+
+    // 处理过期时间
+    if (updateData.expires_at !== undefined) {
+      finalUpdateData.expires_at = updateData.expires_at;
+    }
+
+    // 处理Worker代理访问设置
+    if (updateData.use_proxy !== undefined) {
+      finalUpdateData.use_proxy = updateData.use_proxy ? 1 : 0;
+    }
+
+    // 处理最大查看次数
+    if (updateData.max_views !== undefined) {
+      finalUpdateData.max_views = updateData.max_views;
+      finalUpdateData.views = 0; // 当修改max_views时，重置views计数为0
+    }
+
+    // 处理密码变更
+    if (updateData.password !== undefined) {
+      await this._processPasswordUpdate(fileId, updateData.password, finalUpdateData);
+    }
+
+    // 如果没有要更新的字段（API密钥用户需要检查）
+    if (userType === "apikey" && Object.keys(finalUpdateData).length === 0) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "没有提供有效的更新字段" });
+    }
+
+    // 添加更新时间
+    finalUpdateData.updated_at = new Date().toISOString();
+
+    // 使用 Repository 更新文件
+    await this.fileRepository.updateFile(fileId, finalUpdateData);
+
+    return {
+      success: true,
+      message: "文件元数据更新成功",
+    };
+  }
+
+  /**
+   * 验证并处理 slug 更新
+   * @private
+   * @param {string} slug - 新的 slug
+   * @param {string} fileId - 文件ID
+   * @param {string} userType - 用户类型
+   */
+  async _validateAndProcessSlug(slug, fileId, userType) {
+    // 格式校验：只允许字母、数字、连字符、下划线、点号
+    if (slug && !validateSlugFormat(slug)) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, {
+        message: "链接后缀格式无效，只能使用字母、数字、下划线、横杠和点号",
+      });
+    }
+
+    // 检查slug是否可用 (不与其他文件冲突)
+    let slugExistsCheck;
+    if (userType === "admin") {
+      slugExistsCheck = await this.fileRepository.findBySlug(slug);
+      if (slugExistsCheck && slugExistsCheck.id !== fileId) {
+        throw new HTTPException(ApiStatus.CONFLICT, {
+          message: "此链接后缀已被其他文件使用",
+        });
+      }
+    } else {
+      slugExistsCheck = await this.fileRepository.findBySlugExcludingId(slug, fileId);
+      if (slugExistsCheck) {
+        throw new HTTPException(ApiStatus.CONFLICT, {
+          message: "此链接后缀已被其他文件使用",
+        });
+      }
+    }
+  }
+
+  /**
+   * 处理密码更新
+   * @private
+   * @param {string} fileId - 文件ID
+   * @param {string} password - 新密码（可能为空字符串表示清除）
+   * @param {Object} updateData - 更新数据对象（引用传递）
+   */
+  async _processPasswordUpdate(fileId, password, updateData) {
+    if (password) {
+      // 设置新密码
+      const passwordHash = await hashPassword(password);
+      updateData.password = passwordHash;
+
+      // 使用 FileRepository 更新或插入明文密码
+      await this.fileRepository.upsertFilePasswordRecord(fileId, password);
+    } else {
+      // 明确提供了空密码，表示要清除密码
+      updateData.password = null;
+
+      // 使用 FileRepository 删除明文密码记录
+      await this.fileRepository.deleteFilePasswordRecord(fileId);
+    }
   }
 
   /**
@@ -567,4 +712,10 @@ export async function getUserFileList(db, apiKeyId, options = {}) {
 export async function getUserFileDetail(db, fileId, apiKeyId, encryptionSecret, request = null) {
   const fileService = new FileService(db);
   return await fileService.getUserFileDetail(fileId, apiKeyId, encryptionSecret, request);
+}
+
+// 文件更新导出函数
+export async function updateFile(db, fileId, updateData, userInfo) {
+  const fileService = new FileService(db);
+  return await fileService.updateFile(fileId, updateData, userInfo);
 }
