@@ -779,7 +779,6 @@ function startMemoryMonitoring(interval = 1200000) {
   // 简单读取容器内存使用情况
   const getContainerMemory = () => {
     try {
-      const fs = require("fs");
       // 尝试读取cgroup内存使用（优先v2，回退v1）
       let usage = null,
         limit = null;
