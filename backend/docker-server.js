@@ -523,6 +523,7 @@ server.use(async (req, res, next) => {
     req.env = {
       DB: sqliteAdapter,
       ENCRYPTION_SECRET: process.env.ENCRYPTION_SECRET || "default-encryption-key",
+      ADMIN_TOKEN_EXPIRY_DAYS: process.env.ADMIN_TOKEN_EXPIRY_DAYS || "7",
     };
 
     next();
