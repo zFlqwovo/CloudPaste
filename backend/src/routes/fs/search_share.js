@@ -1,0 +1,91 @@
+import { HTTPException } from "hono/http-exception";
+import { ApiStatus } from "../../constants/index.js";
+import { MountManager } from "../../storage/managers/MountManager.js";
+import { FileSystem } from "../../storage/fs/FileSystem.js";
+import { useRepositories } from "../../utils/repositories.js";
+
+const extractSearchParams = (queryParams) => {
+  const query = queryParams.q || "";
+  const scope = queryParams.scope || "global";
+  const mountId = queryParams.mount_id || "";
+  const path = queryParams.path || "";
+  const limit = parseInt(queryParams.limit) || 50;
+  const offset = parseInt(queryParams.offset) || 0;
+
+  return {
+    query,
+    scope,
+    mountId,
+    path,
+    limit: Math.min(limit, 200),
+    offset: Math.max(offset, 0),
+  };
+};
+
+export const registerSearchShareRoutes = (router, helpers) => {
+  const { getServiceParams } = helpers;
+
+  router.post("/api/fs/create-share", async (c) => {
+    try {
+      const db = c.env.DB;
+      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const userInfo = c.get("userInfo");
+      const { userIdOrInfo, userType } = getServiceParams(userInfo);
+
+      const body = await c.req.json();
+      const { path } = body;
+
+      if (!path) {
+        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "文件路径不能为空" });
+      }
+
+      const { FileShareService } = await import("../../services/fileShareService.js");
+      const repositoryFactory = useRepositories(c);
+      const fileShareService = new FileShareService(db, repositoryFactory, encryptionSecret);
+      const result = await fileShareService.createShareFromFileSystem(path, userIdOrInfo, userType);
+
+      return c.json({
+        code: ApiStatus.SUCCESS,
+        message: "分享创建成功",
+        data: result,
+        success: true,
+      });
+    } catch (error) {
+      console.error("创建分享失败:", error);
+      if (error instanceof HTTPException) {
+        throw error;
+      }
+      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "创建分享失败" });
+    }
+  });
+
+  router.get("/api/fs/search", async (c) => {
+    const db = c.env.DB;
+    const searchParams = extractSearchParams(c.req.query());
+    const userInfo = c.get("userInfo");
+    const { userIdOrInfo, userType } = getServiceParams(userInfo);
+
+    if (!searchParams.query || searchParams.query.trim().length < 2) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "搜索查询至少需要2个字符" });
+    }
+
+    try {
+      const mountManager = new MountManager(db);
+      const fileSystem = new FileSystem(mountManager);
+      const result = await fileSystem.searchFiles(searchParams.query, searchParams, userIdOrInfo, userType);
+
+      return c.json({
+        code: ApiStatus.SUCCESS,
+        message: "搜索完成",
+        data: result,
+        success: true,
+      });
+    } catch (error) {
+      console.error("搜索文件错误:", error);
+      if (error instanceof HTTPException) {
+        throw error;
+      }
+      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "搜索文件失败" });
+    }
+  });
+};
