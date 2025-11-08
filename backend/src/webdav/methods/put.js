@@ -8,6 +8,7 @@ import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 import { handleWebDAVError } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { getSettingsByGroup } from "../../services/systemService.js";
 import { lockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
@@ -61,7 +62,7 @@ function isReallyEmptyFile(contentLength, transferEncoding) {
 export async function handlePut(c, path, userId, userType, db) {
   try {
     // 获取加密密钥
-    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+    const encryptionSecret = getEncryptionSecret(c);
     if (!encryptionSecret) {
       throw new Error("缺少加密密钥配置");
     }
@@ -232,6 +233,6 @@ export async function handlePut(c, path, userId, userType, db) {
     }
   } catch (error) {
     console.error(`WebDAV PUT - 处理失败: ${error.message}`);
-    return handleWebDAVError(error, `PUT ${path}`);
+    return handleWebDAVError(`PUT ${path}`, error);
   }
 }

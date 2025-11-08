@@ -5,7 +5,6 @@ import { Hono } from "hono";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { createMount, updateMount, deleteMount, getAllMounts } from "../services/storageMountService.js";
 import { ApiStatus } from "../constants/index.js";
-import { HTTPException } from "hono/http-exception";
 import { Permission } from "../constants/permissions.js";
 
 const mountRoutes = new Hono();
@@ -26,36 +25,26 @@ mountRoutes.get("/api/mount/list", authGateway({
   const db = c.env.DB;
   const authResult = c.get("authResult");
 
-  try {
-    if (authResult.isAdmin()) {
-      // 管理员：获取所有挂载点（包括禁用的，用于管理界面）
-      const mounts = await getAllMounts(db, true);
-      
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "获取挂载点列表成功",
-        data: mounts,
-        success: true,
-      });
-    } else {
-      // API密钥用户：根据基本路径获取可访问的挂载点
-      const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
-      const mounts = await authGateway.utils.getAccessibleMounts(db, apiKeyInfo, "apiKey");
-      
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "获取挂载点列表成功",
-        data: mounts,
-        success: true,
-      });
-    }
-  } catch (error) {
-    console.error("获取挂载点列表失败:", error);
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取挂载点列表失败" });
+  if (authResult.isAdmin()) {
+    const mounts = await getAllMounts(db, true);
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "获取挂载点列表成功",
+      data: mounts,
+      success: true,
+    });
   }
+
+  const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
+  const mounts = await authGateway.utils.getAccessibleMounts(db, apiKeyInfo, "apiKey");
+
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取挂载点列表成功",
+    data: mounts,
+    success: true,
+  });
 });
 
 /**
@@ -65,24 +54,15 @@ mountRoutes.post("/api/mount/create", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
 
-  try {
-    const body = await c.req.json();
-    const mount = await createMount(db, body, adminId);
+  const body = await c.req.json();
+  const mount = await createMount(db, body, adminId);
 
-    // 返回创建成功响应
-    return c.json({
-      code: ApiStatus.CREATED,
-      message: "挂载点创建成功",
-      data: mount,
-      success: true,
-    });
-  } catch (error) {
-    console.error("创建挂载点失败:", error);
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "创建挂载点失败" });
-  }
+  return c.json({
+    code: ApiStatus.CREATED,
+    message: "挂载点创建成功",
+    data: mount,
+    success: true,
+  });
 });
 
 /**
@@ -93,22 +73,14 @@ mountRoutes.put("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
 
-  try {
-    const body = await c.req.json();
-    await updateMount(db, id, body, adminId, true);
+  const body = await c.req.json();
+  await updateMount(db, id, body, adminId, true);
 
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "挂载点已更新",
-      success: true,
-    });
-  } catch (error) {
-    console.error("更新挂载点失败:", error);
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "更新挂载点失败" });
-  }
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "挂载点已更新",
+    success: true,
+  });
 });
 
 /**
@@ -119,21 +91,13 @@ mountRoutes.delete("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
 
-  try {
-    await deleteMount(db, id, adminId, true);
+  await deleteMount(db, id, adminId, true);
 
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "挂载点删除成功",
-      success: true,
-    });
-  } catch (error) {
-    console.error("删除挂载点失败:", error);
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "删除挂载点失败" });
-  }
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "挂载点删除成功",
+    success: true,
+  });
 });
 
 export default mountRoutes;

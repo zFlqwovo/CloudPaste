@@ -12,7 +12,8 @@ export const registerOpsRoutes = (router, helpers) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
-    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+    const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
+    const encryptionSecret = getEncryptionSecret(c);
     const body = await c.req.json();
     const oldPath = body.oldPath;
     const newPath = body.newPath;
@@ -30,43 +31,36 @@ export const registerOpsRoutes = (router, helpers) => {
       }
     }
 
+    const mountManager = new MountManager(db, encryptionSecret);
+    const fileSystem = new FileSystem(mountManager);
+    await fileSystem.renameItem(oldPath, newPath, userIdOrInfo, userType);
+
     try {
-      const mountManager = new MountManager(db, encryptionSecret);
-      const fileSystem = new FileSystem(mountManager);
-      await fileSystem.renameItem(oldPath, newPath, userIdOrInfo, userType);
+      const { mount } = await mountManager.getDriverByPath(oldPath, userIdOrInfo, userType);
+      const { mount: newMount } = await mountManager.getDriverByPath(newPath, userIdOrInfo, userType);
 
-      try {
-        const { mount } = await mountManager.getDriverByPath(oldPath, userIdOrInfo, userType);
-        const { mount: newMount } = await mountManager.getDriverByPath(newPath, userIdOrInfo, userType);
-
-        await clearDirectoryCache({ mountId: mount.id });
-        if (newMount.id !== mount.id) {
-          await clearDirectoryCache({ mountId: newMount.id });
-        }
-        console.log(`重命名操作完成后缓存已刷新：${oldPath} -> ${newPath}`);
-      } catch (cacheError) {
-        console.warn(`执行缓存清理时出错: ${cacheError.message}`);
+      await clearDirectoryCache({ mountId: mount.id });
+      if (newMount.id !== mount.id) {
+        await clearDirectoryCache({ mountId: newMount.id });
       }
-
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "重命名成功",
-        success: true,
-      });
-    } catch (error) {
-      console.error("重命名错误:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "重命名失败" });
+      console.log(`重命名操作完成后缓存已刷新：${oldPath} -> ${newPath}`);
+    } catch (cacheError) {
+      console.warn(`执行缓存清理时出错: ${cacheError.message}`);
     }
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "重命名成功",
+      success: true,
+    });
   });
 
   router.delete("/api/fs/batch-remove", async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
-    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+    const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
+    const encryptionSecret = getEncryptionSecret(c);
     const body = await c.req.json();
     const paths = body.paths;
 
@@ -84,50 +78,43 @@ export const registerOpsRoutes = (router, helpers) => {
       }
     }
 
-    try {
-      const mountManager = new MountManager(db, encryptionSecret);
-      const fileSystem = new FileSystem(mountManager);
-      const result = await fileSystem.batchRemoveItems(paths, userIdOrInfo, userType);
+    const mountManager = new MountManager(db, encryptionSecret);
+    const fileSystem = new FileSystem(mountManager);
+    const result = await fileSystem.batchRemoveItems(paths, userIdOrInfo, userType);
 
-      const mountIds = new Set();
-      for (const path of paths) {
-        try {
-          const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
-          mountIds.add(mount.id);
-        } catch (error) {
-          console.warn(`获取路径挂载信息失败: ${path}`, error);
-        }
-      }
-
+    const mountIds = new Set();
+    for (const path of paths) {
       try {
-        for (const mountId of mountIds) {
-          await clearDirectoryCache({ mountId });
-        }
-        console.log(`批量删除操作完成后缓存已刷新：${mountIds.size} 个挂载点`);
-      } catch (cacheError) {
-        console.warn(`执行缓存清理时出错: ${cacheError.message}`);
+        const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
+        mountIds.add(mount.id);
+      } catch (error) {
+        console.warn(`获取路径挂载信息失败: ${path}`, error);
       }
-
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "批量删除成功",
-        data: result,
-        success: true,
-      });
-    } catch (error) {
-      console.error("批量删除错误:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "批量删除失败" });
     }
+
+    try {
+      for (const mountId of mountIds) {
+        await clearDirectoryCache({ mountId });
+      }
+      console.log(`批量删除操作完成后缓存已刷新：${mountIds.size} 个挂载点`);
+    } catch (cacheError) {
+      console.warn(`执行缓存清理时出错: ${cacheError.message}`);
+    }
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "批量删除成功",
+      data: result,
+      success: true,
+    });
   });
 
   router.post("/api/fs/batch-copy", async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
-    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+    const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
+    const encryptionSecret = getEncryptionSecret(c);
     const body = await c.req.json();
     const items = body.items;
     const skipExisting = body.skipExisting !== false;
@@ -250,7 +237,8 @@ export const registerOpsRoutes = (router, helpers) => {
         throw new HTTPException(ApiStatus.NOT_FOUND, { message: "目标挂载点不存在" });
       }
 
-      const s3Config = await getS3ConfigByUserType(db, mount.storage_config_id, userIdOrInfo, userType, c.env.ENCRYPTION_SECRET);
+      const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
+      const s3Config = await getS3ConfigByUserType(db, mount.storage_config_id, userIdOrInfo, userType, getEncryptionSecret(c));
       if (!s3Config) {
         throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
       }

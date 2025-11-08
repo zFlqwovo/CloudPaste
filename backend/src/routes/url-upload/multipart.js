@@ -1,5 +1,6 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { FileShareService } from "../../services/fileShareService.js";
@@ -36,7 +37,7 @@ export const registerUrlMultipartRoutes = (router) => {
         throw new HTTPException(ApiStatus.NOT_FOUND, { message: "指定的S3配置不存在或无权访问" });
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       let metadata;
 
@@ -128,7 +129,7 @@ export const registerUrlMultipartRoutes = (router) => {
         throw new HTTPException(ApiStatus.FORBIDDEN, { message: "此API密钥无权完成此文件的上传" });
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       const result = await shareService.completeUrlMultipartUpload(body.file_id, body.upload_id, body.parts, userId, authType);
 
@@ -185,7 +186,7 @@ export const registerUrlMultipartRoutes = (router) => {
         throw new HTTPException(ApiStatus.FORBIDDEN, { message: "此API密钥无权终止此文件的上传" });
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       const result = await shareService.abortUrlMultipartUpload(body.file_id, body.upload_id, userId, authType);
 

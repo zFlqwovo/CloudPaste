@@ -2,6 +2,7 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { FileShareService } from "../../services/fileShareService.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 
 export const registerUrlPresignRoutes = (router) => {
   router.post("/api/url/presign", authGateway.requireFile(), async (c) => {
@@ -20,7 +21,7 @@ export const registerUrlPresignRoutes = (router) => {
         throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少S3配置ID参数" });
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       let metadata;
 
@@ -86,7 +87,7 @@ export const registerUrlPresignRoutes = (router) => {
         console.warn(`URL上传提交时未提供ETag: ${body.file_id}，可能是由于CORS限制导致前端无法获取ETag响应头`);
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       const uploadResult = {
         etag: body.etag || null,

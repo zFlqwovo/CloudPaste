@@ -67,7 +67,8 @@ export class WebDAVAuth {
       }
 
       // 2. 检查挂载点权限
-      const mountManager = new MountManager(this.db, c.env.ENCRYPTION_SECRET);
+      const { getEncryptionSecret } = await import("../../../utils/environmentUtils.js");
+      const mountManager = new MountManager(this.db, getEncryptionSecret(c));
 
       try {
         const { mount } = await mountManager.getDriverByPath(path, keyInfo, "apiKey");

@@ -589,10 +589,11 @@ export async function handlePropfind(c, path, userId, userType, db) {
       return createErrorResponse("/dav" + path, 401, "未知用户类型");
     }
 
-    return await processPropfindRequest(path, requestInfo, userIdOrInfo, actualUserType, db, c.env.ENCRYPTION_SECRET);
+    const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
+    return await processPropfindRequest(path, requestInfo, userIdOrInfo, actualUserType, db, getEncryptionSecret(c));
   } catch (error) {
     console.error("PROPFIND处理失败:", error);
-    return handleWebDAVError(error, "PROPFIND");
+    return handleWebDAVError("PROPFIND", error);
   }
 }
 

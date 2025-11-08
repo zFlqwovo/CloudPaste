@@ -18,6 +18,8 @@ import {
 import { DbTables, ApiStatus } from "../constants/index.js";
 import { HTTPException } from "hono/http-exception";
 import { decryptValue } from "../utils/crypto.js";
+import { getPagination } from "../utils/common.js";
+import { getEncryptionSecret } from "../utils/environmentUtils.js";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -40,8 +42,7 @@ s3ConfigRoutes.get("/api/s3-configs", authGateway.requireFile(), async (c) => {
 
       if (hasPageParam || hasLimitParam) {
         // 明确的分页查询
-        const limit = parseInt(c.req.query("limit") || "10");
-        const page = parseInt(c.req.query("page") || "1");
+        const { limit, page } = getPagination(c, { limit: 10, page: 1 });
         const result = await getS3ConfigsByAdmin(db, adminId, { page, limit });
 
         return c.json({
@@ -121,7 +122,7 @@ s3ConfigRoutes.get("/api/s3-configs/:id", authGateway.requireFile(), async (c) =
 s3ConfigRoutes.post("/api/s3-configs", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
-  const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+  const encryptionSecret = getEncryptionSecret(c);
 
   try {
     const body = await c.req.json();
@@ -148,7 +149,7 @@ s3ConfigRoutes.put("/api/s3-configs/:id", authGateway.requireAdmin(), async (c) 
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
-  const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+  const encryptionSecret = getEncryptionSecret(c);
 
   try {
     const body = await c.req.json();
@@ -184,7 +185,7 @@ s3ConfigRoutes.delete("/api/s3-configs/:id", authGateway.requireAdmin(), async (
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
-  const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+  const encryptionSecret = getEncryptionSecret(c);
 
   try {
     // S3配置删除前，先清理相关的驱动缓存
@@ -242,7 +243,7 @@ s3ConfigRoutes.post("/api/s3-configs/:id/test", authGateway.requireAdmin(), asyn
   const db = c.env.DB;
   const adminId = authGateway.utils.getUserId(c);
   const { id } = c.req.param();
-  const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+  const encryptionSecret = getEncryptionSecret(c);
   const requestOrigin = c.req.header("origin");
 
   try {

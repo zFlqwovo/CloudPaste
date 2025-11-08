@@ -10,6 +10,8 @@ import {
 import { deleteFileFromS3 } from "../../utils/s3Utils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
 import { useRepositories } from "../../utils/repositories.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
+import { getPagination } from "../../utils/common.js";
 
 export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
   router.get("/api/files", unifiedAuth, async (c) => {
@@ -18,47 +20,40 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
     const userId = c.get("userId");
     const apiKeyInfo = c.get("apiKeyInfo");
 
-    try {
-      let result;
+    let result;
 
-      if (userType === "admin") {
-        const limit = parseInt(c.req.query("limit") || "30");
-        const offset = parseInt(c.req.query("offset") || "0");
-        const search = c.req.query("search");
-        const createdBy = c.req.query("created_by");
+    if (userType === "admin") {
+      const { limit, offset } = getPagination(c, { limit: 30 });
+      const search = c.req.query("search");
+      const createdBy = c.req.query("created_by");
 
-        const options = { limit, offset };
-        if (search) options.search = search;
-        if (createdBy) options.createdBy = createdBy;
+      const options = { limit, offset };
+      if (search) options.search = search;
+      if (createdBy) options.createdBy = createdBy;
 
-        result = await getAdminFileList(db, options);
-      } else {
-        const limit = parseInt(c.req.query("limit") || "30");
-        const offset = parseInt(c.req.query("offset") || "0");
-        const search = c.req.query("search");
+      result = await getAdminFileList(db, options);
+    } else {
+      const { limit, offset } = getPagination(c, { limit: 30 });
+      const search = c.req.query("search");
 
-        const options = { limit, offset };
-        if (search) options.search = search;
+      const options = { limit, offset };
+      if (search) options.search = search;
 
-        result = await getUserFileList(db, userId, options);
-      }
-
-      const response = {
-        code: ApiStatus.SUCCESS,
-        message: "获取文件列表成功",
-        data: result,
-        success: true,
-      };
-
-      if (userType === "apikey") {
-        response.key_info = apiKeyInfo;
-      }
-
-      return c.json(response);
-    } catch (error) {
-      console.error("获取文件列表错误:", error);
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取文件列表失败" });
+      result = await getUserFileList(db, userId, options);
     }
+
+    const response = {
+      code: ApiStatus.SUCCESS,
+      message: "获取文件列表成功",
+      data: result,
+      success: true,
+    };
+
+    if (userType === "apikey") {
+      response.key_info = apiKeyInfo;
+    }
+
+    return c.json(response);
   });
 
   router.get("/api/files/:id", unifiedAuth, async (c) => {
@@ -66,27 +61,21 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
     const userType = c.get("userType");
     const userId = c.get("userId");
     const { id } = c.req.param();
-    const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+    const encryptionSecret = getEncryptionSecret(c);
 
-    try {
-      let result;
-
-      if (userType === "admin") {
-        result = await getAdminFileDetail(db, id, encryptionSecret, c.req.raw);
-      } else {
-        result = await getUserFileDetail(db, id, userId, encryptionSecret, c.req.raw);
-      }
-
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "获取文件成功",
-        data: result,
-        success: true,
-      });
-    } catch (error) {
-      console.error("获取文件错误:", error);
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取文件失败" });
+    let result;
+    if (userType === "admin") {
+      result = await getAdminFileDetail(db, id, encryptionSecret, c.req.raw);
+    } else {
+      result = await getUserFileDetail(db, id, userId, encryptionSecret, c.req.raw);
     }
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "获取文件成功",
+      data: result,
+      success: true,
+    });
   });
 
   router.delete("/api/files/batch-delete", unifiedAuth, async (c) => {
@@ -107,7 +96,7 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
 
     const result = { success: 0, failed: [] };
     const s3ConfigIds = new Set();
-    const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+    const encryptionSecret = getEncryptionSecret(c);
     const repositoryFactory = useRepositories(c);
     const fileRepository = repositoryFactory.getFileRepository();
 
@@ -200,21 +189,11 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
     const { id } = c.req.param();
     const body = await c.req.json();
 
-    try {
-      const result = await updateFile(db, id, body, { userType, userId });
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: result.message,
-        success: true,
-      });
-    } catch (error) {
-      console.error("更新文件元数据错误:", error);
-
-      if (error.status) {
-        throw new HTTPException(error.status, { message: error.message });
-      }
-
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "更新文件元数据失败" });
-    }
+    const result = await updateFile(db, id, body, { userType, userId });
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: result.message,
+      success: true,
+    });
   });
 };

@@ -3,6 +3,7 @@ import { ApiStatus } from "../../constants/index.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { useRepositories } from "../../utils/repositories.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 
 const extractSearchParams = (queryParams) => {
   const query = queryParams.q || "";
@@ -28,7 +29,7 @@ export const registerSearchShareRoutes = (router, helpers) => {
   router.post("/api/fs/create-share", async (c) => {
     try {
       const db = c.env.DB;
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const userInfo = c.get("userInfo");
       const { userIdOrInfo, userType } = getServiceParams(userInfo);
 

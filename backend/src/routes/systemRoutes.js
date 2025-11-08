@@ -11,6 +11,7 @@ import {
   getSettingMetadata,
 } from "../services/systemService.js";
 import { ApiStatus } from "../constants/index.js";
+import { getQueryBool } from "../utils/common.js";
 
 const systemRoutes = new Hono();
 
@@ -43,22 +44,16 @@ systemRoutes.get("/api/system/max-upload-size", async (c) => {
 
 // 仪表盘统计数据API
 systemRoutes.get("/api/admin/dashboard/stats", authGateway.requireAdmin(), async (c) => {
-  try {
-    const db = c.env.DB;
-    const adminId = authGateway.utils.getUserId(c);
+  const db = c.env.DB;
+  const adminId = authGateway.utils.getUserId(c);
+  const stats = await getDashboardStats(db, adminId);
 
-    const stats = await getDashboardStats(db, adminId);
-
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取仪表盘统计数据成功",
-      data: stats,
-      success: true,
-    });
-  } catch (error) {
-    console.error("获取仪表盘统计数据失败:", error);
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取仪表盘统计数据失败: " + error.message });
-  }
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取仪表盘统计数据成功",
+    data: stats,
+    success: true,
+  });
 });
 
 // 获取系统版本信息（公共API）
@@ -118,117 +113,91 @@ systemRoutes.get("/api/version", async (c) => {
 // 按分组获取设置项（公开访问，无需认证）
 systemRoutes.get("/api/admin/settings", async (c) => {
   const db = c.env.DB;
+  const groupId = c.req.query("group");
+  const includeMetadata = getQueryBool(c, "metadata", true);
 
-  try {
-    const groupId = c.req.query("group");
-    const includeMetadata = c.req.query("metadata") !== "false";
-
-    if (groupId) {
-      // 按分组查询
-      const groupIdNum = parseInt(groupId);
-      if (isNaN(groupIdNum)) {
-        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
-      }
-
-      const settings = await getSettingsByGroup(db, groupIdNum, includeMetadata);
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "获取分组设置成功",
-        data: settings,
-        success: true,
-      });
-    } else {
-      // 获取所有分组的设置
-      const includeSystemGroup = c.req.query("includeSystem") === "true";
-      const groupedSettings = await getAllSettingsByGroups(db, includeSystemGroup);
-
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "获取所有分组设置成功",
-        data: groupedSettings,
-        success: true,
-      });
+  if (groupId) {
+    const groupIdNum = parseInt(groupId, 10);
+    if (Number.isNaN(groupIdNum)) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
     }
-  } catch (error) {
-    console.error("获取设置错误:", error);
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取设置失败: " + error.message });
+
+    const settings = await getSettingsByGroup(db, groupIdNum, includeMetadata);
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "获取分组设置成功",
+      data: settings,
+      success: true,
+    });
   }
+
+  const includeSystemGroup = getQueryBool(c, "includeSystem", false);
+  const groupedSettings = await getAllSettingsByGroups(db, includeSystemGroup);
+
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取所有分组设置成功",
+    data: groupedSettings,
+    success: true,
+  });
 });
 
 // 获取分组列表和统计信息
 systemRoutes.get("/api/admin/settings/groups", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
+  const groupsInfo = await getGroupsInfo(db);
 
-  try {
-    const groupsInfo = await getGroupsInfo(db);
-
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取分组信息成功",
-      data: { groups: groupsInfo },
-      success: true,
-    });
-  } catch (error) {
-    console.error("获取分组信息错误:", error);
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取分组信息失败: " + error.message });
-  }
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取分组信息成功",
+    data: { groups: groupsInfo },
+    success: true,
+  });
 });
 
 // 获取设置项元数据
 systemRoutes.get("/api/admin/settings/metadata", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
-
-  try {
-    const key = c.req.query("key");
-    if (!key) {
-      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少设置键名参数" });
-    }
-
-    const metadata = await getSettingMetadata(db, key);
-    if (!metadata) {
-      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "设置项不存在" });
-    }
-
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取设置元数据成功",
-      data: metadata,
-      success: true,
-    });
-  } catch (error) {
-    console.error("获取设置元数据错误:", error);
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取设置元数据失败: " + error.message });
+  const key = c.req.query("key");
+  if (!key) {
+    throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少设置键名参数" });
   }
+
+  const metadata = await getSettingMetadata(db, key);
+  if (!metadata) {
+    throw new HTTPException(ApiStatus.NOT_FOUND, { message: "设置项不存在" });
+  }
+
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取设置元数据成功",
+    data: metadata,
+    success: true,
+  });
 });
 
 // 按分组批量更新设置
 systemRoutes.put("/api/admin/settings/group/:groupId", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
-
-  try {
-    const groupId = parseInt(c.req.param("groupId"));
-    if (isNaN(groupId)) {
-      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
-    }
-
-    const body = await c.req.json();
-    if (!body || typeof body !== "object") {
-      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请求参数无效" });
-    }
-
-    const validateType = c.req.query("validate") !== "false";
-    const result = await updateGroupSettings(db, groupId, body, { validateType });
-
-    return c.json({
-      code: result.success ? ApiStatus.SUCCESS : ApiStatus.ACCEPTED,
-      message: result.message,
-      data: result,
-      success: result.success,
-    });
-  } catch (error) {
-    console.error("批量更新分组设置错误:", error);
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "批量更新分组设置失败: " + error.message });
+  const groupId = parseInt(c.req.param("groupId"), 10);
+  if (Number.isNaN(groupId)) {
+    throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
   }
+
+  const body = await c.req.json();
+  if (!body || typeof body !== "object") {
+    throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请求参数无效" });
+  }
+
+  const validateType = getQueryBool(c, "validate", true);
+  const result = await updateGroupSettings(db, groupId, body, { validateType });
+
+  return c.json({
+    code: result.success ? ApiStatus.SUCCESS : ApiStatus.ACCEPTED,
+    message: result.message,
+    data: result,
+    success: result.success,
+  });
 });
 
 export default systemRoutes;

@@ -1,5 +1,6 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { deleteFileFromS3 } from "../../utils/s3Utils.js";
@@ -58,7 +59,7 @@ export const registerUrlCancelRoutes = (router) => {
 
       if (file.storage_type === "S3" && s3Config) {
         try {
-          const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+          const encryptionSecret = getEncryptionSecret(c);
           await deleteFileFromS3(s3Config, file.storage_path, encryptionSecret);
           console.log(`已从S3删除文件: ${file.storage_path}`);
         } catch (s3Error) {

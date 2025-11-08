@@ -3,6 +3,7 @@
  * 用于创建目录
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
@@ -29,7 +30,7 @@ export async function handleMkcol(c, path, userId, userType, db) {
     }
 
     // 创建FileSystem实例
-    const mountManager = new MountManager(db, c.env.ENCRYPTION_SECRET);
+    const mountManager = new MountManager(db, getEncryptionSecret(c));
     const fileSystem = new FileSystem(mountManager);
 
     console.log(`WebDAV MKCOL - 开始创建目录: ${path}, 用户类型: ${userType}`);

@@ -3,6 +3,8 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../constants/index.js";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { FileShareService } from "../services/fileShareService.js";
+import { getQueryBool, getQueryInt } from "../utils/common.js";
+import { getEncryptionSecret } from "../utils/environmentUtils.js";
 
 const app = new Hono();
 
@@ -22,7 +24,7 @@ app.post("/api/s3/presign", authGateway.requireFile(), async (c) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "必须提供 filename" });
     }
 
-    const shareService = new FileShareService(db, c.env.ENCRYPTION_SECRET || "default-encryption-key");
+    const shareService = new FileShareService(db, getEncryptionSecret(c));
     const result = await shareService.createPresignedUpload(body.s3_config_id, body.filename, userId, authType, {
       fileSize: body.size,
       slug: body.slug,
@@ -66,7 +68,7 @@ app.post("/api/s3/commit", authGateway.requireFile(), async (c) => {
       console.warn(`文件提交时未提供ETag: ${body.file_id}，前端可能受CORS限制`);
     }
 
-    const shareService = new FileShareService(db, c.env.ENCRYPTION_SECRET || "default-encryption-key");
+    const shareService = new FileShareService(db, getEncryptionSecret(c));
     const result = await shareService.commitUpload(
       body.file_id,
       {
@@ -116,18 +118,18 @@ app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => 
       path: c.req.query("path") || "",
       remark: c.req.query("remark") || "",
       password: c.req.query("password"),
-      expires_in: c.req.query("expires_in") ? parseInt(c.req.query("expires_in")) : 0,
-      max_views: c.req.query("max_views") ? parseInt(c.req.query("max_views")) : 0,
-      override: c.req.query("override") === "true",
-      original_filename: c.req.query("original_filename") === "true",
-      use_proxy: c.req.query("use_proxy") !== "0" ? 1 : 0,
+      expires_in: getQueryInt(c, "expires_in", 0),
+      max_views: getQueryInt(c, "max_views", 0),
+      override: getQueryBool(c, "override", false),
+      original_filename: getQueryBool(c, "original_filename", false),
+      use_proxy: getQueryBool(c, "use_proxy", true) ? 1 : 0,
     };
 
     if (!params.s3_config_id) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "必须提供 s3_config_id" });
     }
 
-    const shareService = new FileShareService(db, c.env.ENCRYPTION_SECRET || "default-encryption-key");
+    const shareService = new FileShareService(db, getEncryptionSecret(c));
     const result = await shareService.uploadDirectComplete(filename, fileContent, fileSize, userId, authType, params);
 
     const { fileRecord, config } = result;
@@ -135,7 +137,7 @@ app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => 
     const { getMimeTypeFromFilename } = await import("../utils/fileUtils.js");
     const contentType = getMimeTypeFromFilename(filename);
     const isAdmin = authType === "admin";
-    const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+    const encryptionSecret = getEncryptionSecret(c);
 
     const previewDirectUrl = await generatePresignedUrl(config, fileRecord.storage_path, encryptionSecret, null, false, contentType, { enableCache: false });
     const downloadDirectUrl = await generatePresignedUrl(config, fileRecord.storage_path, encryptionSecret, null, true, contentType, { enableCache: false });

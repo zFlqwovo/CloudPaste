@@ -239,6 +239,54 @@ export async function generateUniqueFileSlug(db, customSlug = null, override = f
 }
 
 /**
+ * 解析查询参数为整数
+ * @param {import('hono').Context} c
+ * @param {string} key
+ * @param {number} defaultValue
+ * @returns {number}
+ */
+export function getQueryInt(c, key, defaultValue = 0) {
+  const val = c.req.query(key);
+  if (val === undefined || val === null || val === "") return defaultValue;
+  const n = parseInt(val, 10);
+  return Number.isFinite(n) ? n : defaultValue;
+}
+
+/**
+ * 解析查询参数为布尔值（支持 true/1/false/0）
+ * @param {import('hono').Context} c
+ * @param {string} key
+ * @param {boolean} defaultValue
+ * @returns {boolean}
+ */
+export function getQueryBool(c, key, defaultValue = false) {
+  const val = c.req.query(key);
+  if (val === undefined || val === null || val === "") return defaultValue;
+  const lowered = String(val).toLowerCase();
+  if (lowered === "true" || lowered === "1") return true;
+  if (lowered === "false" || lowered === "0") return false;
+  return defaultValue;
+}
+
+/**
+ * 标准化分页解析：优先使用 offset，缺失时按 page 计算
+ * @param {import('hono').Context} c
+ * @param {{limit?:number,page?:number,offset?:number}} defaults
+ * @returns {{limit:number,page:number,offset:number}}
+ */
+export function getPagination(c, defaults = {}) {
+  const limitDefault = defaults.limit ?? 30;
+  const pageDefault = defaults.page ?? 1;
+  const offsetDefault = defaults.offset ?? 0;
+
+  const limit = getQueryInt(c, "limit", limitDefault);
+  const page = getQueryInt(c, "page", pageDefault);
+  const hasOffset = c.req.query("offset") !== undefined;
+  const offset = hasOffset ? getQueryInt(c, "offset", offsetDefault) : Math.max(0, (page - 1) * limit);
+  return { limit, page, offset };
+}
+
+/**
  * 处理文件覆盖逻辑的辅助函数
  * @private
  */

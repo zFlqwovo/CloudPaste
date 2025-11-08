@@ -10,6 +10,7 @@ import {
   createPaste,
 } from "../../services/pasteService.js";
 import { ApiStatus, DbTables } from "../../constants/index.js";
+import { getPagination } from "../../utils/common.js";
 import { useRepositories } from "../../utils/repositories.js";
 
 export const registerPastesProtectedRoutes = (router) => {
@@ -45,15 +46,12 @@ export const registerPastesProtectedRoutes = (router) => {
       let result;
 
       if (userType === "admin") {
-        const limit = parseInt(c.req.query("limit") || "10");
-        const page = parseInt(c.req.query("page") || "1");
-        const offset = parseInt(c.req.query("offset") || (page - 1) * limit);
+        const { limit, page, offset } = getPagination(c, { limit: 10, page: 1 });
         const search = c.req.query("search");
         const created_by = c.req.query("created_by");
         result = await getAllPastes(db, page, limit, created_by, search, offset);
       } else {
-        const limit = parseInt(c.req.query("limit") || "30");
-        const offset = parseInt(c.req.query("offset") || "0");
+        const { limit, offset } = getPagination(c, { limit: 30 });
         const search = c.req.query("search");
         result = await getUserPastes(db, userId, limit, offset, search);
       }

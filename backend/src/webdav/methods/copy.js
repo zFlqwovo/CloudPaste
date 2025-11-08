@@ -3,6 +3,7 @@
  * 用于复制文件和目录
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
@@ -241,7 +242,7 @@ export async function handleCopy(c, path, userId, userType, db) {
     }
 
     // 6. 创建FileSystem实例
-    const mountManager = new MountManager(db, c.env.ENCRYPTION_SECRET);
+    const mountManager = new MountManager(db, getEncryptionSecret(c));
     const fileSystem = new FileSystem(mountManager);
 
     console.log(`WebDAV COPY - 开始复制: ${path} -> ${destPath}, 用户类型: ${userType}`);

@@ -1,6 +1,7 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { FileShareService } from "../../services/fileShareService.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 
 export const registerUrlInfoRoutes = (router) => {
   router.post("/api/url/info", async (c) => {
@@ -13,7 +14,7 @@ export const registerUrlInfoRoutes = (router) => {
         throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少URL参数" });
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       const metadata = await shareService.validateUrlMetadata(body.url);
 
@@ -46,7 +47,7 @@ export const registerUrlInfoRoutes = (router) => {
         throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少URL参数" });
       }
 
-      const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+      const encryptionSecret = getEncryptionSecret(c);
       const shareService = new FileShareService(db, encryptionSecret);
       const response = await shareService.proxyUrlContent(url);
       return response;

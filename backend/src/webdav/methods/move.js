@@ -7,6 +7,7 @@
 
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { clearDirectoryCache } from "../../cache/index.js";
@@ -242,7 +243,7 @@ export async function handleMove(c, path, userId, userType, db) {
     }
 
     // 6. 创建FileSystem实例
-    const mountManager = new MountManager(db, c.env.ENCRYPTION_SECRET);
+    const mountManager = new MountManager(db, getEncryptionSecret(c));
     const fileSystem = new FileSystem(mountManager);
 
     console.log(`WebDAV MOVE - 开始移动: ${path} -> ${destPath}, 用户类型: ${userType}`);

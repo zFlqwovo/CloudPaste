@@ -12,6 +12,8 @@ import { FileSystem } from "../storage/fs/FileSystem.js";
 import { findMountPointByPathForProxy } from "../storage/fs/utils/MountResolver.js";
 import { PROXY_CONFIG, safeDecodeProxyPath } from "../constants/proxy.js";
 import { ProxySignatureService } from "../services/ProxySignatureService.js";
+import { getEncryptionSecret } from "../utils/environmentUtils.js";
+import { getQueryBool } from "../utils/common.js";
 
 const fsProxyRoutes = new Hono();
 
@@ -36,9 +38,9 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
     // 移除代理前缀，得到实际文件路径，并进行安全解码
     const rawPath = fullPath.replace(new RegExp(`^${PROXY_CONFIG.ROUTE_PREFIX}`), "") || "/";
     const path = safeDecodeProxyPath(rawPath);
-    const download = c.req.query("download") === "true";
+    const download = getQueryBool(c, "download", false);
     const db = c.env.DB;
-    const encryptionSecret = c.env.ENCRYPTION_SECRET;
+    const encryptionSecret = getEncryptionSecret(c);
 
     console.log(`[fsProxy] 代理访问: ${path}`);
 

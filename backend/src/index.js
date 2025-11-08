@@ -62,6 +62,7 @@ const structuredLogger = async (c, next) => {
     throw error;
   } finally {
     const durationMs = Number((now() - started).toFixed(2));
+    const slow = durationMs >= 1000; // 简单慢请求标记（>=1s）
     const { userType, userId } = getAuthSnapshot(c);
     const status = caughtError?.status ?? c.res?.status ?? 200;
     const logPayload = {
@@ -71,6 +72,7 @@ const structuredLogger = async (c, next) => {
       path: c.req.path,
       status,
       durationMs,
+      slow,
       userType,
       userId,
     };

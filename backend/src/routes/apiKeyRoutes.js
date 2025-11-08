@@ -76,20 +76,14 @@ apiKeyRoutes.get("/api/test/api-key", authGateway.requireAuth(), async (c) => {
 // 获取所有API密钥列表
 apiKeyRoutes.get("/api/admin/api-keys", authGateway.requireAdmin(), async (c) => {
   const db = c.env.DB;
+  const keys = await getAllApiKeys(db);
 
-  try {
-    const keys = await getAllApiKeys(db);
-
-    // 兼容前端期望的响应格式
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取成功",
-      data: keys,
-      success: true, // 添加兼容字段
-    });
-  } catch (error) {
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取API密钥列表失败" });
-  }
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取成功",
+    data: keys,
+    success: true, // 添加兼容字段
+  });
 });
 
 // 创建新的API密钥

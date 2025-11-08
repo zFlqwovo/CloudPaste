@@ -4,6 +4,7 @@
  */
 import { Hono } from "hono";
 import { useRepositories } from "../utils/repositories.js";
+import { getEncryptionSecret } from "../utils/environmentUtils.js";
 import { verifyPassword } from "../utils/crypto.js";
 import { generatePresignedUrl } from "../utils/s3Utils.js";
 import { isOfficeFile } from "../utils/fileUtils.js";
@@ -32,7 +33,7 @@ app.get("/api/file-view/:slug", async (c) => {
 app.get("/api/office-preview/:slug", async (c) => {
   const slug = c.req.param("slug");
   const db = c.env.DB;
-  const encryptionSecret = c.env.ENCRYPTION_SECRET || "default-encryption-key";
+  const encryptionSecret = getEncryptionSecret(c);
 
   try {
     // 查询文件详情
@@ -90,7 +91,7 @@ app.get("/api/office-preview/:slug", async (c) => {
     const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
     const s3Config = await s3ConfigRepository.findById(file.storage_config_id);
     if (!s3Config) {
-      return c.json({ error: "无法获取存储配置信息" }, 500);
+      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "无法获取存储配置信息" });
     }
 
     // 计算访问次数（暂不增加计数器，因为这只是获取URL）
@@ -115,11 +116,11 @@ app.get("/api/office-preview/:slug", async (c) => {
       });
     } catch (error) {
       console.error("生成Office预览URL出错:", error);
-      return c.json({ error: "生成预览URL失败: " + error.message }, 500);
+      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "生成预览URL失败: " + error.message });
     }
   } catch (error) {
     console.error("处理Office预览URL请求错误:", error);
-    return c.json({ error: "服务器处理错误: " + error.message }, 500);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "服务器处理错误: " + error.message });
   }
 });
 

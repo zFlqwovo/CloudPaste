@@ -4,6 +4,7 @@
  * 重构版本：使用FileSystem统一抽象层替代直接S3调用
  */
 import { MountManager } from "../../storage/managers/MountManager.js";
+import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
 import { addWebDAVHeaders, getStandardWebDAVHeaders } from "../utils/headerUtils.js";
@@ -22,7 +23,7 @@ export async function handleGet(c, path, userId, userType, db) {
 
   try {
     // 创建FileSystem实例
-    const mountManager = new MountManager(db, c.env.ENCRYPTION_SECRET);
+    const mountManager = new MountManager(db, getEncryptionSecret(c));
     const fileSystem = new FileSystem(mountManager);
 
     // 获取文件名并统一从文件名推断MIME类型
