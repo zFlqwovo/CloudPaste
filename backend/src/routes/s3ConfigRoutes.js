@@ -16,7 +16,6 @@ import {
   getS3ConfigsWithUsage,
 } from "../services/s3ConfigService.js";
 import { DbTables, ApiStatus } from "../constants/index.js";
-import { createErrorResponse } from "../utils/common.js";
 import { HTTPException } from "hono/http-exception";
 import { decryptValue } from "../utils/crypto.js";
 import * as fs from "fs";
@@ -78,7 +77,10 @@ s3ConfigRoutes.get("/api/s3-configs", authGateway.requireFile(), async (c) => {
     }
   } catch (error) {
     console.error("获取S3配置列表错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "获取S3配置列表失败"), ApiStatus.INTERNAL_ERROR);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取S3配置列表失败" });
   }
 });
 
@@ -108,7 +110,10 @@ s3ConfigRoutes.get("/api/s3-configs/:id", authGateway.requireFile(), async (c) =
     });
   } catch (error) {
     console.error("获取S3配置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "获取S3配置失败"), ApiStatus.INTERNAL_ERROR);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取S3配置失败" });
   }
 });
 
@@ -131,7 +136,10 @@ s3ConfigRoutes.post("/api/s3-configs", authGateway.requireAdmin(), async (c) => 
     });
   } catch (error) {
     console.error("创建S3配置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "创建S3配置失败"), ApiStatus.INTERNAL_ERROR);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "创建S3配置失败" });
   }
 });
 
@@ -164,7 +172,10 @@ s3ConfigRoutes.put("/api/s3-configs/:id", authGateway.requireAdmin(), async (c) 
     });
   } catch (error) {
     console.error("更新S3配置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "更新S3配置失败"), ApiStatus.INTERNAL_ERROR);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "更新S3配置失败" });
   }
 });
 
@@ -196,7 +207,10 @@ s3ConfigRoutes.delete("/api/s3-configs/:id", authGateway.requireAdmin(), async (
     });
   } catch (error) {
     console.error("删除S3配置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "删除S3配置失败"), ApiStatus.INTERNAL_ERROR);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "删除S3配置失败" });
   }
 });
 
@@ -216,7 +230,10 @@ s3ConfigRoutes.put("/api/s3-configs/:id/set-default", authGateway.requireAdmin()
     });
   } catch (error) {
     console.error("设置默认S3配置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "设置默认S3配置失败"), ApiStatus.INTERNAL_ERROR);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "设置默认S3配置失败" });
   }
 });
 
@@ -242,21 +259,7 @@ s3ConfigRoutes.post("/api/s3-configs/:id/test", authGateway.requireAdmin(), asyn
     });
   } catch (error) {
     console.error("测试S3配置错误:", error);
-    return c.json(
-      {
-        code: ApiStatus.INTERNAL_ERROR,
-        message: error.message || "测试S3配置失败",
-        data: {
-          success: false,
-          result: {
-            error: error.message,
-            stack: process.env.NODE_ENV === "development" ? error.stack : null,
-          },
-        },
-        success: false,
-      },
-      ApiStatus.INTERNAL_ERROR
-    );
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "测试S3配置失败" });
   }
 });
 

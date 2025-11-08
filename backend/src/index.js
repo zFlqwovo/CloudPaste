@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { logger } from "hono/logger";
 import adminRoutes from "./routes/adminRoutes.js";
 import apiKeyRoutes from "./routes/apiKeyRoutes.js";
 import { backupRoutes } from "./routes/backupRoutes.js";
@@ -21,11 +20,77 @@ import urlUploadRoutes from "./routes/urlUploadRoutes.js";
 import { fsProxyRoutes } from "./routes/fsProxyRoutes.js";
 import { authGateway } from "./middlewares/authGatewayMiddleware.js";
 
+const getTimeSource = () => {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return () => performance.now();
+  }
+  return () => Date.now();
+};
+
+const now = getTimeSource();
+
+const generateRequestId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const getAuthSnapshot = (c) => {
+  const authResult = c.get("authResult");
+  if (!authResult) {
+    return { userType: "guest", userId: null };
+  }
+  if (authResult.isAdmin && authResult.isAdmin()) {
+    return { userType: "admin", userId: authResult.getUserId?.() || null };
+  }
+  if (authResult.keyInfo) {
+    return { userType: "apiKey", userId: authResult.keyInfo.id || authResult.keyInfo.name || null };
+  }
+  return { userType: "unknown", userId: authResult.getUserId?.() || null };
+};
+
+const structuredLogger = async (c, next) => {
+  const reqId = generateRequestId();
+  c.set("reqId", reqId);
+  const started = now();
+  let caughtError = null;
+  try {
+    await next();
+  } catch (error) {
+    caughtError = error;
+    throw error;
+  } finally {
+    const durationMs = Number((now() - started).toFixed(2));
+    const { userType, userId } = getAuthSnapshot(c);
+    const status = caughtError?.status ?? c.res?.status ?? 200;
+    const logPayload = {
+      type: "request",
+      reqId,
+      method: c.req.method,
+      path: c.req.path,
+      status,
+      durationMs,
+      userType,
+      userId,
+    };
+
+    if (caughtError) {
+      logPayload.error = {
+        name: caughtError.name,
+        message: caughtError.message,
+      };
+    }
+
+    console.log(JSON.stringify(logPayload));
+  }
+};
+
 // 创建一个Hono应用实例
 const app = new Hono();
 
 // 注册中间件
-app.use("*", logger());
+app.use("*", structuredLogger);
 // 导入WebDAV配置
 import { WEBDAV_BASE_PATH } from "./webdav/auth/config/WebDAVConfig.js";
 

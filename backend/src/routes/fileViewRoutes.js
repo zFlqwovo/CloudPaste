@@ -3,7 +3,7 @@
  * 处理文件分享的查看、下载、预览功能
  */
 import { Hono } from "hono";
-import { RepositoryFactory } from "../repositories/index.js";
+import { useRepositories } from "../utils/repositories.js";
 import { verifyPassword } from "../utils/crypto.js";
 import { generatePresignedUrl } from "../utils/s3Utils.js";
 import { isOfficeFile } from "../utils/fileUtils.js";
@@ -86,7 +86,7 @@ app.get("/api/office-preview/:slug", async (c) => {
     }
 
     // 获取S3配置
-    const repositoryFactory = new RepositoryFactory(db);
+    const repositoryFactory = useRepositories(c);
     const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
     const s3Config = await s3ConfigRepository.findById(file.storage_config_id);
     if (!s3Config) {

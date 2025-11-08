@@ -1,6 +1,6 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { BackupService } from "../services/BackupService.js";
-import { createErrorResponse } from "../utils/common.js";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { ApiStatus } from "../constants/index.js";
 
@@ -17,7 +17,7 @@ backupRoutes.post("/api/admin/backup/create", authGateway.requireAdmin(), async 
 
     // 验证输入参数
     if (backup_type === "modules" && (!selected_modules || selected_modules.length === 0)) {
-      return c.json(createErrorResponse(400, "模块备份必须选择至少一个模块"), 400);
+      throw new HTTPException(400, { message: "模块备份必须选择至少一个模块" });
     }
 
     const backupService = new BackupService(c.env.DB);
@@ -44,7 +44,7 @@ backupRoutes.post("/api/admin/backup/create", authGateway.requireAdmin(), async 
     return response;
   } catch (error) {
     console.error("创建备份失败:", error);
-    return c.json(createErrorResponse(500, "创建备份失败: " + error.message), 500);
+    throw new HTTPException(500, { message: `创建备份失败: ${error.message}` });
   }
 });
 
@@ -59,12 +59,12 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
     const mode = formData.get("mode") || "overwrite";
 
     if (!file) {
-      return c.json(createErrorResponse(400, "请选择备份文件"), 400);
+      throw new HTTPException(400, { message: "请选择备份文件" });
     }
 
     // 验证文件类型
     if (!file.name.endsWith(".json")) {
-      return c.json(createErrorResponse(400, "只支持JSON格式的备份文件"), 400);
+      throw new HTTPException(400, { message: "只支持JSON格式的备份文件" });
     }
 
     // 读取文件内容
@@ -74,7 +74,7 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
     try {
       backupData = JSON.parse(fileContent);
     } catch (error) {
-      return c.json(createErrorResponse(400, "备份文件格式错误，请确保是有效的JSON文件"), 400);
+      throw new HTTPException(400, { message: "备份文件格式错误，请确保是有效的JSON文件" });
     }
 
     const backupService = new BackupService(c.env.DB);
@@ -111,7 +111,7 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
     });
   } catch (error) {
     console.error("还原备份失败:", error);
-    return c.json(createErrorResponse(500, "还原备份失败: " + error.message), 500);
+    throw new HTTPException(500, { message: `还原备份失败: ${error.message}` });
   }
 });
 
@@ -134,7 +134,7 @@ backupRoutes.get("/api/admin/backup/modules", authGateway.requireAdmin(), async 
     });
   } catch (error) {
     console.error("获取模块信息失败:", error);
-    return c.json(createErrorResponse(500, "获取模块信息失败: " + error.message), 500);
+    throw new HTTPException(500, { message: `获取模块信息失败: ${error.message}` });
   }
 });
 

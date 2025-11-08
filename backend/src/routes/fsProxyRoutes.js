@@ -7,7 +7,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../constants/index.js";
-import { createErrorResponse } from "../utils/common.js";
 import { MountManager } from "../storage/managers/MountManager.js";
 import { FileSystem } from "../storage/fs/FileSystem.js";
 import { findMountPointByPathForProxy } from "../storage/fs/utils/MountResolver.js";
@@ -48,7 +47,7 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
 
     if (mountResult.error) {
       console.warn(`代理访问失败 - 挂载点查找失败: ${mountResult.error.message}`);
-      return c.json(createErrorResponse(mountResult.error.status, mountResult.error.message), mountResult.error.status);
+      throw new HTTPException(mountResult.error.status, { message: mountResult.error.message });
     }
 
     // 挂载点验证成功，mountResult包含mount和subPath信息
@@ -120,10 +119,10 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
     console.error("文件系统代理访问错误:", error);
 
     if (error instanceof HTTPException) {
-      return c.json(createErrorResponse(error.status, error.message), error.status);
+      throw error;
     }
 
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "代理访问失败"), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "代理访问失败" });
   }
 });
 

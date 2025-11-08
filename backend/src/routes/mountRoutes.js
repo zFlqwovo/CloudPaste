@@ -5,32 +5,10 @@ import { Hono } from "hono";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { createMount, updateMount, deleteMount, getAllMounts } from "../services/storageMountService.js";
 import { ApiStatus } from "../constants/index.js";
-import { createErrorResponse } from "../utils/common.js";
 import { HTTPException } from "hono/http-exception";
 import { Permission } from "../constants/permissions.js";
 
 const mountRoutes = new Hono();
-
-/**
- * 统一的API错误处理函数
- * 消除原来两个文件中的重复代码
- * @param {Context} c - Hono上下文
- * @param {Error} error - 捕获的错误
- * @param {string} defaultMessage - 默认错误消息
- * @returns {Response} JSON错误响应
- */
-const handleApiError = (c, error, defaultMessage) => {
-  // 记录错误，但避免冗余日志
-  console.error(`API错误: ${error.message || defaultMessage}`);
-
-  // 如果是HTTPException，使用其状态码
-  if (error instanceof HTTPException) {
-    return c.json(createErrorResponse(error.status, error.message), error.status);
-  }
-
-  // 其他错误视为内部服务器错误
-  return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || defaultMessage), ApiStatus.INTERNAL_ERROR);
-};
 
 /**
  * 获取挂载点列表
@@ -72,7 +50,11 @@ mountRoutes.get("/api/mount/list", authGateway({
       });
     }
   } catch (error) {
-    return handleApiError(c, error, "获取挂载点列表失败");
+    console.error("获取挂载点列表失败:", error);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取挂载点列表失败" });
   }
 });
 
@@ -95,7 +77,11 @@ mountRoutes.post("/api/mount/create", authGateway.requireAdmin(), async (c) => {
       success: true,
     });
   } catch (error) {
-    return handleApiError(c, error, "创建挂载点失败");
+    console.error("创建挂载点失败:", error);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "创建挂载点失败" });
   }
 });
 
@@ -117,7 +103,11 @@ mountRoutes.put("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
       success: true,
     });
   } catch (error) {
-    return handleApiError(c, error, "更新挂载点失败");
+    console.error("更新挂载点失败:", error);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "更新挂载点失败" });
   }
 });
 
@@ -138,7 +128,11 @@ mountRoutes.delete("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
       success: true,
     });
   } catch (error) {
-    return handleApiError(c, error, "删除挂载点失败");
+    console.error("删除挂载点失败:", error);
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "删除挂载点失败" });
   }
 });
 

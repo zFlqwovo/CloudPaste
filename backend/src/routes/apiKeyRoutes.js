@@ -1,9 +1,9 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { Permission, PermissionChecker } from "../constants/permissions.js";
 import { getAllApiKeys, createApiKey, updateApiKey, deleteApiKey } from "../services/apiKeyService.js";
 import { ApiStatus } from "../constants/index.js";
-import { createErrorResponse } from "../utils/common.js";
 
 const apiKeyRoutes = new Hono();
 
@@ -88,8 +88,7 @@ apiKeyRoutes.get("/api/admin/api-keys", authGateway.requireAdmin(), async (c) =>
       success: true, // 添加兼容字段
     });
   } catch (error) {
-    // 使用统一错误响应
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, error.message || "获取API密钥列表失败"), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "获取API密钥列表失败" });
   }
 });
 
@@ -112,13 +111,12 @@ apiKeyRoutes.post("/api/admin/api-keys", authGateway.requireAdmin(), async (c) =
     // 检查是否是唯一性约束错误
     if (error.message && error.message.includes("UNIQUE constraint failed")) {
       if (error.message.includes("api_keys.name")) {
-        return c.json(createErrorResponse(ApiStatus.CONFLICT, "密钥名称已存在"), ApiStatus.CONFLICT);
+        throw new HTTPException(ApiStatus.CONFLICT, { message: "密钥名称已存在" });
       } else if (error.message.includes("api_keys.key")) {
-        return c.json(createErrorResponse(ApiStatus.CONFLICT, "密钥已存在"), ApiStatus.CONFLICT);
+        throw new HTTPException(ApiStatus.CONFLICT, { message: "密钥已存在" });
       }
     }
 
-    // 其他错误处理
     let status = ApiStatus.INTERNAL_ERROR;
     let message = error.message || "创建API密钥失败";
 
@@ -126,7 +124,7 @@ apiKeyRoutes.post("/api/admin/api-keys", authGateway.requireAdmin(), async (c) =
       status = ApiStatus.BAD_REQUEST;
     }
 
-    return c.json(createErrorResponse(status, message), status);
+    throw new HTTPException(status, { message });
   }
 });
 
@@ -146,7 +144,6 @@ apiKeyRoutes.put("/api/admin/api-keys/:id", authGateway.requireAdmin(), async (c
       success: true, // 添加兼容字段
     });
   } catch (error) {
-    // 错误处理
     let status = ApiStatus.INTERNAL_ERROR;
     let message = error.message || "更新API密钥失败";
 
@@ -158,7 +155,7 @@ apiKeyRoutes.put("/api/admin/api-keys/:id", authGateway.requireAdmin(), async (c
       status = ApiStatus.CONFLICT;
     }
 
-    return c.json(createErrorResponse(status, message), status);
+    throw new HTTPException(status, { message });
   }
 });
 
@@ -183,7 +180,7 @@ apiKeyRoutes.delete("/api/admin/api-keys/:id", authGateway.requireAdmin(), async
       status = ApiStatus.NOT_FOUND;
     }
 
-    return c.json(createErrorResponse(status, message), status);
+    throw new HTTPException(status, { message });
   }
 });
 

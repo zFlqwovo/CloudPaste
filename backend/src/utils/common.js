@@ -31,9 +31,6 @@ export function createErrorResponse(statusCode, message) {
   };
 }
 
-// getLocalTimeString() 函数已被移除
-// 现在所有时间处理都使用 CURRENT_TIMESTAMP 以支持更好的国际化
-
 /**
  * 格式化文件大小
  * @param {number} bytes 文件大小（字节）

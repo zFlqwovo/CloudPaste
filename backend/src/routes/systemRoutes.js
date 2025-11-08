@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import {
   getMaxUploadSize,
@@ -10,7 +11,6 @@ import {
   getSettingMetadata,
 } from "../services/systemService.js";
 import { ApiStatus } from "../constants/index.js";
-import { createErrorResponse } from "../utils/common.js";
 
 const systemRoutes = new Hono();
 
@@ -57,7 +57,7 @@ systemRoutes.get("/api/admin/dashboard/stats", authGateway.requireAdmin(), async
     });
   } catch (error) {
     console.error("获取仪表盘统计数据失败:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "获取仪表盘统计数据失败: " + error.message), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取仪表盘统计数据失败: " + error.message });
   }
 });
 
@@ -127,7 +127,7 @@ systemRoutes.get("/api/admin/settings", async (c) => {
       // 按分组查询
       const groupIdNum = parseInt(groupId);
       if (isNaN(groupIdNum)) {
-        return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "分组ID必须是数字"), ApiStatus.BAD_REQUEST);
+        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
       }
 
       const settings = await getSettingsByGroup(db, groupIdNum, includeMetadata);
@@ -151,7 +151,7 @@ systemRoutes.get("/api/admin/settings", async (c) => {
     }
   } catch (error) {
     console.error("获取设置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "获取设置失败: " + error.message), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取设置失败: " + error.message });
   }
 });
 
@@ -170,7 +170,7 @@ systemRoutes.get("/api/admin/settings/groups", authGateway.requireAdmin(), async
     });
   } catch (error) {
     console.error("获取分组信息错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "获取分组信息失败: " + error.message), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取分组信息失败: " + error.message });
   }
 });
 
@@ -181,12 +181,12 @@ systemRoutes.get("/api/admin/settings/metadata", authGateway.requireAdmin(), asy
   try {
     const key = c.req.query("key");
     if (!key) {
-      return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "缺少设置键名参数"), ApiStatus.BAD_REQUEST);
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少设置键名参数" });
     }
 
     const metadata = await getSettingMetadata(db, key);
     if (!metadata) {
-      return c.json(createErrorResponse(ApiStatus.NOT_FOUND, "设置项不存在"), ApiStatus.NOT_FOUND);
+      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "设置项不存在" });
     }
 
     return c.json({
@@ -197,7 +197,7 @@ systemRoutes.get("/api/admin/settings/metadata", authGateway.requireAdmin(), asy
     });
   } catch (error) {
     console.error("获取设置元数据错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "获取设置元数据失败: " + error.message), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取设置元数据失败: " + error.message });
   }
 });
 
@@ -208,12 +208,12 @@ systemRoutes.put("/api/admin/settings/group/:groupId", authGateway.requireAdmin(
   try {
     const groupId = parseInt(c.req.param("groupId"));
     if (isNaN(groupId)) {
-      return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "分组ID必须是数字"), ApiStatus.BAD_REQUEST);
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
     }
 
     const body = await c.req.json();
     if (!body || typeof body !== "object") {
-      return c.json(createErrorResponse(ApiStatus.BAD_REQUEST, "请求参数无效"), ApiStatus.BAD_REQUEST);
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请求参数无效" });
     }
 
     const validateType = c.req.query("validate") !== "false";
@@ -227,8 +227,9 @@ systemRoutes.put("/api/admin/settings/group/:groupId", authGateway.requireAdmin(
     });
   } catch (error) {
     console.error("批量更新分组设置错误:", error);
-    return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "批量更新分组设置失败: " + error.message), ApiStatus.INTERNAL_ERROR);
+    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "批量更新分组设置失败: " + error.message });
   }
 });
 
 export default systemRoutes;
+
