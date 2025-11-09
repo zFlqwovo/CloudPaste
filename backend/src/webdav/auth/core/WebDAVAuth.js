@@ -3,6 +3,7 @@
  */
 
 import { MountManager } from "../../../storage/managers/MountManager.js";
+import { UserType } from "../../../constants/index.js";
 import { processWebDAVPath } from "../../utils/webdavUtils.js";
 import { getAccessibleMountsForUser } from "../../../security/helpers/access.js";
 
@@ -50,7 +51,8 @@ export class WebDAVAuth {
 
       // 2. 检查挂载点权限
       const { getEncryptionSecret } = await import("../../../utils/environmentUtils.js");
-      const mountManager = new MountManager(this.db, getEncryptionSecret(c));
+      const repositoryFactory = c.get("repos");
+      const mountManager = new MountManager(this.db, getEncryptionSecret(c), repositoryFactory);
 
       try {
         const { mount } = await mountManager.getDriverByPath(path, keyInfo, "apiKey");
@@ -177,8 +179,8 @@ export class WebDAVAuth {
         return this.generateAuthChallenge();
       }
 
-      const userType = principal.isAdmin ? "admin" : principal.type;
-      if (userType !== "admin" && userType !== "apiKey") {
+      const userType = principal.isAdmin ? UserType.ADMIN : principal.type;
+      if (userType !== UserType.ADMIN && userType !== UserType.API_KEY) {
         return {
           type: AuthResultType.FORBIDDEN,
           message: "不支持的身份类型",
@@ -186,7 +188,7 @@ export class WebDAVAuth {
       }
 
       let apiKeyInfo = null;
-      if (userType === "apiKey") {
+      if (userType === UserType.API_KEY) {
         apiKeyInfo = principal.attributes?.keyInfo ?? null;
         if (!apiKeyInfo) {
           return {
@@ -207,7 +209,7 @@ export class WebDAVAuth {
       return {
         type: AuthResultType.SUCCESS,
         userType,
-        userId: userType === "admin" ? principal.id : apiKeyInfo,
+        userId: userType === UserType.ADMIN ? principal.id : apiKeyInfo,
       };
     } catch (error) {
       console.error("WebDAV统一认证错误:", error);

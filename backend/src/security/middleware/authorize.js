@@ -67,24 +67,20 @@ const resolvePaths = async (resolver, c, principal) => {
 };
 
 const emitAuditEvent = (c, principal, { decision, policyName, reason = null, status = null }) => {
-  try {
-    const payload = {
-      type: "auth.audit",
-      reqId: c.get?.("reqId") ?? null,
-      method: c.req?.method ?? null,
-      path: c.req?.path ?? null,
-      policy: policyName ?? "inline",
-      principalType: principal?.type ?? "guest",
-      principalId: principal?.id ?? null,
-      decision,
-      reason,
-      status,
-      timestamp: new Date().toISOString(),
-    };
-    console.log(JSON.stringify(payload));
-  } catch (error) {
-    console.error("authorize audit emit failed", error);
-  }
+  const payload = {
+    type: "auth.audit",
+    reqId: c.get?.("reqId") ?? null,
+    method: c.req?.method ?? null,
+    path: c.req?.path ?? null,
+    policy: policyName ?? "inline",
+    principalType: principal?.type ?? "guest",
+    principalId: principal?.id ?? null,
+    decision,
+    reason,
+    status,
+    timestamp: new Date().toISOString(),
+  };
+  console.log(JSON.stringify(payload));
 };
 
 const raiseAuthError = (c, principal, { status, message, reason, policyName }) => {

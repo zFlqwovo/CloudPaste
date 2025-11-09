@@ -13,12 +13,8 @@ const getWebDAVPath = (c) => {
   if (cached) {
     return cached;
   }
-  try {
-    const url = new URL(c.req?.url ?? "", "http://localhost");
-    return processWebDAVPath(url.pathname, false) || "/";
-  } catch (error) {
-    return "/";
-  }
+  const url = new URL(c.req?.url ?? "http://localhost/", "http://localhost");
+  return processWebDAVPath(url.pathname, false) || "/";
 };
 
 const Policies = {

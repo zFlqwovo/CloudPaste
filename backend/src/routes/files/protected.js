@@ -1,5 +1,5 @@
 import { HTTPException } from "hono/http-exception";
-import { ApiStatus } from "../../constants/index.js";
+import { ApiStatus, UserType } from "../../constants/index.js";
 import {
   getAdminFileList,
   getAdminFileDetail,
@@ -17,7 +17,7 @@ import { resolvePrincipal } from "../../security/helpers/principal.js";
 
 const requireFilesAccess = usePolicy("files.manage");
 
-const getFilesPrincipal = (c) => resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+const getFilesPrincipal = (c) => resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
 
 export const registerFilesProtectedRoutes = (router) => {
   router.get("/api/files", requireFilesAccess, async (c) => {
@@ -26,7 +26,7 @@ export const registerFilesProtectedRoutes = (router) => {
 
     let result;
 
-    if (userType === "admin") {
+    if (userType === UserType.ADMIN) {
       const { limit, offset } = getPagination(c, { limit: 30 });
       const search = c.req.query("search");
       const createdBy = c.req.query("created_by");
@@ -53,7 +53,7 @@ export const registerFilesProtectedRoutes = (router) => {
       success: true,
     };
 
-    if (userType === "apikey") {
+    if (userType === UserType.API_KEY) {
       response.key_info = apiKeyInfo;
     }
 
@@ -67,7 +67,7 @@ export const registerFilesProtectedRoutes = (router) => {
     const encryptionSecret = getEncryptionSecret(c);
 
     let result;
-    if (userType === "admin") {
+    if (userType === UserType.ADMIN) {
       result = await getAdminFileDetail(db, id, encryptionSecret, c.req.raw);
     } else {
       result = await getUserFileDetail(db, id, userId, encryptionSecret, c.req.raw);
@@ -103,81 +103,84 @@ export const registerFilesProtectedRoutes = (router) => {
     const fileRepository = repositoryFactory.getFileRepository();
 
     for (const id of ids) {
-      try {
-        let file;
+    await (async () => {
+      let file;
 
-        if (userType === "admin") {
-          file = await fileRepository.findByIdWithStorageConfig(id);
-          if (!file) {
-            result.failed.push({ id, error: "文件不存在" });
-            continue;
-          }
-        } else {
-          file = await fileRepository.findByIdAndCreator(id, `apikey:${userId}`);
-          if (!file) {
-            result.failed.push({ id, error: "文件不存在或无权删除" });
-            continue;
-          }
+      if (userType === UserType.ADMIN) {
+        file = await fileRepository.findByIdWithStorageConfig(id);
+        if (!file) {
+          result.failed.push({ id, error: "文件不存在" });
+          return;
         }
-
-        if (file.storage_type === "S3" && file.storage_config_id) {
-          s3ConfigIds.add(file.storage_config_id);
+      } else {
+        file = await fileRepository.findByIdAndCreator(id, `apikey:${userId}`);
+        if (!file) {
+          result.failed.push({ id, error: "文件不存在或无权删除" });
+          return;
         }
-
-        try {
-          if (deleteMode === "both" && file.file_path) {
-            const { MountManager } = await import("../../storage/managers/MountManager.js");
-            const { FileSystem } = await import("../../storage/fs/FileSystem.js");
-
-            const mountManager = new MountManager(db, encryptionSecret);
-            const fileSystem = new FileSystem(mountManager);
-
-            try {
-              await fileSystem.batchRemoveItems([file.file_path], userType === "admin" ? userId : `apikey:${userId}`, userType);
-            } catch (fsError) {
-              console.error(`删除文件系统文件错误 (ID: ${id}):`, fsError);
-            }
-          }
-
-          if (deleteMode === "both" && file.storage_path && file.bucket_name) {
-            const s3Config = {
-              id: file.id,
-              endpoint_url: file.endpoint_url,
-              bucket_name: file.bucket_name,
-              region: file.region,
-              access_key_id: file.access_key_id,
-              secret_access_key: file.secret_access_key,
-              path_style: file.path_style,
-            };
-            await deleteFileFromS3(s3Config, file.storage_path, encryptionSecret);
-          }
-        } catch (deleteError) {
-          console.error(`删除文件错误 (ID: ${id}):`, deleteError);
-        }
-
-        if (userType === "admin") {
-          await fileRepository.deleteFilePasswordRecord(id);
-        }
-        await fileRepository.deleteFile(id);
-
-        result.success++;
-      } catch (error) {
-        console.error(`删除文件失败 (ID: ${id}):`, error);
-        result.failed.push({ id, error: error.message || "删除失败" });
       }
-    }
 
-    for (const s3ConfigId of s3ConfigIds) {
-      invalidateFsCache({ s3ConfigId, reason: "files-batch-delete", db });
-    }
+      if (file.storage_type === "S3" && file.storage_config_id) {
+        s3ConfigIds.add(file.storage_config_id);
+      }
 
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: `批量删除完成，成功: ${result.success}，失败: ${result.failed.length}`,
-      data: result,
-      success: true,
+      await (async () => {
+        if (deleteMode === "both" && file.file_path) {
+          const { MountManager } = await import("../../storage/managers/MountManager.js");
+          const { FileSystem } = await import("../../storage/fs/FileSystem.js");
+
+          const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
+          const fileSystem = new FileSystem(mountManager);
+
+          await fileSystem
+            .batchRemoveItems([file.file_path], userType === UserType.ADMIN ? userId : `apikey:${userId}`, userType)
+            .catch((fsError) => {
+              console.error(`删除文件系统文件失败 (ID: ${id}):`, fsError);
+            });
+        }
+
+        if (deleteMode === "both" && file.storage_path && file.bucket_name) {
+          const s3Config = {
+            id: file.id,
+            endpoint_url: file.endpoint_url,
+            bucket_name: file.bucket_name,
+            region: file.region,
+            access_key_id: file.access_key_id,
+            secret_access_key: file.secret_access_key,
+            path_style: file.path_style,
+          };
+
+          await deleteFileFromS3(s3Config, file.storage_path, encryptionSecret).catch((deleteError) => {
+            console.error(`删除S3文件失败 (ID: ${id}):`, deleteError);
+          });
+        }
+      })().catch((deleteError) => {
+        console.error(`删除文件存储失败 (ID: ${id}):`, deleteError);
+      });
+
+      if (userType === UserType.ADMIN) {
+        await fileRepository.deleteFilePasswordRecord(id);
+      }
+      await fileRepository.deleteFile(id);
+
+      result.success++;
+    })().catch((error) => {
+      console.error(`删除文件失败 (ID: ${id}):`, error);
+      result.failed.push({ id, error: error.message || "删除失败" });
     });
+  }
+
+  for (const s3ConfigId of s3ConfigIds) {
+    invalidateFsCache({ s3ConfigId, reason: "files-batch-delete", db });
+  }
+
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: `批量删除完成，成功: ${result.success}，失败: ${result.failed.length}`,
+    data: result,
+    success: true,
   });
+});
 
   router.put("/api/files/:id", requireFilesAccess, async (c) => {
     const db = c.env.DB;

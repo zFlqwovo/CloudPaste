@@ -6,7 +6,7 @@
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse, withWebDAVErrorHandling } from "../utils/errorUtils.js";
 import { addWebDAVHeaders, getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 
@@ -20,10 +20,10 @@ import { getEffectiveMimeType } from "../../utils/fileUtils.js";
  */
 export async function handleGet(c, path, userId, userType, db) {
   const isHead = c.req.method === "HEAD";
-
-  try {
+  return withWebDAVErrorHandling("GET", async () => {
     // 创建FileSystem实例
-    const mountManager = new MountManager(db, getEncryptionSecret(c));
+    const repositoryFactory = c.get("repos");
+    const mountManager = new MountManager(db, getEncryptionSecret(c), repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
 
     // 获取文件名并统一从文件名推断MIME类型
@@ -188,8 +188,5 @@ export async function handleGet(c, path, userId, userType, db) {
 
       return addWebDAVHeaders(response);
     }
-  } catch (error) {
-    // 使用统一的错误处理
-    return handleWebDAVError("GET", error);
-  }
+  });
 }

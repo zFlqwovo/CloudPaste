@@ -9,7 +9,7 @@ import {
   updateGroupSettings,
   getSettingMetadata,
 } from "../services/systemService.js";
-import { ApiStatus } from "../constants/index.js";
+import { ApiStatus, UserType } from "../constants/index.js";
 import { getQueryBool } from "../utils/common.js";
 import { usePolicy } from "../security/policies/policies.js";
 import { resolvePrincipal } from "../security/helpers/principal.js";
@@ -20,35 +20,24 @@ const requireAdmin = usePolicy("admin.all");
 // 获取最大上传文件大小限制（公共API）
 systemRoutes.get("/api/system/max-upload-size", async (c) => {
   const db = c.env.DB;
+  const repositoryFactory = c.get("repos");
 
-  try {
-    // 获取最大上传大小设置
-    const size = await getMaxUploadSize(db);
+  const size = await getMaxUploadSize(db, repositoryFactory);
 
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取最大上传大小成功",
-      data: { max_upload_size: size },
-      success: true,
-    });
-  } catch (error) {
-    console.error("获取最大上传大小错误:", error);
-    // 获取默认值
-    const defaultSize = await getMaxUploadSize(db);
-    return c.json({
-      code: ApiStatus.SUCCESS,
-      message: "获取最大上传大小成功（使用默认值）",
-      data: { max_upload_size: defaultSize },
-      success: true,
-    });
-  }
+  return c.json({
+    code: ApiStatus.SUCCESS,
+    message: "获取最大上传大小成功",
+    data: { max_upload_size: size },
+    success: true,
+  });
 });
 
 // 仪表盘统计数据API
 systemRoutes.get("/api/admin/dashboard/stats", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
-  const stats = await getDashboardStats(db, adminId);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN] });
+  const repositoryFactory = c.get("repos");
+  const stats = await getDashboardStats(db, adminId, repositoryFactory);
 
   return c.json({
     code: ApiStatus.SUCCESS,
@@ -73,19 +62,20 @@ systemRoutes.get("/api/version", async (c) => {
 
   // 根据环境获取版本信息
   if (isDocker) {
-    // Docker环境：尝试读取package.json
-    try {
+    const packageJson = await (async () => {
       const fs = await import("fs");
       const path = await import("path");
       const packagePath = path.resolve("./package.json");
-      const packageContent = fs.readFileSync(packagePath, "utf8");
-      const packageJson = JSON.parse(packageContent);
+      const packageContent = await fs.promises.readFile(packagePath, "utf8");
+      return JSON.parse(packageContent);
+    })().catch((error) => {
+      console.warn("Docker环境读取package.json失败，使用默认值:", error.message);
+      return null;
+    });
 
+    if (packageJson) {
       version = packageJson.version || DEFAULT_VERSION;
       name = packageJson.name || DEFAULT_NAME;
-    } catch (error) {
-      console.warn("Docker环境读取package.json失败，使用默认值:", error.message);
-      // 保持默认值
     }
   } else {
     // Workers环境：使用环境变量或默认值
@@ -115,6 +105,7 @@ systemRoutes.get("/api/version", async (c) => {
 // 按分组获取设置项（公开访问，无需认证）
 systemRoutes.get("/api/admin/settings", async (c) => {
   const db = c.env.DB;
+  const repositoryFactory = c.get("repos");
   const groupId = c.req.query("group");
   const includeMetadata = getQueryBool(c, "metadata", true);
 
@@ -124,7 +115,7 @@ systemRoutes.get("/api/admin/settings", async (c) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
     }
 
-    const settings = await getSettingsByGroup(db, groupIdNum, includeMetadata);
+    const settings = await getSettingsByGroup(db, groupIdNum, includeMetadata, repositoryFactory);
     return c.json({
       code: ApiStatus.SUCCESS,
       message: "获取分组设置成功",
@@ -134,7 +125,7 @@ systemRoutes.get("/api/admin/settings", async (c) => {
   }
 
   const includeSystemGroup = getQueryBool(c, "includeSystem", false);
-  const groupedSettings = await getAllSettingsByGroups(db, includeSystemGroup);
+  const groupedSettings = await getAllSettingsByGroups(db, includeSystemGroup, repositoryFactory);
 
   return c.json({
     code: ApiStatus.SUCCESS,
@@ -147,7 +138,8 @@ systemRoutes.get("/api/admin/settings", async (c) => {
 // 获取分组列表和统计信息
 systemRoutes.get("/api/admin/settings/groups", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const groupsInfo = await getGroupsInfo(db);
+  const repositoryFactory = c.get("repos");
+  const groupsInfo = await getGroupsInfo(db, repositoryFactory);
 
   return c.json({
     code: ApiStatus.SUCCESS,
@@ -160,12 +152,13 @@ systemRoutes.get("/api/admin/settings/groups", requireAdmin, async (c) => {
 // 获取设置项元数据
 systemRoutes.get("/api/admin/settings/metadata", requireAdmin, async (c) => {
   const db = c.env.DB;
+  const repositoryFactory = c.get("repos");
   const key = c.req.query("key");
   if (!key) {
     throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少设置键名参数" });
   }
 
-  const metadata = await getSettingMetadata(db, key);
+  const metadata = await getSettingMetadata(db, key, repositoryFactory);
   if (!metadata) {
     throw new HTTPException(ApiStatus.NOT_FOUND, { message: "设置项不存在" });
   }
@@ -181,6 +174,7 @@ systemRoutes.get("/api/admin/settings/metadata", requireAdmin, async (c) => {
 // 按分组批量更新设置
 systemRoutes.put("/api/admin/settings/group/:groupId", requireAdmin, async (c) => {
   const db = c.env.DB;
+  const repositoryFactory = c.get("repos");
   const groupId = parseInt(c.req.param("groupId"), 10);
   if (Number.isNaN(groupId)) {
     throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "分组ID必须是数字" });
@@ -192,7 +186,7 @@ systemRoutes.put("/api/admin/settings/group/:groupId", requireAdmin, async (c) =
   }
 
   const validateType = getQueryBool(c, "validate", true);
-  const result = await updateGroupSettings(db, groupId, body, { validateType });
+  const result = await updateGroupSettings(db, groupId, body, { validateType }, repositoryFactory);
 
   return c.json({
     code: result.success ? ApiStatus.SUCCESS : ApiStatus.ACCEPTED,

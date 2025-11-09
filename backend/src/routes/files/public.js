@@ -26,18 +26,18 @@ export const registerFilesPublicRoutes = (router) => {
       const result = await incrementAndCheckFileViews(db, file, encryptionSecret);
 
       if (result.isExpired) {
-        try {
+        await (async () => {
           const repositoryFactory = useRepositories(c);
           const fileRepository = repositoryFactory.getFileRepository();
           const fileStillExists = await fileRepository.findById(file.id);
           if (fileStillExists) {
             console.log(`文件(${file.id})达到最大访问次数但未被删除，再次尝试删除...`);
             const { checkAndDeleteExpiredFile } = await import("../../services/fileViewService.js");
-            await checkAndDeleteExpiredFile(db, result.file, encryptionSecret);
+            await checkAndDeleteExpiredFile(db, result.file, encryptionSecret, repositoryFactory);
           }
-        } catch (error) {
+        })().catch((error) => {
           console.error(`尝试再次删除文件(${file.id})时出错:`, error);
-        }
+        });
         throw new HTTPException(ApiStatus.GONE, { message: "文件已达到最大查看次数" });
       }
 

@@ -11,7 +11,7 @@ import { GetFileType, getFileTypeName } from "../utils/fileTypeDetector.js";
 import { validateSlugFormat } from "../utils/common.js";
 import { hashPassword } from "../utils/crypto.js";
 import { HTTPException } from "hono/http-exception";
-import { ApiStatus, DbTables } from "../constants/index.js";
+import { ApiStatus, DbTables, UserType } from "../constants/index.js";
 
 export class FileService {
   /**
@@ -271,7 +271,7 @@ export class FileService {
 
     // 检查文件是否存在并验证权限
     let existingFile;
-    if (userType === "admin") {
+    if (userType === UserType.ADMIN) {
       // 管理员：可以更新任何文件
       existingFile = await this.fileRepository.findById(fileId);
       if (!existingFile) {
@@ -324,7 +324,7 @@ export class FileService {
     }
 
     // 如果没有要更新的字段（API密钥用户需要检查）
-    if (userType === "apikey" && Object.keys(finalUpdateData).length === 0) {
+    if (userType === UserType.API_KEY && Object.keys(finalUpdateData).length === 0) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "没有提供有效的更新字段" });
     }
 
@@ -357,7 +357,7 @@ export class FileService {
 
     // 检查slug是否可用 (不与其他文件冲突)
     let slugExistsCheck;
-    if (userType === "admin") {
+    if (userType === UserType.ADMIN) {
       slugExistsCheck = await this.fileRepository.findBySlug(slug);
       if (slugExistsCheck && slugExistsCheck.id !== fileId) {
         throw new HTTPException(ApiStatus.CONFLICT, {

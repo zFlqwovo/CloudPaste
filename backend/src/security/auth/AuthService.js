@@ -7,7 +7,7 @@ import { Permission, PermissionChecker } from "../../constants/permissions.js";
 import { validateAdminToken } from "../../services/adminService.js";
 import { checkAndDeleteExpiredApiKey } from "../../services/apiKeyService.js";
 import { verifyPassword } from "../../utils/crypto.js";
-import { RepositoryFactory } from "../../repositories/index.js";
+import { ensureRepositoryFactory } from "../../utils/repositories.js";
 
 /**
  * 认证结果类
@@ -94,8 +94,9 @@ export class AuthResult {
  * 认证服务类 - 基于位标志权限系统
  */
 export class AuthService {
-  constructor(db) {
+  constructor(db, repositoryFactory = null) {
     this.db = db;
+    this.repositoryFactory = ensureRepositoryFactory(db, repositoryFactory);
   }
 
   /**
@@ -122,145 +123,143 @@ export class AuthService {
    * 验证管理员认证
    */
   async validateAdminAuth(token) {
-    try {
-      const adminId = await validateAdminToken(this.db, token);
-      if (!adminId) {
-        return new AuthResult();
-      }
-
-      return new AuthResult({
-        isAuthenticated: true,
-        userId: adminId,
-        permissions: 0,
-        isAdmin: true,
-      });
-    } catch (error) {
-      console.error("管理员认证失败:", error);
+    const adminId = await validateAdminToken(this.db, token, this.repositoryFactory);
+    if (!adminId) {
       return new AuthResult();
     }
+
+    return new AuthResult({
+      isAuthenticated: true,
+      userId: adminId,
+      permissions: 0,
+      isAdmin: true,
+    });
   }
 
   /**
    * 验证API密钥认证
    */
   async validateApiKeyAuth(apiKey) {
-    try {
-      const repositoryFactory = new RepositoryFactory(this.db);
-      const apiKeyRepository = repositoryFactory.getApiKeyRepository();
-      const keyRecord = await apiKeyRepository.findByKey(apiKey);
+    const apiKeyRepository = this.repositoryFactory.getApiKeyRepository();
+    const keyRecord = await apiKeyRepository.findByKey(apiKey);
 
-      if (!keyRecord) {
-        return new AuthResult();
-      }
-
-      // 检查是否过期
-      if (await checkAndDeleteExpiredApiKey(this.db, keyRecord)) {
-        return new AuthResult();
-      }
-
-      // 更新最后使用时间
-      await apiKeyRepository.updateLastUsed(keyRecord.id);
-
-      return new AuthResult({
-        isAuthenticated: true,
-        userId: keyRecord.id,
-        permissions: keyRecord.permissions || 0,
-        basicPath: keyRecord.basic_path || "/",
-        keyInfo: {
-          id: keyRecord.id,
-          name: keyRecord.name,
-          key: keyRecord.key,
-          basicPath: keyRecord.basic_path || "/",
-          permissions: keyRecord.permissions || 0,
-          role: keyRecord.role || "GENERAL",
-          isGuest: keyRecord.is_guest === 1,
-        },
-      });
-    } catch (error) {
-      console.error("API密钥认证失败:", error);
+    if (!keyRecord) {
       return new AuthResult();
     }
+
+    if (await checkAndDeleteExpiredApiKey(this.db, keyRecord, this.repositoryFactory)) {
+      return new AuthResult();
+    }
+
+    await apiKeyRepository.updateLastUsed(keyRecord.id);
+    return this.buildApiKeyAuthResult(keyRecord);
   }
 
   /**
    * 验证Basic认证（用于WebDAV）
    */
   async validateBasicAuth(token) {
-    try {
-      const credentials = Buffer.from(token, "base64").toString("utf-8");
-      const [username, password] = credentials.split(":");
-
-      if (!username || !password) {
-        return new AuthResult();
-      }
-
-      // 尝试管理员认证
-      try {
-        const repositoryFactory = new RepositoryFactory(this.db);
-        const adminRepository = repositoryFactory.getAdminRepository();
-        const adminRecord = await adminRepository.findByUsername(username);
-
-        if (adminRecord && (await verifyPassword(password, adminRecord.password))) {
-          return new AuthResult({
-            isAuthenticated: true,
-            userId: adminRecord.id,
-            permissions: 0,
-            isAdmin: true,
-          });
-        }
-      } catch (error) {
-        console.error("WebDAV认证: 管理员验证过程出错", error);
-      }
-
-      // 尝试API密钥认证
-      try {
-        const repositoryFactory = new RepositoryFactory(this.db);
-        const apiKeyRepository = repositoryFactory.getApiKeyRepository();
-        const keyRecord = await apiKeyRepository.findByKey(username);
-
-        if (keyRecord) {
-          // 检查WebDAV权限 - 至少需要读取权限才能进行WebDAV认证
-          const hasWebDAVPermission = PermissionChecker.hasPermission(keyRecord.permissions || 0, Permission.WEBDAV_READ);
-
-          if (hasWebDAVPermission) {
-            // 对于API密钥，用户名和密码应相同
-            if (username === password) {
-              // 检查是否过期
-              if (await checkAndDeleteExpiredApiKey(this.db, keyRecord)) {
-                return new AuthResult();
-              }
-
-              // 更新最后使用时间
-              await apiKeyRepository.updateLastUsed(keyRecord.id);
-
-              return new AuthResult({
-                isAuthenticated: true,
-                userId: keyRecord.id,
-                permissions: keyRecord.permissions || 0,
-                basicPath: keyRecord.basic_path || "/",
-                keyInfo: {
-                  id: keyRecord.id,
-                  name: keyRecord.name,
-                  key: keyRecord.key,
-                  basicPath: keyRecord.basic_path || "/",
-                  permissions: keyRecord.permissions || 0,
-                  role: keyRecord.role || "GENERAL",
-                  isGuest: keyRecord.is_guest === 1,
-                },
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error("WebDAV认证: API密钥验证过程出错", error);
-      }
-
-      return new AuthResult();
-    } catch (error) {
-      console.error("Basic认证验证失败:", error);
+    const credentials = this.decodeBasicCredentials(token);
+    if (!credentials) {
       return new AuthResult();
     }
+
+    const separatorIndex = credentials.indexOf(":");
+    if (separatorIndex === -1) {
+      return new AuthResult();
+    }
+
+    const username = credentials.slice(0, separatorIndex);
+    const password = credentials.slice(separatorIndex + 1);
+    if (!username || !password) {
+      return new AuthResult();
+    }
+
+    const adminResult = await this.authenticateBasicAdmin(username, password);
+    if (adminResult) {
+      return adminResult;
+    }
+
+    const apiKeyResult = await this.authenticateBasicApiKey(username, password);
+    if (apiKeyResult) {
+      return apiKeyResult;
+    }
+
+    return new AuthResult();
   }
+
+  decodeBasicCredentials(token) {
+    if (!token || typeof token !== "string") {
+      return null;
+    }
+
+    const normalized = token.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const decoded = Buffer.from(normalized, "base64").toString("utf-8");
+    return decoded || null;
+  }
+
+  async authenticateBasicAdmin(username, password) {
+    const adminRepository = this.repositoryFactory.getAdminRepository();
+    const adminRecord = await adminRepository.findByUsername(username);
+
+    if (adminRecord && (await verifyPassword(password, adminRecord.password))) {
+      return new AuthResult({
+        isAuthenticated: true,
+        userId: adminRecord.id,
+        permissions: 0,
+        isAdmin: true,
+      });
+    }
+
+    return null;
+  }
+
+  async authenticateBasicApiKey(username, password) {
+    if (username !== password) {
+      return null;
+    }
+
+    const apiKeyRepository = this.repositoryFactory.getApiKeyRepository();
+    const keyRecord = await apiKeyRepository.findByKey(username);
+    if (!keyRecord) {
+      return null;
+    }
+
+    const hasWebDAVPermission = PermissionChecker.hasPermission(keyRecord.permissions || 0, Permission.WEBDAV_READ);
+    if (!hasWebDAVPermission) {
+      return null;
+    }
+
+    if (await checkAndDeleteExpiredApiKey(this.db, keyRecord, this.repositoryFactory)) {
+      return null;
+    }
+
+    await apiKeyRepository.updateLastUsed(keyRecord.id);
+    return this.buildApiKeyAuthResult(keyRecord);
+  }
+
+  buildApiKeyAuthResult(keyRecord) {
+    return new AuthResult({
+      isAuthenticated: true,
+      userId: keyRecord.id,
+      permissions: keyRecord.permissions || 0,
+      basicPath: keyRecord.basic_path || "/",
+      keyInfo: {
+        id: keyRecord.id,
+        name: keyRecord.name,
+        key: keyRecord.key,
+        basicPath: keyRecord.basic_path || "/",
+        permissions: keyRecord.permissions || 0,
+        role: keyRecord.role || "GENERAL",
+        isGuest: keyRecord.is_guest === 1,
+      },
+    });
+  }
+
 
   /**
    * 统一认证方法
@@ -335,6 +334,6 @@ export class AuthService {
 /**
  * 创建认证服务实例
  */
-export function createAuthService(db) {
-  return new AuthService(db);
+export function createAuthService(db, repositoryFactory = null) {
+  return new AuthService(db, repositoryFactory);
 }

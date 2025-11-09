@@ -29,6 +29,7 @@ export const registerWriteRoutes = (router, helpers) => {
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const encryptionSecret = getEncryptionSecret(c);
+    const repositoryFactory = c.get("repos");
     const body = c.get("jsonBody");
     const path = body.path;
 
@@ -36,7 +37,7 @@ export const registerWriteRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供目录路径" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     await fileSystem.createDirectory(path, userIdOrInfo, userType);
 
@@ -52,6 +53,7 @@ export const registerWriteRoutes = (router, helpers) => {
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const encryptionSecret = getEncryptionSecret(c);
+    const repositoryFactory = c.get("repos");
     const formData = c.get("formData");
     const file = formData.get("file");
     const path = formData.get("path");
@@ -61,7 +63,7 @@ export const registerWriteRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供文件和路径" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.uploadFile(path, file, userIdOrInfo, userType, { useMultipart });
 
@@ -87,6 +89,7 @@ export const registerWriteRoutes = (router, helpers) => {
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const encryptionSecret = getEncryptionSecret(c);
+    const repositoryFactory = c.get("repos");
     const body = c.get("jsonBody");
     const path = body.path;
     const content = body.content;
@@ -95,7 +98,7 @@ export const registerWriteRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供文件路径和内容" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.updateFile(path, content, userIdOrInfo, userType);
 

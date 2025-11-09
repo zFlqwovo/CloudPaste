@@ -1,4 +1,5 @@
 import { createAuthService } from "./AuthService.js";
+import { useRepositories } from "../../utils/repositories.js";
 
 /**
  * 轻量化的认证入口，仅负责调用 AuthService 并缓存结果。
@@ -10,7 +11,8 @@ export const performAuth = async (c) => {
   let authService = c.get("authService");
 
   if (!authResult) {
-    authService = createAuthService(c.env.DB);
+    const repositoryFactory = c.get("repos") ?? useRepositories(c);
+    authService = createAuthService(c.env.DB, repositoryFactory);
 
     const authHeader = c.req.header("Authorization");
     authResult = await authService.authenticate(authHeader);

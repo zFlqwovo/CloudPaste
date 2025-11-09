@@ -15,3 +15,22 @@ export const useRepositories = (c) => {
   c.set("repos", factory);
   return factory;
 };
+
+export const ensureRepositoryFactory = (db, repositoryFactory = null) => {
+  if (repositoryFactory) {
+    return repositoryFactory;
+  }
+  if (!db) {
+    throw new Error("Database connection is required to create RepositoryFactory");
+  }
+  return new RepositoryFactory(db);
+};
+
+// Optional middleware to ensure RepositoryFactory is initialized per request.
+// Keeping this here avoids creating a separate middlewares folder for a single helper.
+export const withRepositories = () => {
+  return async (c, next) => {
+    useRepositories(c);
+    await next();
+  };
+};

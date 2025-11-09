@@ -65,3 +65,10 @@ export const S3ProviderTypes = {
   ALIYUN_OSS: "Aliyun OSS",
   OTHER: "Other S3 Compatible",
 };
+
+// 统一的用户类型常量（供服务层/能力层使用）
+export const UserType = {
+  ADMIN: "admin",
+  API_KEY: "apiKey",
+  GUEST: "guest",
+};

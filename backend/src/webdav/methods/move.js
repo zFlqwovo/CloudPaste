@@ -8,7 +8,7 @@
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
-import { createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse, withWebDAVErrorHandling } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { invalidateFsCache } from "../../cache/invalidation.js";
 import { lockManager } from "../utils/LockManager.js";
@@ -195,7 +195,7 @@ async function performFileCrossStorageTransfer(fileItem) {
  * @returns {Promise<Response>} HTTP响应
  */
 export async function handleMove(c, path, userId, userType, db) {
-  try {
+  return withWebDAVErrorHandling("MOVE", async () => {
     console.log(`WebDAV MOVE - 开始处理: ${path}`);
 
     // 1. 解析WebDAV头部（与COPY方法完全一致）
@@ -243,7 +243,8 @@ export async function handleMove(c, path, userId, userType, db) {
     }
 
     // 6. 创建FileSystem实例
-    const mountManager = new MountManager(db, getEncryptionSecret(c));
+    const repositoryFactory = c.get("repos");
+    const mountManager = new MountManager(db, getEncryptionSecret(c), repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
 
     console.log(`WebDAV MOVE - 开始移动: ${path} -> ${destPath}, 用户类型: ${userType}`);
@@ -387,8 +388,5 @@ export async function handleMove(c, path, userId, userType, db) {
         }),
       });
     }
-  } catch (error) {
-    console.error(`WebDAV MOVE - 处理异常: ${error.message}`, error);
-    return createWebDAVErrorResponse(`服务器内部错误: ${error.message}`, 500, false);
-  }
+  }, { includeDetails: false, useXmlResponse: false });
 }

@@ -2,7 +2,6 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { invalidateFsCache } from "../../cache/invalidation.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { usePolicy } from "../../security/policies/policies.js";
 
@@ -52,6 +51,7 @@ export const registerOpsRoutes = (router, helpers) => {
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
     const encryptionSecret = getEncryptionSecret(c);
+    const repositoryFactory = c.get("repos");
     const body = c.get("jsonBody");
     const oldPath = body.oldPath;
     const newPath = body.newPath;
@@ -60,7 +60,7 @@ export const registerOpsRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供原路径和新路径" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     await fileSystem.renameItem(oldPath, newPath, userIdOrInfo, userType);
 
@@ -77,6 +77,7 @@ export const registerOpsRoutes = (router, helpers) => {
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
     const encryptionSecret = getEncryptionSecret(c);
+    const repositoryFactory = c.get("repos");
     const body = c.get("jsonBody");
     const paths = body.paths;
 
@@ -84,7 +85,7 @@ export const registerOpsRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供有效的路径数组" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.batchRemoveItems(paths, userIdOrInfo, userType);
 
@@ -102,6 +103,7 @@ export const registerOpsRoutes = (router, helpers) => {
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
     const encryptionSecret = getEncryptionSecret(c);
+    const repositoryFactory = c.get("repos");
     const body = c.get("jsonBody");
     const items = body.items;
     const skipExisting = body.skipExisting !== false;
@@ -110,59 +112,51 @@ export const registerOpsRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供有效的复制项数组" });
     }
 
-    try {
-      const mountManager = new MountManager(db, encryptionSecret);
-      const fileSystem = new FileSystem(mountManager);
-      const copyItems = items.map((item) => ({ ...item, skipExisting }));
-      const result = await fileSystem.batchCopyItems(copyItems, userIdOrInfo, userType);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
+    const fileSystem = new FileSystem(mountManager);
+    const copyItems = items.map((item) => ({ ...item, skipExisting }));
+    const result = await fileSystem.batchCopyItems(copyItems, userIdOrInfo, userType);
 
-      const totalSuccess = result.success || 0;
-      const totalSkipped = result.skipped || 0;
-      const totalFailed = (result.failed && result.failed.length) || 0;
-      const allDetails = result.details || [];
-      const allFailedItems = result.failed || [];
-      const hasCrossStorageOperations = result.hasCrossStorageOperations || false;
-      const crossStorageResults = result.crossStorageResults || [];
+    const totalSuccess = result.success || 0;
+    const totalSkipped = result.skipped || 0;
+    const totalFailed = (result.failed && result.failed.length) || 0;
+    const allDetails = result.details || [];
+    const allFailedItems = result.failed || [];
+    const hasCrossStorageOperations = result.hasCrossStorageOperations || false;
+    const crossStorageResults = result.crossStorageResults || [];
 
-      if (hasCrossStorageOperations) {
-        return c.json({
-          code: ApiStatus.SUCCESS,
-          message: "FILE_COPY_SUCCESS",
-          data: {
-            crossStorage: true,
-            requiresClientSideCopy: true,
-            standardCopyResults: {
-              success: totalSuccess,
-              skipped: totalSkipped,
-              failed: totalFailed,
-            },
-            crossStorageResults,
-            failed: allFailedItems,
-            details: allDetails,
-          },
-          success: true,
-        });
-      }
-
+    if (hasCrossStorageOperations) {
       return c.json({
         code: ApiStatus.SUCCESS,
         message: "FILE_COPY_SUCCESS",
         data: {
-          crossStorage: false,
-          success: totalSuccess,
-          skipped: totalSkipped,
-          failed: totalFailed,
+          crossStorage: true,
+          requiresClientSideCopy: true,
+          standardCopyResults: {
+            success: totalSuccess,
+            skipped: totalSkipped,
+            failed: totalFailed,
+          },
+          crossStorageResults,
+          failed: allFailedItems,
           details: allDetails,
         },
         success: true,
       });
-    } catch (error) {
-      console.error("批量复制错误:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "批量复制失败" });
     }
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "FILE_COPY_SUCCESS",
+      data: {
+        crossStorage: false,
+        success: totalSuccess,
+        skipped: totalSkipped,
+        failed: totalFailed,
+        details: allDetails,
+      },
+      success: true,
+    });
   });
 
   router.post("/api/fs/batch-copy-commit", parseJsonBody, usePolicy("fs.copy", { pathCheck: false }), async (c) => {
@@ -176,66 +170,35 @@ export const registerOpsRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供有效的目标挂载点ID和文件列表" });
     }
 
-    try {
-      const repositoryFactory = useRepositories(c);
-      const mountRepository = repositoryFactory.getMountRepository();
-      const mount = await mountRepository.findById(targetMountId);
-      if (!mount) {
-        throw new HTTPException(ApiStatus.NOT_FOUND, { message: "目标挂载点不存在" });
-      }
-
-      const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
-      const s3Config = await getS3ConfigByUserType(db, mount.storage_config_id, userIdOrInfo, userType, getEncryptionSecret(c));
-      if (!s3Config) {
-        throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
-      }
-
-      const results = { success: [], failed: [] };
-
-      for (const file of files) {
-        try {
-          const { targetPath, s3Path } = file;
-
-          if (!targetPath || !s3Path) {
-            results.failed.push({
-              targetPath: targetPath || "未指定",
-              error: "目标路径或S3路径不能为空",
-            });
-            continue;
-          }
-
-          const fileName = targetPath.split("/").filter(Boolean).pop();
-          results.success.push({ targetPath, fileName });
-        } catch (fileError) {
-          console.error("处理单个文件复制提交时出错:", fileError);
-          results.failed.push({
-            targetPath: file.targetPath || "未知路径",
-            error: fileError.message || "处理文件时出错",
-          });
-        }
-      }
-
-      invalidateFsCache({ mountId: mount.id, reason: "batch-copy-commit", db });
-
-      const hasFailures = results.failed.length > 0;
-      const hasSuccess = results.success.length > 0;
-      const overallSuccess = hasSuccess;
-
-      return c.json({
-        code: overallSuccess ? ApiStatus.SUCCESS : ApiStatus.ACCEPTED,
-        message: "FILE_COPY_SUCCESS",
-        data: {
-          ...results,
-          crossStorage: true,
-        },
-        success: overallSuccess,
-      });
-    } catch (error) {
-      console.error("提交批量复制完成错误:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "提交批量复制完成失败" });
+    const repositoryFactory = useRepositories(c);
+    const mountRepository = repositoryFactory.getMountRepository();
+    const mount = await mountRepository.findById(targetMountId);
+    if (!mount) {
+      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "目标挂载点不存在" });
     }
+
+    const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
+    const s3Config = await getS3ConfigByUserType(db, mount.storage_config_id, userIdOrInfo, userType, getEncryptionSecret(c));
+    if (!s3Config) {
+      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
+    }
+
+    const mountManager = new MountManager(db, getEncryptionSecret(c), repositoryFactory);
+    const fsForCommit = new FileSystem(mountManager);
+    const results = await fsForCommit.commitCrossStorageCopy(mount, files);
+
+    const hasFailures = results.failed.length > 0;
+    const hasSuccess = results.success.length > 0;
+    const overallSuccess = hasSuccess;
+
+    return c.json({
+      code: overallSuccess ? ApiStatus.SUCCESS : ApiStatus.ACCEPTED,
+      message: "FILE_COPY_SUCCESS",
+      data: {
+        ...results,
+        crossStorage: true,
+      },
+      success: overallSuccess,
+    });
   });
 };

@@ -3,7 +3,7 @@
  */
 import { Hono } from "hono";
 import { createMount, updateMount, deleteMount, getAllMounts } from "../services/storageMountService.js";
-import { ApiStatus } from "../constants/index.js";
+import { ApiStatus, UserType } from "../constants/index.js";
 import { usePolicy } from "../security/policies/policies.js";
 import { resolvePrincipal } from "../security/helpers/principal.js";
 import { getAccessibleMountsForUser } from "../security/helpers/access.js";
@@ -21,7 +21,7 @@ const requireMountView = usePolicy("fs.base");
 
 mountRoutes.get("/api/mount/list", requireMountView, async (c) => {
   const db = c.env.DB;
-  const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+  const identity = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
 
   if (identity.isAdmin) {
     const mounts = await getAllMounts(db, true);
@@ -34,7 +34,7 @@ mountRoutes.get("/api/mount/list", requireMountView, async (c) => {
     });
   }
 
-  const mounts = await getAccessibleMountsForUser(db, identity.apiKeyInfo, "apiKey");
+  const mounts = await getAccessibleMountsForUser(db, identity.apiKeyInfo, UserType.API_KEY);
 
   return c.json({
     code: ApiStatus.SUCCESS,
@@ -49,7 +49,7 @@ mountRoutes.get("/api/mount/list", requireMountView, async (c) => {
  */
 mountRoutes.post("/api/mount/create", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN] });
 
   const body = await c.req.json();
   const mount = await createMount(db, body, adminId);
@@ -67,7 +67,7 @@ mountRoutes.post("/api/mount/create", requireAdmin, async (c) => {
  */
 mountRoutes.put("/api/mount/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN] });
   const { id } = c.req.param();
 
   const body = await c.req.json();
@@ -85,7 +85,7 @@ mountRoutes.put("/api/mount/:id", requireAdmin, async (c) => {
  */
 mountRoutes.delete("/api/mount/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN] });
   const { id } = c.req.param();
 
   await deleteMount(db, id, adminId, true);

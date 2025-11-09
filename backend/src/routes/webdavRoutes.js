@@ -3,9 +3,7 @@
  */
 import { Hono } from "hono";
 import { webdavAuthMiddleware, handleWebDAV } from "../webdav/index.js";
-import { HTTPException } from "hono/http-exception";
 import { WEBDAV_BASE_PATH, isReadOperation } from "../webdav/auth/config/WebDAVConfig.js";
-import { ApiStatus } from "../constants/index.js";
 import { webdavHeaders } from "../webdav/middlewares/webdavHeaders.js";
 import { usePolicy } from "../security/policies/policies.js";
 
@@ -32,36 +30,19 @@ const buildMiddlewareChain = (method) => {
 // 明确定义各种WebDAV方法的处理函数，避免使用all通配符
 const webdavMethods = ["GET", "PUT", "DELETE", "OPTIONS", "PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK", "HEAD"];
 
+const wrapWebDAVHandler = () => {
+  return (c) => handleWebDAV(c);
+};
 // 注册WebDAV路由处理器
 webdavMethods.forEach((method) => {
   const baseMiddlewares = buildMiddlewareChain(method);
-  webdavRoutes.on(method, WEBDAV_BASE_PATH, ...baseMiddlewares, async (c) => {
-    try {
-      return await handleWebDAV(c);
-    } catch (error) {
-      console.error(`WebDAV ${method} 请求处理错误:`, error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "WebDAV服务处理错误" });
-    }
-  });
+  webdavRoutes.on(method, WEBDAV_BASE_PATH, ...baseMiddlewares, wrapWebDAVHandler());
 });
 
 // 处理WebDAV子路径的请求
 webdavMethods.forEach((method) => {
   const nestedMiddlewares = buildMiddlewareChain(method);
-  webdavRoutes.on(method, `${WEBDAV_BASE_PATH}/*`, ...nestedMiddlewares, async (c) => {
-    try {
-      return await handleWebDAV(c);
-    } catch (error) {
-      console.error(`WebDAV ${method} 请求处理错误:`, error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "WebDAV服务处理错误" });
-    }
-  });
+  webdavRoutes.on(method, `${WEBDAV_BASE_PATH}/*`, ...nestedMiddlewares, wrapWebDAVHandler());
 });
 
 export default webdavRoutes;

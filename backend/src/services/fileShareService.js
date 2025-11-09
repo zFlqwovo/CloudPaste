@@ -5,9 +5,9 @@
  */
 
 import { HTTPException } from "hono/http-exception";
-import { ApiStatus } from "../constants/index.js";
+import { ApiStatus, UserType } from "../constants/index.js";
 import { FileShareSystem } from "../storage/fs/FileShareSystem.js";
-import { RepositoryFactory } from "../repositories/index.js";
+import { ensureRepositoryFactory } from "../utils/repositories.js";
 import { generateFileId, generateUniqueFileSlug, generateShortId, getFileNameAndExt, getSafeFileName, formatFileSize, shouldUseRandomSuffix } from "../utils/common.js";
 import { getMimeTypeFromFilename } from "../utils/fileUtils.js";
 import { hashPassword } from "../utils/crypto.js";
@@ -23,11 +23,11 @@ export class FileShareService {
    * @param {Object} db - 数据库实例
    * @param {string} encryptionSecret - 加密密钥
    */
-  constructor(db, encryptionSecret) {
+  constructor(db, encryptionSecret, repositoryFactory = null) {
     this.db = db;
     this.encryptionSecret = encryptionSecret;
     this.shareSystem = new FileShareSystem(db, encryptionSecret);
-    this.repositoryFactory = new RepositoryFactory(db);
+    this.repositoryFactory = ensureRepositoryFactory(db, repositoryFactory);
   }
 
   /**
@@ -187,7 +187,7 @@ export class FileShareService {
     }
 
     // 如果是管理员授权，确认配置属于该管理员
-    if (userType === "admin" && config.admin_id !== userIdOrInfo) {
+    if (userType === UserType.ADMIN && config.admin_id !== userIdOrInfo) {
       throw new HTTPException(ApiStatus.FORBIDDEN, {
         message: "您无权使用此存储配置",
       });
@@ -239,6 +239,7 @@ export class FileShareService {
       userType,
       encryptionSecret: this.encryptionSecret,
       repositoryFactory: this.repositoryFactory,
+      db: this.db,
     });
 
     // 生成存储路径
@@ -290,7 +291,7 @@ export class FileShareService {
       expires_at: expiresAt,
       max_views: maxViews > 0 ? maxViews : null,
       use_proxy: use_proxy !== undefined ? use_proxy : defaultUseProxy,
-      created_by: userType === "admin" ? userIdOrInfo : `apikey:${userIdOrInfo}`,
+      created_by: userType === UserType.ADMIN ? userIdOrInfo : `apikey:${userIdOrInfo}`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -403,13 +404,13 @@ export class FileShareService {
    * @private
    */
   async _resolveS3Config(s3ConfigId, userIdOrInfo, userType) {
-    const repositoryFactory = new RepositoryFactory(this.db);
+    const repositoryFactory = this.repositoryFactory;
     const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
-    const isAdmin = userType === "admin";
+    const isAdmin = userType === UserType.ADMIN;
 
     // 如果指定了配置ID
     if (s3ConfigId) {
-      if (userType === "apikey") {
+      if (userType === UserType.API_KEY) {
         // API密钥用户只能使用公开配置
         const config = await s3ConfigRepository.findPublicById(s3ConfigId);
         if (!config) {
@@ -552,13 +553,13 @@ export class FileShareService {
    * @private
    */
   async _validateUploadPermission(fileRecord, userIdOrInfo, userType) {
-    if (userType === "admin" && fileRecord.created_by && fileRecord.created_by !== userIdOrInfo) {
+    if (userType === UserType.ADMIN && fileRecord.created_by && fileRecord.created_by !== userIdOrInfo) {
       throw new HTTPException(ApiStatus.FORBIDDEN, {
         message: "您无权更新此文件",
       });
     }
 
-    if (userType === "apikey" && fileRecord.created_by && fileRecord.created_by !== `apikey:${userIdOrInfo}`) {
+    if (userType === UserType.API_KEY && fileRecord.created_by && fileRecord.created_by !== `apikey:${userIdOrInfo}`) {
       throw new HTTPException(ApiStatus.FORBIDDEN, {
         message: "此API密钥无权更新此文件",
       });
@@ -1039,7 +1040,7 @@ export class FileShareService {
 
     try {
       // 1. 通过FileSystem获取文件信息和权限验证
-      const mountManager = new MountManager(this.db, this.encryptionSecret);
+      const mountManager = new MountManager(this.db, this.encryptionSecret, this.repositoryFactory);
       const fileSystem = new FileSystem(mountManager);
 
       const fileInfo = await fileSystem.getFileInfo(fsPath, userIdOrInfo, userType);
@@ -1079,7 +1080,7 @@ export class FileShareService {
         expires_at: null, // 文件系统分享暂不支持过期时间
         max_views: null, // 文件系统分享暂不支持查看次数限制
         use_proxy: true,
-        created_by: userType === "admin" ? userIdOrInfo : `apikey:${userIdOrInfo.id}`,
+        created_by: userType === UserType.ADMIN ? userIdOrInfo : `apikey:${userIdOrInfo.id}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

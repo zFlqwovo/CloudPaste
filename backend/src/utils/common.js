@@ -1,6 +1,7 @@
 /**
  * 通用工具函数
  */
+import { UserType } from "../constants/index.js";
 
 /**
  * 生成随机字符串
@@ -295,12 +296,12 @@ async function handleFileOverride(existingFile, overrideContext) {
     throw new Error("覆盖操作需要提供上下文信息");
   }
 
-  const { userIdOrInfo, userType, encryptionSecret, repositoryFactory } = overrideContext;
+  const { userIdOrInfo, userType, encryptionSecret, repositoryFactory, db } = overrideContext;
 
   console.log(`覆盖模式：删除已存在的文件记录 Slug: ${existingFile.slug}`);
 
   // 检查当前用户是否为文件创建者
-  const currentCreator = userType === "admin" ? userIdOrInfo : `apikey:${userIdOrInfo}`;
+  const currentCreator = userType === UserType.ADMIN ? userIdOrInfo : `apikey:${userIdOrInfo}`;
   if (existingFile.created_by !== currentCreator) {
     console.log(`覆盖操作被拒绝：用户 ${currentCreator} 尝试覆盖 ${existingFile.created_by} 创建的文件`);
     const { HTTPException } = await import("hono/http-exception");

@@ -17,22 +17,19 @@ import { getQueryBool } from "../utils/common.js";
 
 // 签名代理路径不会走 RBAC，因此这里用结构化日志补充最少可观测性。
 const emitProxyAudit = (c, details) => {
-  try {
-    const payload = {
-      type: "proxy.audit",
-      reqId: c.get?.("reqId") ?? null,
-      path: details.path,
-      decision: details.decision,
-      reason: details.reason ?? null,
-      signatureRequired: details.signatureRequired ?? false,
-      signatureProvided: details.signatureProvided ?? false,
-      mountId: details.mountId ?? null,
-      timestamp: new Date().toISOString(),
-    };
-    console.log(JSON.stringify(payload));
-  } catch (error) {
-    console.error("fsProxy audit emit failed", error);
-  }
+  const payload = {
+    type: "proxy.audit",
+    reqId: c.get?.("reqId") ?? null,
+    path: details.path,
+    decision: details.decision,
+    reason: details.reason ?? null,
+    signatureRequired: details.signatureRequired ?? false,
+    signatureProvided: details.signatureProvided ?? false,
+    mountId: details.mountId ?? null,
+    timestamp: new Date().toISOString(),
+  };
+
+  console.log(JSON.stringify(payload));
 };
 
 const fsProxyRoutes = new Hono();
@@ -51,11 +48,9 @@ fsProxyRoutes.options(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, (c) => {
  *
  */
 fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
-  try {
-    // 从URL中提取路径部分
+  const run = async () => {
     const url = new URL(c.req.url);
     const fullPath = url.pathname;
-    // 移除代理前缀，得到实际文件路径，并进行安全解码
     const rawPath = fullPath.replace(new RegExp(`^${PROXY_CONFIG.ROUTE_PREFIX}`), "") || "/";
     const path = safeDecodeProxyPath(rawPath);
     const download = getQueryBool(c, "download", false);
@@ -82,7 +77,8 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
     // 挂载点验证成功，mountResult包含mount和subPath信息
 
     // 检查是否需要签名验证
-    const signatureService = new ProxySignatureService(db, encryptionSecret);
+    const repositoryFactory = c.get("repos");
+    const signatureService = new ProxySignatureService(db, encryptionSecret, repositoryFactory);
     const signatureNeed = await signatureService.needsSignature(mountResult.mount);
 
     if (signatureNeed.required) {
@@ -123,7 +119,7 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
     }
 
     // 创建FileSystem实例进行文件访问
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
 
     // 获取文件名用于下载
@@ -171,24 +167,25 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
     });
 
     return response;
-  } catch (error) {
+  };
+
+  return run().catch((error) => {
     console.error("文件系统代理访问错误:", error);
 
-    if (error instanceof HTTPException) {
-      throw error;
+    if (!(error instanceof HTTPException)) {
+      const signatureParam = typeof c.req?.query === "function" ? c.req.query(PROXY_CONFIG.SIGN_PARAM) : null;
+      emitProxyAudit(c, {
+        path: c.req?.path ?? null,
+        decision: "deny",
+        reason: "internal_error",
+        signatureRequired: false,
+        signatureProvided: Boolean(signatureParam),
+      });
+      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "代理访问失败" });
     }
 
-    const signatureParam = typeof c.req?.query === "function" ? c.req.query(PROXY_CONFIG.SIGN_PARAM) : null;
-    emitProxyAudit(c, {
-      path: c.req?.path ?? null,
-      decision: "deny",
-      reason: "internal_error",
-      signatureRequired: false,
-      signatureProvided: Boolean(signatureParam),
-    });
-
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "代理访问失败" });
-  }
+    throw error;
+  });
 });
 
 export { fsProxyRoutes };

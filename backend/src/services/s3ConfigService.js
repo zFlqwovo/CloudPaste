@@ -8,7 +8,7 @@ import { encryptValue, decryptValue } from "../utils/crypto.js";
 import { createS3Client } from "../utils/s3Utils.js";
 import { S3Client, ListObjectsV2Command, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { S3ConfigRepository, FileRepository, RepositoryFactory } from "../repositories/index.js";
+import { ensureRepositoryFactory } from "../utils/repositories.js";
 
 /**
  * S3配置服务类
@@ -18,10 +18,11 @@ class S3ConfigService {
    * 构造函数
    * @param {D1Database} db - 数据库实例
    */
-  constructor(db) {
-    this.s3ConfigRepository = new S3ConfigRepository(db);
-    this.fileRepository = new FileRepository(db);
-    this.db = db; // 保留db引用，用于复杂查询和测试功能
+  constructor(db, repositoryFactory = null) {
+    this.db = db;
+    this.repositoryFactory = ensureRepositoryFactory(db, repositoryFactory);
+    this.s3ConfigRepository = this.repositoryFactory.getS3ConfigRepository();
+    this.fileRepository = this.repositoryFactory.getFileRepository();
   }
 
   /**
@@ -503,10 +504,9 @@ class S3TestStrategyFactory {
  * @param {string} requestOrigin - 请求来源
  * @returns {Promise<Object>} 测试结果
  */
-export async function testS3Connection(db, id, adminId, encryptionSecret, requestOrigin) {
-  // 使用 S3ConfigRepository 获取配置（需要包含敏感字段用于测试）
-  const repositoryFactory = new RepositoryFactory(db);
-  const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
+export async function testS3Connection(db, id, adminId, encryptionSecret, requestOrigin, repositoryFactory = null) {
+  const factory = ensureRepositoryFactory(db, repositoryFactory);
+  const s3ConfigRepository = factory.getS3ConfigRepository();
 
   const config = await s3ConfigRepository.findByIdAndAdminWithSecrets(id, adminId);
 
@@ -543,7 +543,7 @@ export async function testS3Connection(db, id, adminId, encryptionSecret, reques
   await executeFrontendSimulationTest(testResult, strategy);
 
   // 更新最后使用时间
-  await updateLastUsedTime(db, id);
+  await updateLastUsedTime(db, id, this.repositoryFactory);
 
   // 生成测试结果摘要
   const summary = generateTestSummary(testResult);
@@ -558,10 +558,9 @@ export async function testS3Connection(db, id, adminId, encryptionSecret, reques
 /**
  * 更新S3配置的最后使用时间
  */
-async function updateLastUsedTime(db, configId) {
-  // 使用 S3ConfigRepository
-  const repositoryFactory = new RepositoryFactory(db);
-  const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
+async function updateLastUsedTime(db, configId, repositoryFactory = null) {
+  const factory = ensureRepositoryFactory(db, repositoryFactory);
+  const s3ConfigRepository = factory.getS3ConfigRepository();
 
   await s3ConfigRepository.updateLastUsed(configId);
 }
@@ -977,8 +976,8 @@ async function executeFrontendSimulationTest(testResult, strategy) {
  * @param {Object} [options] - 查询选项
  * @returns {Promise<Object>} S3配置列表和分页信息
  */
-export async function getS3ConfigsByAdmin(db, adminId, options = {}) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function getS3ConfigsByAdmin(db, adminId, options = {}, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.getS3ConfigsByAdmin(adminId, options);
 }
 
@@ -987,8 +986,8 @@ export async function getS3ConfigsByAdmin(db, adminId, options = {}) {
  * @param {D1Database} db - D1数据库实例
  * @returns {Promise<Array>} 公开的S3配置列表
  */
-export async function getPublicS3Configs(db) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function getPublicS3Configs(db, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.getPublicS3Configs();
 }
 
@@ -999,8 +998,8 @@ export async function getPublicS3Configs(db) {
  * @param {string} adminId - 管理员ID
  * @returns {Promise<Object>} S3配置对象
  */
-export async function getS3ConfigByIdForAdmin(db, id, adminId) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function getS3ConfigByIdForAdmin(db, id, adminId, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.getS3ConfigByIdForAdmin(id, adminId);
 }
 
@@ -1010,8 +1009,8 @@ export async function getS3ConfigByIdForAdmin(db, id, adminId) {
  * @param {string} id - 配置ID
  * @returns {Promise<Object>} S3配置对象
  */
-export async function getPublicS3ConfigById(db, id) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function getPublicS3ConfigById(db, id, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.getPublicS3ConfigById(id);
 }
 
@@ -1023,8 +1022,8 @@ export async function getPublicS3ConfigById(db, id) {
  * @param {string} encryptionSecret - 加密密钥
  * @returns {Promise<Object>} 创建的S3配置
  */
-export async function createS3Config(db, configData, adminId, encryptionSecret) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function createS3Config(db, configData, adminId, encryptionSecret, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.createS3Config(configData, adminId, encryptionSecret);
 }
 
@@ -1037,8 +1036,8 @@ export async function createS3Config(db, configData, adminId, encryptionSecret) 
  * @param {string} encryptionSecret - 加密密钥
  * @returns {Promise<void>}
  */
-export async function updateS3Config(db, id, updateData, adminId, encryptionSecret) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function updateS3Config(db, id, updateData, adminId, encryptionSecret, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.updateS3Config(id, updateData, adminId, encryptionSecret);
 }
 
@@ -1049,8 +1048,8 @@ export async function updateS3Config(db, id, updateData, adminId, encryptionSecr
  * @param {string} adminId - 管理员ID
  * @returns {Promise<void>}
  */
-export async function deleteS3Config(db, id, adminId) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function deleteS3Config(db, id, adminId, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.deleteS3Config(id, adminId);
 }
 
@@ -1061,8 +1060,8 @@ export async function deleteS3Config(db, id, adminId) {
  * @param {string} adminId - 管理员ID
  * @returns {Promise<void>}
  */
-export async function setDefaultS3Config(db, id, adminId) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function setDefaultS3Config(db, id, adminId, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.setDefaultS3Config(id, adminId);
 }
 
@@ -1071,7 +1070,7 @@ export async function setDefaultS3Config(db, id, adminId) {
  * @param {D1Database} db - D1数据库实例
  * @returns {Promise<Array>} S3配置列表
  */
-export async function getS3ConfigsWithUsage(db) {
-  const s3ConfigService = new S3ConfigService(db);
+export async function getS3ConfigsWithUsage(db, repositoryFactory = null) {
+  const s3ConfigService = new S3ConfigService(db, repositoryFactory);
   return await s3ConfigService.getS3ConfigsWithUsage();
 }

@@ -4,6 +4,7 @@
  */
 import crypto from "crypto";
 import { BaseCache } from "./BaseCache.js";
+import { UserType } from "../constants/index.js";
 import { getMountsVersion } from "./cacheState.js";
 
 class SearchCacheManager extends BaseCache {
@@ -45,9 +46,9 @@ class SearchCacheManager extends BaseCache {
     };
 
     // 根据用户类型添加用户标识
-    if (userType === "admin") {
+    if (userType === UserType.ADMIN) {
       keyComponents.userId = typeof userIdOrInfo === "string" ? userIdOrInfo : userIdOrInfo?.id || "";
-    } else if (userType === "apiKey") {
+    } else if (userType === UserType.API_KEY) {
       // 对于API密钥用户，使用basicPath作为权限标识
       keyComponents.basicPath = userIdOrInfo.basicPath || "";
       keyComponents.apiKeyId = userIdOrInfo.id || "";
@@ -109,9 +110,9 @@ class SearchCacheManager extends BaseCache {
     };
 
     // 根据用户类型添加用户标识字段，用于invalidateUser方法
-    if (userType === "admin") {
+    if (userType === UserType.ADMIN) {
       additionalData.userId = typeof userIdOrInfo === "string" ? userIdOrInfo : userIdOrInfo?.id || "";
-    } else if (userType === "apiKey") {
+    } else if (userType === UserType.API_KEY) {
       additionalData.basicPath = userIdOrInfo.basicPath || "";
       additionalData.apiKeyId = userIdOrInfo.id || "";
     }
@@ -186,14 +187,14 @@ class SearchCacheManager extends BaseCache {
       if (cacheItem.userType === userType) {
         let shouldDelete = false;
 
-        if (userType === "admin") {
+        if (userType === UserType.ADMIN) {
           // 对于管理员，直接比较用户ID
           const adminId = typeof userIdOrInfo === "string" ? userIdOrInfo : userIdOrInfo.id;
           // 正确访问：检查额外数据中的用户信息
           if (cacheItem.userId === adminId) {
             shouldDelete = true;
           }
-        } else if (userType === "apiKey") {
+        } else if (userType === UserType.API_KEY) {
           // 对于API密钥用户，比较basicPath和apiKeyId
           const apiKeyInfo = userIdOrInfo;
           // 正确访问：检查额外数据中的API密钥信息

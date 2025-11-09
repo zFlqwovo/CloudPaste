@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { HTTPException } from "hono/http-exception";
 import adminRoutes from "./routes/adminRoutes.js";
 import apiKeyRoutes from "./routes/apiKeyRoutes.js";
 import { backupRoutes } from "./routes/backupRoutes.js";
@@ -10,7 +9,7 @@ import systemRoutes from "./routes/systemRoutes.js";
 import mountRoutes from "./routes/mountRoutes.js";
 import webdavRoutes from "./routes/webdavRoutes.js";
 import fsRoutes from "./routes/fsRoutes.js";
-import { DbTables, ApiStatus } from "./constants/index.js";
+import { DbTables, ApiStatus, UserType } from "./constants/index.js";
 import { createErrorResponse } from "./utils/common.js";
 import filesRoutes from "./routes/filesRoutes.js";
 import pastesRoutes from "./routes/pastesRoutes.js";
@@ -19,6 +18,9 @@ import fileViewRoutes from "./routes/fileViewRoutes.js";
 import urlUploadRoutes from "./routes/urlUploadRoutes.js";
 import { fsProxyRoutes } from "./routes/fsProxyRoutes.js";
 import { securityContext } from "./security/middleware/securityContext.js";
+import { withRepositories } from "./utils/repositories.js";
+import { errorBoundary } from "./http/middlewares/errorBoundary.js";
+import { normalizeError } from "./http/errors.js";
 
 const getTimeSource = () => {
   if (typeof performance !== "undefined" && typeof performance.now === "function") {
@@ -39,20 +41,24 @@ const generateRequestId = () => {
 const getAuthSnapshot = (c) => {
   const authResult = c.get("authResult");
   if (!authResult) {
-    return { userType: "guest", userId: null };
+    return { userType: UserType.GUEST, userId: null };
   }
   if (authResult.isAdmin && authResult.isAdmin()) {
-    return { userType: "admin", userId: authResult.getUserId?.() || null };
+    return { userType: UserType.ADMIN, userId: authResult.getUserId?.() || null };
   }
   if (authResult.keyInfo) {
-    return { userType: "apiKey", userId: authResult.keyInfo.id || authResult.keyInfo.name || null };
+    return { userType: UserType.API_KEY, userId: authResult.keyInfo.id || authResult.keyInfo.name || null };
   }
-  return { userType: "unknown", userId: authResult.getUserId?.() || null };
+  return { userType: UserType.GUEST, userId: authResult.getUserId?.() || null };
 };
 
 const structuredLogger = async (c, next) => {
-  const reqId = generateRequestId();
-  c.set("reqId", reqId);
+  const existingReqId = c.get("reqId");
+  const reqId = existingReqId ?? generateRequestId();
+  if (!existingReqId) {
+    c.set("reqId", reqId);
+  }
+
   const started = now();
   let caughtError = null;
   try {
@@ -61,10 +67,11 @@ const structuredLogger = async (c, next) => {
     caughtError = error;
     throw error;
   } finally {
+    const handledError = c.get("handledError");
     const durationMs = Number((now() - started).toFixed(2));
     const slow = durationMs >= 1000; // 简单慢请求标记（>=1s）
     const { userType, userId } = getAuthSnapshot(c);
-    const status = caughtError?.status ?? c.res?.status ?? 200;
+    const status = handledError?.status ?? caughtError?.status ?? c.res?.status ?? 200;
     const logPayload = {
       type: "request",
       reqId,
@@ -77,10 +84,11 @@ const structuredLogger = async (c, next) => {
       userId,
     };
 
-    if (caughtError) {
+    const errorForLog = handledError?.originalError ?? caughtError;
+    if (errorForLog) {
       logPayload.error = {
-        name: caughtError.name,
-        message: caughtError.message,
+        name: errorForLog.name,
+        message: handledError?.publicMessage ?? errorForLog.message,
       };
     }
 
@@ -93,6 +101,8 @@ const app = new Hono();
 
 // 注册中间件
 app.use("*", structuredLogger);
+app.use("*", errorBoundary());
+app.use("*", withRepositories());
 app.use("*", securityContext());
 // 导入WebDAV配置
 import { WEBDAV_BASE_PATH } from "./webdav/auth/config/WebDAVConfig.js";
@@ -184,15 +194,16 @@ app.get("/api/health", (c) => {
 
 // 全局错误处理
 app.onError((err, c) => {
-  console.error(`[错误] ${err.message}`, err.stack);
-
-  if (err instanceof HTTPException) {
-    const status = err.status || ApiStatus.INTERNAL_ERROR;
-    const message = err.message || "服务器内部错误";
-    return c.json(createErrorResponse(status, message), status);
-  }
-
-  return c.json(createErrorResponse(ApiStatus.INTERNAL_ERROR, "服务器内部错误"), ApiStatus.INTERNAL_ERROR);
+  const normalized = normalizeError(err, {
+    method: c.req.method,
+    path: c.req.path,
+    reqId: c.get("reqId"),
+  });
+  console.error(`[错误] ${normalized.publicMessage}`, err);
+  return c.json(
+    createErrorResponse(normalized.status, normalized.expose ? normalized.publicMessage : "服务器内部错误"),
+    normalized.status
+  );
 });
 
 // 404路由处理

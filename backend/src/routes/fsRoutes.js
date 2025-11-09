@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { ApiStatus } from "../constants/index.js";
+import { ApiStatus, UserType } from "../constants/index.js";
 import { usePolicy } from "../security/policies/policies.js";
 import { getS3ConfigByIdForAdmin, getPublicS3ConfigById } from "../services/s3ConfigService.js";
 import { getAccessibleMountsForUser } from "../security/helpers/access.js";
@@ -22,11 +22,11 @@ const unifiedFsAuthMiddleware = async (c, next) => {
 
   if (principal.isAdmin) {
     c.set("userInfo", {
-      type: "admin",
+      type: UserType.ADMIN,
       id: principal.id,
       hasFullAccess: true,
     });
-  } else if (principal.type === "apikey") {
+  } else if (principal.type === UserType.API_KEY) {
     const apiKeyInfo = principal.attributes?.keyInfo ?? {
       id: principal.id,
       basicPath: principal.attributes?.basicPath ?? "/",
@@ -34,7 +34,7 @@ const unifiedFsAuthMiddleware = async (c, next) => {
     };
 
     c.set("userInfo", {
-      type: "apiKey",
+      type: UserType.API_KEY,
       info: apiKeyInfo,
       hasFullAccess: false,
     });
@@ -57,14 +57,14 @@ fsRoutes.use(`${FS_BASE_PATH}/file-link`, usePolicy("fs.share-link"));
 
 
 const getServiceParams = (userInfo) => {
-  if (userInfo.type === "admin") {
-    return { userIdOrInfo: userInfo.id, userType: "admin" };
+  if (userInfo.type === UserType.ADMIN) {
+    return { userIdOrInfo: userInfo.id, userType: UserType.ADMIN };
   }
-  return { userIdOrInfo: userInfo.info, userType: "apiKey" };
+  return { userIdOrInfo: userInfo.info, userType: UserType.API_KEY };
 };
 
 const getS3ConfigByUserType = async (db, configId, userIdOrInfo, userType, encryptionSecret) => {
-  if (userType === "admin") {
+  if (userType === UserType.ADMIN) {
     return await getS3ConfigByIdForAdmin(db, configId, userIdOrInfo);
   }
   return await getPublicS3ConfigById(db, configId);

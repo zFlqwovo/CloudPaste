@@ -49,11 +49,11 @@ export const registerMultipartRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.UNAUTHORIZED, { message: "未授权访问" });
     }
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
-    return { db: c.env.DB, encryptionSecret: getEncryptionSecret(c), userInfo, userIdOrInfo, userType };
+    return { db: c.env.DB, encryptionSecret: getEncryptionSecret(c), repositoryFactory: c.get("repos"), userInfo, userIdOrInfo, userType };
   };
 
   router.post("/api/fs/multipart/init", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path, fileName, fileSize, partSize = 5 * 1024 * 1024, partCount } = body;
 
@@ -61,7 +61,7 @@ export const registerMultipartRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少必要参数" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.initializeFrontendMultipartUpload(path, fileName, fileSize, userIdOrInfo, userType, partSize, partCount);
 
@@ -74,7 +74,7 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/multipart/complete", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path, uploadId, parts, fileName, fileSize } = body;
 
@@ -82,7 +82,7 @@ export const registerMultipartRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少必要参数" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.completeFrontendMultipartUpload(path, uploadId, parts, fileName, fileSize, userIdOrInfo, userType);
 
@@ -95,7 +95,7 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/multipart/abort", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path, uploadId, fileName } = body;
 
@@ -103,7 +103,7 @@ export const registerMultipartRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少必要参数" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     await fileSystem.abortFrontendMultipartUpload(path, uploadId, fileName, userIdOrInfo, userType);
 
@@ -115,11 +115,11 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/multipart/list-uploads", parseJsonBody, usePolicy("fs.upload", { pathCheck: true, pathResolver: jsonPathResolver("path", { optional: true }) }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path = "" } = body;
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.listMultipartUploads(path, userIdOrInfo, userType);
 
@@ -132,7 +132,7 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/multipart/list-parts", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path, uploadId, fileName } = body;
 
@@ -140,7 +140,7 @@ export const registerMultipartRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少必要参数" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.listMultipartParts(path, uploadId, fileName, userIdOrInfo, userType);
 
@@ -153,7 +153,7 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/multipart/refresh-urls", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path, uploadId, partNumbers } = body;
 
@@ -161,7 +161,7 @@ export const registerMultipartRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少必要参数" });
     }
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.refreshMultipartUrls(path, uploadId, partNumbers, userIdOrInfo, userType);
 
@@ -174,7 +174,7 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/presign", parseJsonBody, usePolicy("fs.upload", { pathResolver: presignTargetResolver }), async (c) => {
-    const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const { path, fileName, contentType = "application/octet-stream", fileSize = 0 } = body;
 
@@ -184,7 +184,7 @@ export const registerMultipartRoutes = (router, helpers) => {
 
     const targetPath = presignTargetResolver(c);
 
-    const mountManager = new MountManager(db, encryptionSecret);
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
 
     if (!mount || mount.storage_type !== "S3") {
@@ -219,37 +219,29 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/presign/commit", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver("targetPath") }), async (c) => {
-    try {
-      const { db } = requireUserContext(c);
-      const body = c.get("jsonBody");
-      const targetPath = body.targetPath;
-      const mountId = body.mountId;
-      const fileSize = body.fileSize || 0;
+    const { db } = requireUserContext(c);
+    const body = c.get("jsonBody");
+    const targetPath = body.targetPath;
+    const mountId = body.mountId;
+    const fileSize = body.fileSize || 0;
 
-      if (!targetPath || !mountId) {
-        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供完整的上传信息" });
-      }
-
-      const fileName = targetPath.split("/").filter(Boolean).pop();
-
-      invalidateFsCache({ mountId, reason: "presign-commit", db });
-
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "文件上传完成",
-        data: {
-          fileName,
-          targetPath,
-          fileSize,
-        },
-        success: true,
-      });
-    } catch (error) {
-      console.error("提交预签名上传完成错误:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "提交预签名上传完成失败" });
+    if (!targetPath || !mountId) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供完整的上传信息" });
     }
+
+    const fileName = targetPath.split("/").filter(Boolean).pop();
+
+    invalidateFsCache({ mountId, reason: "presign-commit", db });
+
+    return c.json({
+      code: ApiStatus.SUCCESS,
+      message: "文件上传完成",
+      data: {
+        fileName,
+        targetPath,
+        fileSize,
+      },
+      success: true,
+    });
   });
 };

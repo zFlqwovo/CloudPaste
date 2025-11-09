@@ -40,18 +40,23 @@ const mapAuthResultToPrincipal = (authResult) => {
   }
 
   const keyInfo = authResult.keyInfo ?? null;
-  return {
-    type: keyInfo ? "apikey" : "user",
-    id: authResult.getUserId?.() ?? keyInfo?.id ?? null,
-    authorities: authResult.permissions ?? 0,
-    attributes: {
-      basicPath: keyInfo?.basicPath ?? authResult.basicPath ?? "/",
-      role: keyInfo?.role ?? null,
-      keyInfo: keyInfo ?? undefined,
-    },
-    isAdmin: false,
-    isAuthenticated: true,
-  };
+  if (keyInfo) {
+    return {
+      type: "apiKey",
+      id: authResult.getUserId?.() ?? keyInfo?.id ?? null,
+      authorities: authResult.permissions ?? 0,
+      attributes: {
+        basicPath: keyInfo?.basicPath ?? authResult.basicPath ?? "/",
+        role: keyInfo?.role ?? null,
+        keyInfo: keyInfo ?? undefined,
+      },
+      isAdmin: false,
+      isAuthenticated: true,
+    };
+  }
+
+  // 非 admin 且无 apiKey，仅保留三种类型：admin/apiKey/guest
+  return createGuestPrincipal();
 };
 
 export const securityContext = () => {

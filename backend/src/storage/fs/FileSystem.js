@@ -9,6 +9,9 @@ import { ApiStatus } from "../../constants/index.js";
 import { CAPABILITIES } from "../interfaces/capabilities/index.js";
 import { findMountPointByPath } from "./utils/MountResolver.js";
 import cacheBus, { CACHE_EVENTS } from "../../cache/cacheBus.js";
+import { ensureRepositoryFactory } from "../../utils/repositories.js";
+import { getAccessibleMountsForUser } from "../../security/helpers/access.js";
+import { UserType } from "../../constants/index.js";
 
 export class FileSystem {
   /**
@@ -17,6 +20,7 @@ export class FileSystem {
    */
   constructor(mountManager) {
     this.mountManager = mountManager;
+    this.repositoryFactory = mountManager?.repositoryFactory ?? null;
   }
 
   /**
@@ -829,7 +833,7 @@ export class FileSystem {
    * @returns {Promise<Object>} 跨存储复制结果
    */
   async handleCrossStorageCopy(sourcePath, targetPath, userIdOrInfo, userType) {
-    const { driver } = await this.mountManager.getDriverBByPath(sourcePath, userIdOrInfo, userType);
+    const { driver } = await this.mountManager.getDriverByPath(sourcePath, userIdOrInfo, userType);
 
     if (!driver.hasCapability(CAPABILITIES.ATOMIC)) {
       throw new HTTPException(ApiStatus.NOT_IMPLEMENTED, {
@@ -888,16 +892,23 @@ export class FileSystem {
       return cachedResult;
     }
 
-    // 获取可访问的挂载点 - 权限检查在路由层完成
+    // 获取可访问的挂载点 - 为安全起见，这里也做兜底
     let resolvedMounts = accessibleMounts;
     if (!resolvedMounts) {
       try {
-        const { RepositoryFactory } = await import("../../repositories/index.js");
-        const repositoryFactory = new RepositoryFactory(this.mountManager.db);
-        const mountRepository = repositoryFactory.getMountRepository();
-        resolvedMounts = await mountRepository.findAll(false); // false = 只获取活跃的挂载点
+        if (userType === UserType.ADMIN) {
+          const factory = this.repositoryFactory ?? ensureRepositoryFactory(this.mountManager.db);
+          const mountRepository = factory.getMountRepository();
+          resolvedMounts = await mountRepository.findAll(false); // 管理员：全部活跃挂载
+        } else if (userType === UserType.API_KEY) {
+          // API密钥用户：严格限制在其可访问挂载集合内
+          const factory = this.repositoryFactory ?? ensureRepositoryFactory(this.mountManager.db);
+          resolvedMounts = await getAccessibleMountsForUser(this.mountManager.db, userIdOrInfo, userType, factory);
+        } else {
+          resolvedMounts = [];
+        }
       } catch (error) {
-        throw new HTTPException(ApiStatus.UNAUTHORIZED, { message: "未授权访问" });
+        throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "获取可访问挂载失败" });
       }
     }
 
@@ -973,6 +984,42 @@ export class FileSystem {
     }
 
     return searchResult;
+  }
+
+  /**
+   * 提交跨存储复制（客户端已完成复制后，通知后端进行缓存失效等收尾）
+   * @param {Object} mount - 目标挂载点对象
+   * @param {Array<Object>} files - 提交的文件列表，包含 targetPath 与 s3Path
+   * @returns {Promise<{success: Array, failed: Array}>}
+   */
+  async commitCrossStorageCopy(mount, files) {
+    const results = { success: [], failed: [] };
+
+    if (!Array.isArray(files) || files.length === 0) {
+      return results;
+    }
+
+    for (const file of files) {
+      try {
+        const { targetPath, s3Path } = file || {};
+        if (!targetPath || !s3Path) {
+          results.failed.push({
+            targetPath: targetPath || "未指定",
+            error: "目标路径和S3路径不能为空",
+          });
+          continue;
+        }
+        const fileName = targetPath.split("/").filter(Boolean).pop();
+        results.success.push({ targetPath, fileName });
+      } catch (err) {
+        results.failed.push({ targetPath: file?.targetPath || "未知路径", error: err?.message || "处理文件时出错" });
+      }
+    }
+
+    // 缓存失效统一由能力层触发
+    this.emitCacheInvalidation({ mount, reason: "batch-copy-commit", db: this.mountManager.db });
+
+    return results;
   }
 
   emitCacheInvalidation(payload = {}) {

@@ -5,7 +5,7 @@
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
+import { createWebDAVErrorResponse, withWebDAVErrorHandling } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { parseDestinationPath } from "../utils/webdavUtils.js";
 import { invalidateFsCache } from "../../cache/invalidation.js";
@@ -196,7 +196,7 @@ async function performFileCrossStorageTransfer(fileItem) {
  * @param {D1Database} db - D1数据库实例
  */
 export async function handleCopy(c, path, userId, userType, db) {
-  try {
+  return withWebDAVErrorHandling("COPY", async () => {
     // 1. 解析WebDAV头部
     const destination = c.req.header("Destination");
     const overwrite = c.req.header("Overwrite") || "T";
@@ -242,7 +242,8 @@ export async function handleCopy(c, path, userId, userType, db) {
     }
 
     // 6. 创建FileSystem实例
-    const mountManager = new MountManager(db, getEncryptionSecret(c));
+    const repositoryFactory = c.get("repos");
+    const mountManager = new MountManager(db, getEncryptionSecret(c), repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
 
     console.log(`WebDAV COPY - 开始复制: ${path} -> ${destPath}, 用户类型: ${userType}`);
@@ -361,9 +362,5 @@ export async function handleCopy(c, path, userId, userType, db) {
         },
       }),
     });
-  } catch (error) {
-    console.error(`WebDAV COPY - 处理错误: ${error.message}`, error);
-    // 使用统一的WebDAV错误处理
-    return handleWebDAVError("COPY", error, false, false);
-  }
+  }, { includeDetails: false, useXmlResponse: false });
 }
