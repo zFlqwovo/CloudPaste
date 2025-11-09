@@ -4,6 +4,13 @@ import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
+import { usePolicy } from "../../security/policies/policies.js";
+
+const parseJsonBody = async (c, next) => {
+  const body = await c.req.json();
+  c.set("jsonBody", body);
+  await next();
+};
 
 const extractSearchParams = (queryParams) => {
   const query = queryParams.q || "";
@@ -24,43 +31,48 @@ const extractSearchParams = (queryParams) => {
 };
 
 export const registerSearchShareRoutes = (router, helpers) => {
-  const { getServiceParams } = helpers;
+  const { getServiceParams, getAccessibleMounts = async () => null } = helpers;
 
-  router.post("/api/fs/create-share", async (c) => {
-    try {
-      const db = c.env.DB;
-      const encryptionSecret = getEncryptionSecret(c);
-      const userInfo = c.get("userInfo");
-      const { userIdOrInfo, userType } = getServiceParams(userInfo);
+  router.post(
+    "/api/fs/create-share",
+    parseJsonBody,
+    usePolicy("fs.share.create", { pathResolver: (c) => c.get("jsonBody")?.path }),
+    async (c) => {
+      try {
+        const db = c.env.DB;
+        const encryptionSecret = getEncryptionSecret(c);
+        const userInfo = c.get("userInfo");
+        const { userIdOrInfo, userType } = getServiceParams(userInfo);
 
-      const body = await c.req.json();
-      const { path } = body;
+        const body = c.get("jsonBody");
+        const { path } = body;
 
-      if (!path) {
-        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "文件路径不能为空" });
+        if (!path) {
+          throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "文件路径不能为空" });
+        }
+
+        const { FileShareService } = await import("../../services/fileShareService.js");
+        const repositoryFactory = useRepositories(c);
+        const fileShareService = new FileShareService(db, repositoryFactory, encryptionSecret);
+        const result = await fileShareService.createShareFromFileSystem(path, userIdOrInfo, userType);
+
+        return c.json({
+          code: ApiStatus.SUCCESS,
+          message: "分享创建成功",
+          data: result,
+          success: true,
+        });
+      } catch (error) {
+        console.error("创建分享失败:", error);
+        if (error instanceof HTTPException) {
+          throw error;
+        }
+        throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "创建分享失败" });
       }
-
-      const { FileShareService } = await import("../../services/fileShareService.js");
-      const repositoryFactory = useRepositories(c);
-      const fileShareService = new FileShareService(db, repositoryFactory, encryptionSecret);
-      const result = await fileShareService.createShareFromFileSystem(path, userIdOrInfo, userType);
-
-      return c.json({
-        code: ApiStatus.SUCCESS,
-        message: "分享创建成功",
-        data: result,
-        success: true,
-      });
-    } catch (error) {
-      console.error("创建分享失败:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: error.message || "创建分享失败" });
     }
-  });
+  );
 
-  router.get("/api/fs/search", async (c) => {
+  router.get("/api/fs/search", usePolicy("fs.search"), async (c) => {
     const db = c.env.DB;
     const searchParams = extractSearchParams(c.req.query());
     const userInfo = c.get("userInfo");
@@ -73,7 +85,8 @@ export const registerSearchShareRoutes = (router, helpers) => {
     try {
       const mountManager = new MountManager(db);
       const fileSystem = new FileSystem(mountManager);
-      const result = await fileSystem.searchFiles(searchParams.query, searchParams, userIdOrInfo, userType);
+      const accessibleMounts = await getAccessibleMounts(db, userIdOrInfo, userType);
+      const result = await fileSystem.searchFiles(searchParams.query, searchParams, userIdOrInfo, userType, accessibleMounts);
 
       return c.json({
         code: ApiStatus.SUCCESS,

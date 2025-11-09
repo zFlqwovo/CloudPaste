@@ -1,5 +1,6 @@
 import { HTTPException } from "hono/http-exception";
-import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
+import { usePolicy } from "../../security/policies/policies.js";
+import { resolvePrincipal } from "../../security/helpers/principal.js";
 import {
   getAllPastes,
   getUserPastes,
@@ -13,14 +14,24 @@ import { ApiStatus, DbTables } from "../../constants/index.js";
 import { getPagination } from "../../utils/common.js";
 import { useRepositories } from "../../utils/repositories.js";
 
+const getPrincipalContext = (c) => {
+  const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+  return {
+    principal: identity.principal,
+    userType: identity.type,
+    userId: identity.userId,
+    apiKeyInfo: identity.apiKeyInfo,
+  };
+};
+
 export const registerPastesProtectedRoutes = (router) => {
-  router.post("/api/paste", authGateway.requireText(), async (c) => {
+  router.post("/api/paste", usePolicy("pastes.manage"), async (c) => {
     const db = c.env.DB;
     const body = await c.req.json();
+    const { userType, userId } = getPrincipalContext(c);
+    const authType = userType;
 
     try {
-      const userId = authGateway.utils.getUserId(c);
-      const authType = authGateway.utils.getAuthType(c);
       const created_by = authType === "admin" ? userId : authType === "apikey" ? `apikey:${userId}` : null;
       const paste = await createPaste(db, body, created_by);
 
@@ -36,11 +47,9 @@ export const registerPastesProtectedRoutes = (router) => {
     }
   });
 
-  router.get("/api/pastes", authGateway.requireText(), async (c) => {
+  router.get("/api/pastes", usePolicy("pastes.manage"), async (c) => {
     const db = c.env.DB;
-    const userType = authGateway.utils.getAuthType(c);
-    const userId = authGateway.utils.getUserId(c);
-    const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
+    const { userType, userId, apiKeyInfo } = getPrincipalContext(c);
 
     try {
       let result;
@@ -78,11 +87,10 @@ export const registerPastesProtectedRoutes = (router) => {
     }
   });
 
-  router.get("/api/pastes/:id", authGateway.requireText(), async (c) => {
+  router.get("/api/pastes/:id", usePolicy("pastes.manage"), async (c) => {
     const db = c.env.DB;
     const { id } = c.req.param();
-    const userType = authGateway.utils.getAuthType(c);
-    const userId = authGateway.utils.getUserId(c);
+    const { userType, userId } = getPrincipalContext(c);
 
     try {
       let result;
@@ -127,10 +135,9 @@ export const registerPastesProtectedRoutes = (router) => {
     }
   });
 
-  router.delete("/api/pastes/batch-delete", authGateway.requireText(), async (c) => {
+  router.delete("/api/pastes/batch-delete", usePolicy("pastes.manage"), async (c) => {
     const db = c.env.DB;
-    const userType = authGateway.utils.getAuthType(c);
-    const userId = authGateway.utils.getUserId(c);
+    const { userType, userId } = getPrincipalContext(c);
 
     try {
       const { ids } = await c.req.json();
@@ -157,11 +164,10 @@ export const registerPastesProtectedRoutes = (router) => {
     }
   });
 
-  router.put("/api/pastes/:slug", authGateway.requireText(), async (c) => {
+  router.put("/api/pastes/:slug", usePolicy("pastes.manage"), async (c) => {
     const db = c.env.DB;
     const { slug } = c.req.param();
-    const userType = authGateway.utils.getAuthType(c);
-    const userId = authGateway.utils.getUserId(c);
+    const { userType, userId } = getPrincipalContext(c);
     const body = await c.req.json();
 
     try {
@@ -188,7 +194,7 @@ export const registerPastesProtectedRoutes = (router) => {
     }
   });
 
-  router.post("/api/pastes/clear-expired", authGateway.requireAdmin(), async (c) => {
+  router.post("/api/pastes/clear-expired", usePolicy("pastes.admin"), async (c) => {
     const db = c.env.DB;
 
     try {

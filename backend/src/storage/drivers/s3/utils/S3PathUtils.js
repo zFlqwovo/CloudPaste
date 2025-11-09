@@ -3,8 +3,6 @@
  * 提供S3存储驱动专用的路径规范化功能
  */
 
-import path from "path";
-
 /**
  * 规范化S3子路径
  * @param {string} subPath - 子路径
@@ -44,6 +42,7 @@ export function isCompleteFilePath(s3SubPath, originalFileName) {
   if (!s3SubPath || !originalFileName) return false;
 
   // Node.js path 模块解析路径
+  const path = require("path");
   const pathInfo = path.parse(s3SubPath);
   const originalInfo = path.parse(originalFileName);
 

@@ -11,7 +11,6 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 
-import { clearDirectoryCache } from "../../../../cache/index.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
 import { getEnvironmentOptimizedUploadConfig, convertStreamForAWSCompatibility } from "../../../../utils/environmentUtils.js";
@@ -92,11 +91,6 @@ export class S3UploadOperations {
         // 更新最后使用时间
         if (db && mount.id) {
           await updateMountLastUsed(db, mount.id);
-        }
-
-        // 清除缓存
-        if (mount) {
-          await clearDirectoryCache({ mountId: mount.id });
         }
 
         return {
@@ -219,11 +213,6 @@ export class S3UploadOperations {
           await updateMountLastUsed(db, mount.id);
         }
 
-        // 清除缓存
-        if (mount) {
-          await clearDirectoryCache({ mountId: mount.id });
-        }
-
         // 构建S3 URL
         const s3Url = buildS3Url(this.config, finalS3Path);
 
@@ -295,10 +284,6 @@ export class S3UploadOperations {
         await updateMountLastUsed(db, mount.id);
       }
 
-      // 清除缓存
-      if (mount) {
-        await clearDirectoryCache({ mountId: mount.id });
-      }
 
       // 构建S3 URL
       const s3Url = buildS3Url(this.config, s3SubPath);
@@ -504,11 +489,6 @@ export class S3UploadOperations {
         // 更新最后使用时间
         if (db && mount.id) {
           await updateMountLastUsed(db, mount.id);
-        }
-
-        // 清除缓存
-        if (mount) {
-          await clearDirectoryCache({ mountId: mount.id });
         }
 
         // 推断MIME类型

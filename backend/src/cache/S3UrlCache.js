@@ -34,24 +34,14 @@ class S3UrlCacheManager extends BaseCache {
    * @returns {string} 缓存键
    */
   generateKey(s3ConfigId, storagePath, forceDownload, userType, userId) {
-    // 参数验证
     if (!s3ConfigId || !storagePath || !userType || !userId) {
       throw new Error(`缓存键生成失败：缺少必要参数 s3ConfigId=${s3ConfigId}, storagePath=${storagePath}, userType=${userType}, userId=${userId}`);
     }
 
-    // 多租户隔离：不同用户类型和ID的缓存分离
     const userScope = `${userType}:${userId}`;
-    const downloadFlag = forceDownload ? "dl" : "pv"; // download/preview
+    const downloadFlag = forceDownload ? "dl" : "pv";
     const encodedPath = Buffer.from(storagePath).toString("base64");
     return `s3url:${s3ConfigId}:${userScope}:${downloadFlag}:${encodedPath}`;
-  }
-
-  /**
-   * 生成缓存键
-   * @deprecated 使用 generateKey 方法
-   */
-  generateCacheKey(s3ConfigId, storagePath, forceDownload, userType, userId) {
-    return this.generateKey(s3ConfigId, storagePath, forceDownload, userType, userId);
   }
 
   /**

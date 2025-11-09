@@ -8,6 +8,7 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { CAPABILITIES } from "../interfaces/capabilities/index.js";
 import { findMountPointByPath } from "./utils/MountResolver.js";
+import cacheBus, { CACHE_EVENTS } from "../../cache/cacheBus.js";
 
 export class FileSystem {
   /**
@@ -119,7 +120,7 @@ export class FileSystem {
       });
     }
 
-    return await driver.uploadFile(path, file, {
+    const result = await driver.uploadFile(path, file, {
       mount,
       subPath,
       db: this.mountManager.db,
@@ -127,6 +128,9 @@ export class FileSystem {
       userType,
       ...options,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "upload" });
+    return result;
   }
 
   /**
@@ -158,7 +162,7 @@ export class FileSystem {
       });
     }
 
-    return await driver.uploadStream(path, stream, {
+    const result = await driver.uploadStream(path, stream, {
       mount,
       subPath,
       db: this.mountManager.db,
@@ -166,6 +170,9 @@ export class FileSystem {
       userType,
       ...options,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "upload-stream" });
+    return result;
   }
 
   /**
@@ -185,11 +192,14 @@ export class FileSystem {
       });
     }
 
-    return await driver.createDirectory(path, {
+    const result = await driver.createDirectory(path, {
       mount,
       subPath,
       db: this.mountManager.db,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "mkdir" });
+    return result;
   }
 
   /**
@@ -209,13 +219,16 @@ export class FileSystem {
       });
     }
 
-    return await driver.renameItem(oldPath, newPath, {
+    const result = await driver.renameItem(oldPath, newPath, {
       mount,
       subPath,
       db: this.mountManager.db,
       userIdOrInfo,
       userType,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [oldPath, newPath], reason: "rename" });
+    return result;
   }
 
   /**
@@ -236,7 +249,7 @@ export class FileSystem {
       });
     }
 
-    return await driver.copyItem(sourcePath, targetPath, {
+    const result = await driver.copyItem(sourcePath, targetPath, {
       mount,
       subPath,
       db: this.mountManager.db,
@@ -246,6 +259,9 @@ export class FileSystem {
       encryptionSecret: this.mountManager.encryptionSecret,
       ...options,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [sourcePath, targetPath], reason: "copy" });
+    return result;
   }
 
   /**
@@ -271,7 +287,7 @@ export class FileSystem {
 
     // 导入findMountPointByPath函数
 
-    return await driver.batchRemoveItems(paths, {
+    const result = await driver.batchRemoveItems(paths, {
       mount,
       subPath,
       db: this.mountManager.db,
@@ -279,6 +295,9 @@ export class FileSystem {
       userType,
       findMountPointByPath,
     });
+
+    this.emitCacheInvalidation({ mount, paths, reason: "batch-remove" });
+    return result;
   }
 
   /**
@@ -502,7 +521,7 @@ export class FileSystem {
       });
     }
 
-    return await driver.completeFrontendMultipartUpload(subPath, {
+    const result = await driver.completeFrontendMultipartUpload(subPath, {
       uploadId,
       parts,
       fileName,
@@ -512,6 +531,9 @@ export class FileSystem {
       userIdOrInfo,
       userType,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "multipart-complete" });
+    return result;
   }
 
   /**
@@ -532,7 +554,7 @@ export class FileSystem {
       });
     }
 
-    return await driver.abortFrontendMultipartUpload(subPath, {
+    const result = await driver.abortFrontendMultipartUpload(subPath, {
       uploadId,
       fileName,
       mount,
@@ -540,6 +562,9 @@ export class FileSystem {
       userIdOrInfo,
       userType,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "multipart-abort" });
+    return result;
   }
 
   /**
@@ -735,13 +760,16 @@ export class FileSystem {
       });
     }
 
-    return await driver.abortBackendMultipartUpload(path, {
+    const result = await driver.abortBackendMultipartUpload(path, {
       mount,
       subPath,
       db: this.mountManager.db,
       uploadId,
       s3Key,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "abort-backend-multipart" });
+    return result;
   }
 
   /**
@@ -780,13 +808,16 @@ export class FileSystem {
       });
     }
 
-    return await driver.updateFile(path, content, {
+    const result = await driver.updateFile(path, content, {
       mount,
       subPath,
       db: this.mountManager.db,
       userIdOrInfo,
       userType,
     });
+
+    this.emitCacheInvalidation({ mount, paths: [path], reason: "update-file" });
+    return result;
   }
 
   /**
@@ -824,9 +855,10 @@ export class FileSystem {
    * @param {number} searchParams.offset - 结果偏移量，默认0
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
+   * @param {Array<Object>} accessibleMounts - 可访问挂载点列表（可选，未提供则内部查询）
    * @returns {Promise<Object>} 搜索结果
    */
-  async searchFiles(query, searchParams, userIdOrInfo, userType) {
+  async searchFiles(query, searchParams, userIdOrInfo, userType, accessibleMounts = null) {
     const { scope = "global", mountId, path, limit = 50, offset = 0 } = searchParams;
 
     // 参数验证
@@ -857,17 +889,19 @@ export class FileSystem {
     }
 
     // 获取可访问的挂载点 - 权限检查在路由层完成
-    let accessibleMounts;
-    try {
-      const { RepositoryFactory } = await import("../../repositories/index.js");
-      const repositoryFactory = new RepositoryFactory(this.mountManager.db);
-      const mountRepository = repositoryFactory.getMountRepository();
-      accessibleMounts = await mountRepository.findAll(false); // false = 只获取活跃的挂载点
-    } catch (error) {
-      throw new HTTPException(ApiStatus.UNAUTHORIZED, { message: "未授权访问" });
+    let resolvedMounts = accessibleMounts;
+    if (!resolvedMounts) {
+      try {
+        const { RepositoryFactory } = await import("../../repositories/index.js");
+        const repositoryFactory = new RepositoryFactory(this.mountManager.db);
+        const mountRepository = repositoryFactory.getMountRepository();
+        resolvedMounts = await mountRepository.findAll(false); // false = 只获取活跃的挂载点
+      } catch (error) {
+        throw new HTTPException(ApiStatus.UNAUTHORIZED, { message: "未授权访问" });
+      }
     }
 
-    if (!accessibleMounts || accessibleMounts.length === 0) {
+    if (!resolvedMounts || resolvedMounts.length === 0) {
       return {
         results: [],
         total: 0,
@@ -877,9 +911,9 @@ export class FileSystem {
     }
 
     // 根据搜索范围过滤挂载点
-    let targetMounts = accessibleMounts;
+    let targetMounts = resolvedMounts;
     if ((scope === "mount" || scope === "directory") && mountId) {
-      targetMounts = accessibleMounts.filter((mount) => mount.id === mountId);
+      targetMounts = resolvedMounts.filter((mount) => mount.id === mountId);
       if (targetMounts.length === 0) {
         throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限访问指定的挂载点" });
       }
@@ -933,11 +967,31 @@ export class FileSystem {
 
     // 缓存搜索结果（仅当结果不为空时缓存）
     if (total > 0) {
-      searchCacheManager.set(query, searchParams, userType, userIdOrInfo, searchResult, 300); // 5分钟缓存
+      const mountIds = targetMounts.map((mount) => mount.id).filter(Boolean);
+      searchCacheManager.set(query, searchParams, userType, userIdOrInfo, searchResult, 300, { mountIds }); // 5分钟缓存
       console.log(`搜索结果已缓存 - 查询: ${query}, 结果数: ${total}, 用户类型: ${userType}`);
     }
 
     return searchResult;
+  }
+
+  emitCacheInvalidation(payload = {}) {
+    try {
+      const { mount = null, mountId = null, s3ConfigId = null, paths = [], reason = "fs_operation" } = payload;
+      const resolvedMountId = mount?.id ?? mountId ?? null;
+      const resolvedS3ConfigId = mount?.storage_config_id ?? s3ConfigId ?? null;
+      const normalizedPaths = Array.isArray(paths) ? paths.filter((path) => typeof path === "string" && path.length > 0) : [];
+      cacheBus.emit(CACHE_EVENTS.INVALIDATE, {
+        target: "fs",
+        mountId: resolvedMountId,
+        s3ConfigId: resolvedS3ConfigId,
+        paths: normalizedPaths,
+        reason,
+        db: this.mountManager.db,
+      });
+    } catch (error) {
+      console.warn("cache.invalidate emit failed", error);
+    }
   }
 
   /**

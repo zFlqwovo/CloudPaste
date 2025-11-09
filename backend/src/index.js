@@ -18,7 +18,7 @@ import s3UploadRoutes from "./routes/s3UploadRoutes.js";
 import fileViewRoutes from "./routes/fileViewRoutes.js";
 import urlUploadRoutes from "./routes/urlUploadRoutes.js";
 import { fsProxyRoutes } from "./routes/fsProxyRoutes.js";
-import { authGateway } from "./middlewares/authGatewayMiddleware.js";
+import { securityContext } from "./security/middleware/securityContext.js";
 
 const getTimeSource = () => {
   if (typeof performance !== "undefined" && typeof performance.now === "function") {
@@ -93,6 +93,7 @@ const app = new Hono();
 
 // 注册中间件
 app.use("*", structuredLogger);
+app.use("*", securityContext());
 // 导入WebDAV配置
 import { WEBDAV_BASE_PATH } from "./webdav/auth/config/WebDAVConfig.js";
 

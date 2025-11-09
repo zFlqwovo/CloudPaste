@@ -1,16 +1,18 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { BackupService } from "../services/BackupService.js";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { ApiStatus } from "../constants/index.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
 
 const backupRoutes = new Hono();
+const requireAdmin = usePolicy("admin.all");
 
 /**
  * 创建备份
  * POST /api/admin/backup/create
  */
-backupRoutes.post("/api/admin/backup/create", authGateway.requireAdmin(), async (c) => {
+backupRoutes.post("/api/admin/backup/create", requireAdmin, async (c) => {
   try {
     const body = await c.req.json();
     const { backup_type = "full", selected_modules = [] } = body;
@@ -52,7 +54,7 @@ backupRoutes.post("/api/admin/backup/create", authGateway.requireAdmin(), async 
  * 还原备份
  * POST /api/admin/backup/restore
  */
-backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async (c) => {
+backupRoutes.post("/api/admin/backup/restore", requireAdmin, async (c) => {
   try {
     const formData = await c.req.formData();
     const file = formData.get("backup_file");
@@ -80,7 +82,7 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
     const backupService = new BackupService(c.env.DB);
 
     // 获取当前管理员ID（用于合并模式下的admin_id映射）
-    const currentAdminId = authGateway.utils.getUserId(c);
+    const { userId: currentAdminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
 
     // 获取额外的还原选项
     const skipIntegrityCheck = formData.get("skipIntegrityCheck") === "true";
@@ -119,7 +121,7 @@ backupRoutes.post("/api/admin/backup/restore", authGateway.requireAdmin(), async
  * 获取备份模块信息
  * GET /api/admin/backup/modules
  */
-backupRoutes.get("/api/admin/backup/modules", authGateway.requireAdmin(), async (c) => {
+backupRoutes.get("/api/admin/backup/modules", requireAdmin, async (c) => {
   try {
     const backupService = new BackupService(c.env.DB);
 

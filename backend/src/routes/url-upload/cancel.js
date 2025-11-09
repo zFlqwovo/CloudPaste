@@ -1,18 +1,22 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
-import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { deleteFileFromS3 } from "../../utils/s3Utils.js";
-import { clearDirectoryCache } from "../../cache/index.js";
+import { invalidateFsCache } from "../../cache/invalidation.js";
+import { usePolicy } from "../../security/policies/policies.js";
+import { resolvePrincipal } from "../../security/helpers/principal.js";
+
+const requireUrlUpload = usePolicy("urlupload.manage");
 
 export const registerUrlCancelRoutes = (router) => {
-  router.post("/api/url/cancel", authGateway.requireFile(), async (c) => {
+  router.post("/api/url/cancel", requireUrlUpload, async (c) => {
     const db = c.env.DB;
 
-    const isAdmin = authGateway.utils.isAdmin(c);
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+    const isAdmin = identity.isAdmin;
+    const userId = identity.userId;
+    const authType = identity.type;
 
     let authorizedBy = "";
     let adminId = null;
@@ -72,11 +76,7 @@ export const registerUrlCancelRoutes = (router) => {
       await fileRepository.deleteFilePasswordRecord(file.id);
       await fileRepository.deleteFile(file.id);
 
-      try {
-        await clearDirectoryCache({ db, s3ConfigId: file.s3_config_id });
-      } catch (cacheError) {
-        console.warn(`清除文件缓存失败: ${cacheError.message}`);
-      }
+      invalidateFsCache({ s3ConfigId: file.s3_config_id, reason: "url-upload-cancel", db });
 
       return c.json({
         code: ApiStatus.SUCCESS,

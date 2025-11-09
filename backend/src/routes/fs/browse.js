@@ -7,7 +7,7 @@ import { getQueryBool } from "../../utils/common.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 
 export const registerBrowseRoutes = (router, helpers) => {
-  const { authGateway, getServiceParams } = helpers;
+  const { getAccessibleMounts, getServiceParams } = helpers;
 
   router.get("/api/fs/list", async (c) => {
     const db = c.env.DB;
@@ -21,15 +21,7 @@ export const registerBrowseRoutes = (router, helpers) => {
       console.log("[后端路由] 收到强制刷新请求:", { path, refresh });
     }
 
-    if (userType === "apiKey") {
-      const basicPath = userIdOrInfo.basicPath;
-      const allowed = authGateway.utils.checkPathPermissionForNavigation(basicPath, path);
-      if (!allowed) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限访问此路径" });
-      }
-    }
-
-    const mounts = await authGateway.utils.getAccessibleMounts(db, userIdOrInfo, userType);
+    const mounts = await getAccessibleMounts(db, userIdOrInfo, userType);
 
     if (isVirtualPath(path, mounts)) {
       const basicPath = userType === "apiKey" ? userIdOrInfo.basicPath : null;
@@ -66,14 +58,6 @@ export const registerBrowseRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供文件路径" });
     }
 
-    if (!userInfo.hasFullAccess) {
-      const basicPath = userIdOrInfo.basicPath;
-      const allowed = authGateway.utils.checkPathPermissionForOperation(c, basicPath, path);
-      if (!allowed) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限访问此路径" });
-      }
-    }
-
     const mountManager = new MountManager(db, encryptionSecret);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.getFileInfo(path, userIdOrInfo, userType, c.req.raw);
@@ -95,14 +79,6 @@ export const registerBrowseRoutes = (router, helpers) => {
 
     if (!path) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供文件路径" });
-    }
-
-    if (!userInfo.hasFullAccess) {
-      const basicPath = userIdOrInfo.basicPath;
-      const allowed = authGateway.utils.checkPathPermissionForOperation(c, basicPath, path);
-      if (!allowed) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限访问此路径" });
-      }
     }
 
     const mountManager = new MountManager(db, encryptionSecret);

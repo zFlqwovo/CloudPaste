@@ -2,19 +2,57 @@ import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { clearDirectoryCache } from "../../cache/index.js";
+import { invalidateFsCache } from "../../cache/invalidation.js";
 import { useRepositories } from "../../utils/repositories.js";
+import { usePolicy } from "../../security/policies/policies.js";
+
+const parseJsonBody = async (c, next) => {
+  const body = await c.req.json();
+  c.set("jsonBody", body);
+  await next();
+};
+
+const renamePathResolver = (c) => {
+  const body = c.get("jsonBody");
+  return [body?.oldPath, body?.newPath].filter(Boolean);
+};
+
+const listPathsResolver = (field) => (c) => {
+  const body = c.get("jsonBody");
+  const value = body?.[field];
+  if (!value) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+};
+
+const copyItemsResolver = (c) => {
+  const body = c.get("jsonBody");
+  if (!body?.items) {
+    return [];
+  }
+  const targets = [];
+  for (const item of body.items) {
+    if (item?.sourcePath) {
+      targets.push(item.sourcePath);
+    }
+    if (item?.targetPath) {
+      targets.push(item.targetPath);
+    }
+  }
+  return targets;
+};
 
 export const registerOpsRoutes = (router, helpers) => {
-  const { authGateway, getServiceParams, getS3ConfigByUserType } = helpers;
+  const { getServiceParams, getS3ConfigByUserType } = helpers;
 
-  router.post("/api/fs/rename", async (c) => {
+  router.post("/api/fs/rename", parseJsonBody, usePolicy("fs.rename", { pathResolver: renamePathResolver }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
     const encryptionSecret = getEncryptionSecret(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const oldPath = body.oldPath;
     const newPath = body.newPath;
 
@@ -22,31 +60,9 @@ export const registerOpsRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供原路径和新路径" });
     }
 
-    if (!userInfo.hasFullAccess) {
-      const basicPath = userIdOrInfo.basicPath;
-      const allowedOld = authGateway.utils.checkPathPermissionForOperation(c, basicPath, oldPath);
-      const allowedNew = authGateway.utils.checkPathPermissionForOperation(c, basicPath, newPath);
-      if (!allowedOld || !allowedNew) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限重命名此路径的文件" });
-      }
-    }
-
     const mountManager = new MountManager(db, encryptionSecret);
     const fileSystem = new FileSystem(mountManager);
     await fileSystem.renameItem(oldPath, newPath, userIdOrInfo, userType);
-
-    try {
-      const { mount } = await mountManager.getDriverByPath(oldPath, userIdOrInfo, userType);
-      const { mount: newMount } = await mountManager.getDriverByPath(newPath, userIdOrInfo, userType);
-
-      await clearDirectoryCache({ mountId: mount.id });
-      if (newMount.id !== mount.id) {
-        await clearDirectoryCache({ mountId: newMount.id });
-      }
-      console.log(`重命名操作完成后缓存已刷新：${oldPath} -> ${newPath}`);
-    } catch (cacheError) {
-      console.warn(`执行缓存清理时出错: ${cacheError.message}`);
-    }
 
     return c.json({
       code: ApiStatus.SUCCESS,
@@ -55,51 +71,22 @@ export const registerOpsRoutes = (router, helpers) => {
     });
   });
 
-  router.delete("/api/fs/batch-remove", async (c) => {
+  router.delete("/api/fs/batch-remove", parseJsonBody, usePolicy("fs.delete", { pathResolver: listPathsResolver("paths") }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
     const encryptionSecret = getEncryptionSecret(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const paths = body.paths;
 
     if (!paths || !Array.isArray(paths) || paths.length === 0) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供有效的路径数组" });
     }
 
-    if (!userInfo.hasFullAccess) {
-      const basicPath = userIdOrInfo.basicPath;
-      for (const path of paths) {
-        const allowed = authGateway.utils.checkPathPermissionForOperation(c, basicPath, path);
-        if (!allowed) {
-          throw new HTTPException(ApiStatus.FORBIDDEN, { message: `没有权限删除路径: ${path}` });
-        }
-      }
-    }
-
     const mountManager = new MountManager(db, encryptionSecret);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.batchRemoveItems(paths, userIdOrInfo, userType);
-
-    const mountIds = new Set();
-    for (const path of paths) {
-      try {
-        const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
-        mountIds.add(mount.id);
-      } catch (error) {
-        console.warn(`获取路径挂载信息失败: ${path}`, error);
-      }
-    }
-
-    try {
-      for (const mountId of mountIds) {
-        await clearDirectoryCache({ mountId });
-      }
-      console.log(`批量删除操作完成后缓存已刷新：${mountIds.size} 个挂载点`);
-    } catch (cacheError) {
-      console.warn(`执行缓存清理时出错: ${cacheError.message}`);
-    }
 
     return c.json({
       code: ApiStatus.SUCCESS,
@@ -109,13 +96,13 @@ export const registerOpsRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/batch-copy", async (c) => {
+  router.post("/api/fs/batch-copy", parseJsonBody, usePolicy("fs.copy", { pathResolver: copyItemsResolver }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
     const encryptionSecret = getEncryptionSecret(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const items = body.items;
     const skipExisting = body.skipExisting !== false;
 
@@ -123,51 +110,11 @@ export const registerOpsRoutes = (router, helpers) => {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供有效的复制项数组" });
     }
 
-    if (!userInfo.hasFullAccess) {
-      const basicPath = userIdOrInfo.basicPath;
-      for (const item of items) {
-        const allowSrc = authGateway.utils.checkPathPermissionForOperation(c, basicPath, item.sourcePath);
-        if (!allowSrc) {
-          throw new HTTPException(ApiStatus.FORBIDDEN, { message: `没有权限访问源路径: ${item.sourcePath}` });
-        }
-        const allowDst = authGateway.utils.checkPathPermissionForOperation(c, basicPath, item.targetPath);
-        if (!allowDst) {
-          throw new HTTPException(ApiStatus.FORBIDDEN, { message: `没有权限访问目标路径: ${item.targetPath}` });
-        }
-      }
-    }
-
     try {
       const mountManager = new MountManager(db, encryptionSecret);
       const fileSystem = new FileSystem(mountManager);
       const copyItems = items.map((item) => ({ ...item, skipExisting }));
       const result = await fileSystem.batchCopyItems(copyItems, userIdOrInfo, userType);
-
-      const sourceMountIds = new Set();
-      const targetMountIds = new Set();
-      for (const item of items) {
-        try {
-          const { mount: sourceMount } = await mountManager.getDriverByPath(item.sourcePath, userIdOrInfo, userType);
-          sourceMountIds.add(sourceMount.id);
-
-          const { mount: targetMount } = await mountManager.getDriverByPath(item.targetPath, userIdOrInfo, userType);
-          targetMountIds.add(targetMount.id);
-        } catch (error) {
-          console.warn(`获取路径挂载信息失败: ${item.sourcePath} -> ${item.targetPath}`, error);
-        }
-      }
-
-      const allMountIds = new Set([...sourceMountIds, ...targetMountIds]);
-      try {
-        for (const mountId of allMountIds) {
-          await clearDirectoryCache({ mountId });
-        }
-        console.log(
-          `批量复制操作完成后缓存已刷新：源挂载点=${sourceMountIds.size}个，目标挂载点=${targetMountIds.size}个，总计=${allMountIds.size}个`
-        );
-      } catch (cacheError) {
-        console.warn(`执行缓存清理时出错: ${cacheError.message}`);
-      }
 
       const totalSuccess = result.success || 0;
       const totalSkipped = result.skipped || 0;
@@ -218,11 +165,11 @@ export const registerOpsRoutes = (router, helpers) => {
     }
   });
 
-  router.post("/api/fs/batch-copy-commit", async (c) => {
+  router.post("/api/fs/batch-copy-commit", parseJsonBody, usePolicy("fs.copy", { pathCheck: false }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { targetMountId, files } = body;
 
     if (!targetMountId || !Array.isArray(files) || files.length === 0) {
@@ -268,12 +215,7 @@ export const registerOpsRoutes = (router, helpers) => {
         }
       }
 
-      try {
-        await clearDirectoryCache({ mountId: mount.id });
-        console.log(`批量复制完成后缓存已刷新：挂载点=${mount.id}, 共处理了${results.success.length}个文件`);
-      } catch (cacheError) {
-        console.warn(`执行缓存清理时出错: ${cacheError.message}`);
-      }
+      invalidateFsCache({ mountId: mount.id, reason: "batch-copy-commit", db });
 
       const hasFailures = results.failed.length > 0;
       const hasSuccess = results.success.length > 0;

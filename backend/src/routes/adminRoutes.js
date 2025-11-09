@@ -1,11 +1,14 @@
 import { Hono } from "hono";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
-import { Permission } from "../constants/permissions.js";
 import { login, logout, changePassword, testAdminToken } from "../services/adminService.js";
 import { ApiStatus } from "../constants/index.js";
-import { directoryCacheManager, clearDirectoryCache, s3UrlCacheManager, clearS3UrlCache, searchCacheManager, clearSearchCache } from "../cache/index.js";
+import { directoryCacheManager, s3UrlCacheManager, searchCacheManager } from "../cache/index.js";
+import { invalidateFsCache, invalidateAllCaches } from "../cache/invalidation.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
 
 const adminRoutes = new Hono();
+const requireAdmin = usePolicy("admin.all");
+const requireMountView = usePolicy("fs.base");
 
 // 管理员登录
 adminRoutes.post("/api/admin/login", async (c) => {
@@ -54,9 +57,9 @@ adminRoutes.post("/api/admin/logout", async (c) => {
 });
 
 // 更改管理员密码（需要认证）
-adminRoutes.post("/api/admin/change-password", authGateway.requireAdmin(), async (c) => {
+adminRoutes.post("/api/admin/change-password", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { currentPassword, newPassword, newUsername } = await c.req.json();
 
   await changePassword(db, adminId, currentPassword, newPassword, newUsername);
@@ -68,7 +71,7 @@ adminRoutes.post("/api/admin/change-password", authGateway.requireAdmin(), async
 });
 
 // 测试管理员令牌路由
-adminRoutes.get("/api/test/admin-token", authGateway.requireAdmin(), async (c) => {
+adminRoutes.get("/api/test/admin-token", requireAdmin, async (c) => {
   // 使用新的统一认证系统，管理员权限已在中间件中验证
   return c.json({
     code: ApiStatus.SUCCESS,
@@ -78,7 +81,7 @@ adminRoutes.get("/api/test/admin-token", authGateway.requireAdmin(), async (c) =
 });
 
 // 获取系统监控信息（包括缓存统计和系统内存）
-adminRoutes.get("/api/admin/cache/stats", authGateway.requireAdmin(), async (c) => {
+adminRoutes.get("/api/admin/cache/stats", requireAdmin, async (c) => {
   try {
     const dirStats = directoryCacheManager.getStats();
 
@@ -142,56 +145,39 @@ adminRoutes.get("/api/admin/cache/stats", authGateway.requireAdmin(), async (c) 
 });
 
 // 清理目录缓存（管理员）
-adminRoutes.post("/api/admin/cache/clear", authGateway.requireAdmin(), async (c) => {
+adminRoutes.post("/api/admin/cache/clear", requireAdmin, async (c) => {
   const db = c.env.DB;
 
   try {
     // 获取请求参数
     const { mountId, s3ConfigId } = await c.req.json().catch(() => ({}));
 
-    let clearedCount = 0;
+    let clearedScope = null;
 
     // 如果指定了挂载点ID，清理特定挂载点的缓存
     if (mountId) {
-      clearedCount = await clearDirectoryCache({ mountId });
-      console.log(`管理员手动清理挂载点缓存 - 挂载点ID: ${mountId}, 清理项: ${clearedCount}`);
+      invalidateFsCache({ mountId, reason: "admin-manual", db });
+      clearedScope = `mount:${mountId}`;
+      console.log(`管理员手动清理挂载点缓存 - 挂载点ID: ${mountId}`);
     }
     // 如果指定了S3配置ID，清理相关挂载点的缓存
     else if (s3ConfigId) {
-      clearedCount = await clearDirectoryCache({ db, s3ConfigId });
-      console.log(`管理员手动清理S3配置缓存 - S3配置ID: ${s3ConfigId}, 清理项: ${clearedCount}`);
+      invalidateFsCache({ s3ConfigId, reason: "admin-manual", db });
+      clearedScope = `s3Config:${s3ConfigId}`;
+      console.log(`管理员手动清理S3配置缓存 - S3配置ID: ${s3ConfigId}`);
     }
     // 如果没有指定参数，清理所有缓存
     else {
-      const dirCleared = directoryCacheManager.invalidateAll();
-      clearedCount += dirCleared;
-
-      // 同时清理S3URL缓存
-      let s3UrlCleared = 0;
-      try {
-        s3UrlCleared = await clearS3UrlCache();
-        clearedCount += s3UrlCleared;
-      } catch (error) {
-        console.warn("清理S3URL缓存失败:", error);
-      }
-
-      // 同时清理搜索缓存
-      let searchCleared = 0;
-      try {
-        searchCleared = clearSearchCache();
-        clearedCount += searchCleared;
-      } catch (error) {
-        console.warn("清理搜索缓存失败:", error);
-      }
-
-      console.log(`管理员手动清理所有缓存 - 目录缓存: ${dirCleared} 项, S3URL缓存: ${s3UrlCleared} 项, 搜索缓存: ${searchCleared} 项, 总计: ${clearedCount} 项`);
+      invalidateAllCaches({ reason: "admin-manual-all" });
+      clearedScope = "all";
+      console.log(`管理员手动清理所有缓存`);
     }
 
     return c.json({
       code: ApiStatus.SUCCESS,
-      message: `缓存清理成功，共清理 ${clearedCount} 项`,
+      message: `缓存清理操作已触发`,
       data: {
-        clearedCount,
+        scope: clearedScope,
         timestamp: new Date().toISOString(),
       },
       success: true,
@@ -210,59 +196,37 @@ adminRoutes.post("/api/admin/cache/clear", authGateway.requireAdmin(), async (c)
 });
 
 // 清理目录缓存（API密钥用户）
-adminRoutes.post("/api/user/cache/clear", authGateway.requireMount(), async (c) => {
+adminRoutes.post("/api/user/cache/clear", requireMountView, async (c) => {
   const db = c.env.DB;
-  const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
+  const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+  const apiKeyInfo = identity.apiKeyInfo;
 
   try {
     // 获取请求参数
     const { mountId, s3ConfigId } = await c.req.json().catch(() => ({}));
 
-    let clearedCount = 0;
+    let clearedScope = null;
 
     // 如果指定了挂载点ID，清理特定挂载点的缓存
     if (mountId) {
-      clearedCount = await clearDirectoryCache({ mountId });
-      console.log(`API密钥用户手动清理挂载点缓存 - 用户: ${apiKeyInfo.name}, 挂载点ID: ${mountId}, 清理项: ${clearedCount}`);
-    }
-    // 如果指定了S3配置ID，清理相关挂载点的缓存
-    else if (s3ConfigId) {
-      clearedCount = await clearDirectoryCache({ db, s3ConfigId });
-      console.log(`API密钥用户手动清理S3配置缓存 - 用户: ${apiKeyInfo.name}, S3配置ID: ${s3ConfigId}, 清理项: ${clearedCount}`);
-    }
-    // 如果没有指定参数，清理所有缓存（API密钥用户只能清理所有缓存，不能指定特定缓存）
-    else {
-      const dirCleared = directoryCacheManager.invalidateAll();
-      clearedCount += dirCleared;
-
-      // 同时清理S3URL缓存
-      let s3UrlCleared = 0;
-      try {
-        s3UrlCleared = await clearS3UrlCache();
-        clearedCount += s3UrlCleared;
-      } catch (error) {
-        console.warn("清理S3URL缓存失败:", error);
-      }
-
-      // 同时清理搜索缓存
-      let searchCleared = 0;
-      try {
-        searchCleared = await clearSearchCache();
-        clearedCount += searchCleared;
-      } catch (error) {
-        console.warn("清理搜索缓存失败:", error);
-      }
-
-      console.log(
-        `API密钥用户手动清理所有缓存 - 用户: ${apiKeyInfo.name}, 目录缓存: ${dirCleared} 项, S3URL缓存: ${s3UrlCleared} 项, 搜索缓存: ${searchCleared} 项, 总计: ${clearedCount} 项`
-      );
+      invalidateFsCache({ mountId, reason: "user-manual", db });
+      clearedScope = `mount:${mountId}`;
+      console.log(`API密钥用户手动清理挂载点缓存 - 用户: ${apiKeyInfo?.name || identity.type}, 挂载点ID: ${mountId}`);
+    } else if (s3ConfigId) {
+      invalidateFsCache({ s3ConfigId, reason: "user-manual", db });
+      clearedScope = `s3Config:${s3ConfigId}`;
+      console.log(`API密钥用户手动清理S3配置缓存 - 用户: ${apiKeyInfo?.name || identity.type}, S3配置ID: ${s3ConfigId}`);
+    } else {
+      invalidateAllCaches({ reason: "user-manual-all" });
+      clearedScope = "all";
+      console.log(`API密钥用户手动清理所有缓存 - 用户: ${apiKeyInfo?.name || identity.type}`);
     }
 
     return c.json({
       code: ApiStatus.SUCCESS,
-      message: `缓存清理成功，共清理 ${clearedCount} 项`,
+      message: `缓存清理操作已触发`,
       data: {
-        clearedCount,
+        scope: clearedScope,
         timestamp: new Date().toISOString(),
       },
       success: true,

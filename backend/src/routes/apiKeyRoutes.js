@@ -1,18 +1,22 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { Permission, PermissionChecker } from "../constants/permissions.js";
 import { getAllApiKeys, createApiKey, updateApiKey, deleteApiKey } from "../services/apiKeyService.js";
 import { ApiStatus } from "../constants/index.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
 
 const apiKeyRoutes = new Hono();
+const requireAdmin = usePolicy("admin.all");
+const requireAuth = usePolicy("auth.authenticated");
 
 // 测试API密钥验证路由
-apiKeyRoutes.get("/api/test/api-key", authGateway.requireAuth(), async (c) => {
+apiKeyRoutes.get("/api/test/api-key", requireAuth, async (c) => {
   // 获取认证信息
-  const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
-  const apiKeyId = authGateway.utils.getUserId(c);
-  const isAdmin = authGateway.utils.isAdmin(c);
+  const identity = resolvePrincipal(c, { allowGuest: false });
+  const apiKeyInfo = identity.apiKeyInfo;
+  const apiKeyId = identity.userId;
+  const isAdmin = identity.isAdmin;
 
   // 如果是管理员，返回管理员信息
   if (isAdmin) {
@@ -74,7 +78,7 @@ apiKeyRoutes.get("/api/test/api-key", authGateway.requireAuth(), async (c) => {
 });
 
 // 获取所有API密钥列表
-apiKeyRoutes.get("/api/admin/api-keys", authGateway.requireAdmin(), async (c) => {
+apiKeyRoutes.get("/api/admin/api-keys", requireAdmin, async (c) => {
   const db = c.env.DB;
   const keys = await getAllApiKeys(db);
 
@@ -87,7 +91,7 @@ apiKeyRoutes.get("/api/admin/api-keys", authGateway.requireAdmin(), async (c) =>
 });
 
 // 创建新的API密钥
-apiKeyRoutes.post("/api/admin/api-keys", authGateway.requireAdmin(), async (c) => {
+apiKeyRoutes.post("/api/admin/api-keys", requireAdmin, async (c) => {
   const db = c.env.DB;
 
   try {
@@ -123,7 +127,7 @@ apiKeyRoutes.post("/api/admin/api-keys", authGateway.requireAdmin(), async (c) =
 });
 
 // 修改API密钥
-apiKeyRoutes.put("/api/admin/api-keys/:id", authGateway.requireAdmin(), async (c) => {
+apiKeyRoutes.put("/api/admin/api-keys/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
   const id = c.req.param("id");
 
@@ -154,7 +158,7 @@ apiKeyRoutes.put("/api/admin/api-keys/:id", authGateway.requireAdmin(), async (c
 });
 
 // 删除API密钥
-apiKeyRoutes.delete("/api/admin/api-keys/:id", authGateway.requireAdmin(), async (c) => {
+apiKeyRoutes.delete("/api/admin/api-keys/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
   const id = c.req.param("id");
 

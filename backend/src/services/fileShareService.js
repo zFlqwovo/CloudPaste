@@ -12,6 +12,7 @@ import { generateFileId, generateUniqueFileSlug, generateShortId, getFileNameAnd
 import { getMimeTypeFromFilename } from "../utils/fileUtils.js";
 import { hashPassword } from "../utils/crypto.js";
 import { GetFileType, getFileTypeName } from "../utils/fileTypeDetector.js";
+import { invalidateFsCache } from "../cache/invalidation.js";
 
 // 默认最大上传限制（MB）
 const DEFAULT_MAX_UPLOAD_SIZE_MB = 100;
@@ -632,13 +633,7 @@ export class FileShareService {
       console.warn("更新父目录修改时间失败:", error);
     }
 
-    try {
-      // 清除相关缓存
-      const { clearDirectoryCache } = await import("../cache/index.js");
-      await clearDirectoryCache({ db: this.db, s3ConfigId: fileRecord.storage_config_id });
-    } catch (error) {
-      console.warn("清除缓存失败:", error);
-    }
+    invalidateFsCache({ s3ConfigId: fileRecord.storage_config_id, reason: "file-share", db: this.db });
   }
 
   // ==================== URL上传相关方法 ====================

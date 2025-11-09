@@ -1,19 +1,20 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../constants/index.js";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { FileShareService } from "../services/fileShareService.js";
 import { getQueryBool, getQueryInt } from "../utils/common.js";
 import { getEncryptionSecret } from "../utils/environmentUtils.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
 
 const app = new Hono();
+const requireS3Upload = usePolicy("s3.upload");
 
-app.post("/api/s3/presign", authGateway.requireFile(), async (c) => {
+app.post("/api/s3/presign", requireS3Upload, async (c) => {
   const db = c.env.DB;
 
   try {
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const { userId, type: authType } = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
     const body = await c.req.json();
 
     if (!body.s3_config_id) {
@@ -52,12 +53,11 @@ app.post("/api/s3/presign", authGateway.requireFile(), async (c) => {
   }
 });
 
-app.post("/api/s3/commit", authGateway.requireFile(), async (c) => {
+app.post("/api/s3/commit", requireS3Upload, async (c) => {
   const db = c.env.DB;
 
   try {
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const { userId, type: authType } = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
     const body = await c.req.json();
 
     if (!body.file_id) {
@@ -103,12 +103,11 @@ app.post("/api/s3/commit", authGateway.requireFile(), async (c) => {
   }
 });
 
-app.put("/api/upload-direct/:filename", authGateway.requireFile(), async (c) => {
+app.put("/api/upload-direct/:filename", requireS3Upload, async (c) => {
   try {
     const db = c.env.DB;
     const filename = c.req.param("filename");
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const { userId, type: authType } = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
     const fileContent = await c.req.arrayBuffer();
     const fileSize = fileContent.byteLength;
 

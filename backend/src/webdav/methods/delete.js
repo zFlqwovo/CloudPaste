@@ -7,7 +7,6 @@ import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
-import { clearDirectoryCache } from "../../cache/index.js";
 import { lockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
 
@@ -72,18 +71,6 @@ export async function handleDelete(c, path, userId, userType, db) {
       } else {
         return createWebDAVErrorResponse(failedItem.error, 500, false);
       }
-    }
-
-    // 手动缓存清理（因为FileSystem不处理WebDAV特定的缓存）
-    try {
-      const { mount } = await mountManager.getDriverByPath(path, userId, userType);
-      if (mount) {
-        await clearDirectoryCache({ mountId: mount.id });
-        console.log(`WebDAV DELETE - 已清理挂载点 ${mount.id} 的缓存`);
-      }
-    } catch (cacheError) {
-      // 缓存清理失败不应该影响删除操作的成功响应
-      console.warn(`WebDAV DELETE - 缓存清理失败: ${cacheError.message}`);
     }
 
     console.log(`WebDAV DELETE - 删除成功: ${path}`);

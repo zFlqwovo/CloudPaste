@@ -3,6 +3,7 @@ import { SETTING_GROUPS } from "../constants/settings.js";
 import { getS3ConfigsWithUsage } from "./s3ConfigService.js";
 import { RepositoryFactory } from "../repositories/index.js";
 import { previewSettingsCache } from "../cache/index.js";
+import { processWeeklyData } from "../utils/common.js";
 
 /**
  * 获取最大上传文件大小限制
@@ -91,36 +92,6 @@ export async function getDashboardStats(db, adminId) {
     console.error("获取仪表盘统计数据失败:", error);
     throw new Error("获取仪表盘统计数据失败: " + error.message);
   }
-}
-
-/**
- * 处理每周数据，确保有7天的数据
- * @param {Array} data - 包含日期和数量的数据
- * @returns {Array} 处理后的数据
- */
-function processWeeklyData(data) {
-  const result = new Array(7).fill(0);
-
-  if (!data || data.length === 0) return result;
-
-  // 获取过去7天的日期
-  const dates = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    dates.push(date.toISOString().split("T")[0]); // 格式：YYYY-MM-DD
-  }
-
-  // 将数据映射到对应日期
-  data.forEach((item) => {
-    const itemDate = item.date.split("T")[0]; // 处理可能的时间部分
-    const index = dates.indexOf(itemDate);
-    if (index !== -1) {
-      result[index] = item.count;
-    }
-  });
-
-  return result;
 }
 
 // ==================== 新增：分组设置管理服务方法 ====================

@@ -1,5 +1,5 @@
-import { WEBDAV_BASE_PATH } from "../webdav/auth/config/WebDAVConfig.js";
-import { getStandardWebDAVHeaders } from "../webdav/utils/headerUtils.js";
+import { WEBDAV_BASE_PATH } from "../auth/config/WebDAVConfig.js";
+import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 
 const isWebDAVPath = (path, basePath) => path === basePath || path.startsWith(`${basePath}/`);
 

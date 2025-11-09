@@ -1,16 +1,18 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
-import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { FileShareService } from "../../services/fileShareService.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
+import { usePolicy } from "../../security/policies/policies.js";
+import { resolvePrincipal } from "../../security/helpers/principal.js";
+
+const requireUrlUpload = usePolicy("urlupload.manage");
 
 export const registerUrlPresignRoutes = (router) => {
-  router.post("/api/url/presign", authGateway.requireFile(), async (c) => {
+  router.post("/api/url/presign", requireUrlUpload, async (c) => {
     const db = c.env.DB;
 
     try {
-      const userId = authGateway.utils.getUserId(c);
-      const authType = authGateway.utils.getAuthType(c);
+      const { userId, type: authType } = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
       const body = await c.req.json();
 
       if (!body.url) {
@@ -71,12 +73,11 @@ export const registerUrlPresignRoutes = (router) => {
     }
   });
 
-  router.post("/api/url/commit", authGateway.requireFile(), async (c) => {
+  router.post("/api/url/commit", requireUrlUpload, async (c) => {
     const db = c.env.DB;
 
     try {
-      const userId = authGateway.utils.getUserId(c);
-      const authType = authGateway.utils.getAuthType(c);
+      const { userId, type: authType } = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
       const body = await c.req.json();
 
       if (!body.file_id) {

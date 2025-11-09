@@ -3,11 +3,45 @@ import { ApiStatus } from "../../constants/index.js";
 import { generateFileId } from "../../utils/common.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
-import { clearDirectoryCache } from "../../cache/index.js";
+import { invalidateFsCache } from "../../cache/invalidation.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
+import { usePolicy } from "../../security/policies/policies.js";
+
+const parseJsonBody = async (c, next) => {
+  const body = await c.req.json();
+  c.set("jsonBody", body);
+  await next();
+};
+
+const jsonPathResolver = (field = "path", options = {}) => {
+  const { optional = false } = options;
+  return (c) => {
+    const body = c.get("jsonBody");
+    if (!body) {
+      return optional ? "/" : undefined;
+    }
+    const value = body[field];
+    if ((value === undefined || value === null || value === "") && optional) {
+      return "/";
+    }
+    return value;
+  };
+};
+
+const presignTargetResolver = (c) => {
+  const body = c.get("jsonBody");
+  if (!body) {
+    return undefined;
+  }
+  const { path, fileName } = body;
+  if (!path || !fileName) {
+    return undefined;
+  }
+  return path.endsWith("/") ? `${path}${fileName}` : `${path}/${fileName}`;
+};
 
 export const registerMultipartRoutes = (router, helpers) => {
-  const { authGateway, getServiceParams, getS3ConfigByUserType } = helpers;
+  const { getServiceParams } = helpers;
 
   const requireUserContext = (c) => {
     const userInfo = c.get("userInfo");
@@ -18,21 +52,13 @@ export const registerMultipartRoutes = (router, helpers) => {
     return { db: c.env.DB, encryptionSecret: getEncryptionSecret(c), userInfo, userIdOrInfo, userType };
   };
 
-  router.post("/api/fs/multipart/init", async (c) => {
+  router.post("/api/fs/multipart/init", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path, fileName, fileSize, partSize = 5 * 1024 * 1024, partCount } = body;
 
     if (!path || !fileName) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少必要参数" });
-    }
-
-    if (userType === "apiKey") {
-      const basicPath = userIdOrInfo.basicPath;
-      const allowed = authGateway.utils.checkPathPermissionForOperation(c, basicPath, path);
-      if (!allowed) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限执行此操作" });
-      }
     }
 
     const mountManager = new MountManager(db, encryptionSecret);
@@ -47,9 +73,9 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/multipart/complete", async (c) => {
+  router.post("/api/fs/multipart/complete", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path, uploadId, parts, fileName, fileSize } = body;
 
     if (!path || !uploadId || !Array.isArray(parts) || parts.length === 0) {
@@ -68,9 +94,9 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/multipart/abort", async (c) => {
+  router.post("/api/fs/multipart/abort", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path, uploadId, fileName } = body;
 
     if (!path || !uploadId || !fileName) {
@@ -88,9 +114,9 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/multipart/list-uploads", async (c) => {
+  router.post("/api/fs/multipart/list-uploads", parseJsonBody, usePolicy("fs.upload", { pathCheck: true, pathResolver: jsonPathResolver("path", { optional: true }) }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path = "" } = body;
 
     const mountManager = new MountManager(db, encryptionSecret);
@@ -105,9 +131,9 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/multipart/list-parts", async (c) => {
+  router.post("/api/fs/multipart/list-parts", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path, uploadId, fileName } = body;
 
     if (!path || !uploadId || !fileName) {
@@ -126,9 +152,9 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/multipart/refresh-urls", async (c) => {
+  router.post("/api/fs/multipart/refresh-urls", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path, uploadId, partNumbers } = body;
 
     if (!path || !uploadId || !Array.isArray(partNumbers) || partNumbers.length === 0) {
@@ -147,23 +173,16 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/presign", async (c) => {
+  router.post("/api/fs/presign", parseJsonBody, usePolicy("fs.upload", { pathResolver: presignTargetResolver }), async (c) => {
     const { db, encryptionSecret, userIdOrInfo, userType } = requireUserContext(c);
-    const body = await c.req.json();
+    const body = c.get("jsonBody");
     const { path, fileName, contentType = "application/octet-stream", fileSize = 0 } = body;
 
     if (!path || !fileName) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供上传路径和文件名" });
     }
 
-    const targetPath = path.endsWith("/") ? `${path}${fileName}` : `${path}/${fileName}`;
-    if (userType === "apiKey") {
-      const basicPath = userIdOrInfo.basicPath;
-      const allowed = authGateway.utils.checkPathPermissionForOperation(c, basicPath, targetPath);
-      if (!allowed) {
-        throw new HTTPException(ApiStatus.FORBIDDEN, { message: "没有权限在此路径上传文件" });
-      }
-    }
+    const targetPath = presignTargetResolver(c);
 
     const mountManager = new MountManager(db, encryptionSecret);
     const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
@@ -199,9 +218,10 @@ export const registerMultipartRoutes = (router, helpers) => {
     });
   });
 
-  router.post("/api/fs/presign/commit", async (c) => {
+  router.post("/api/fs/presign/commit", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver("targetPath") }), async (c) => {
     try {
-      const body = await c.req.json();
+      const { db } = requireUserContext(c);
+      const body = c.get("jsonBody");
       const targetPath = body.targetPath;
       const mountId = body.mountId;
       const fileSize = body.fileSize || 0;
@@ -212,12 +232,7 @@ export const registerMultipartRoutes = (router, helpers) => {
 
       const fileName = targetPath.split("/").filter(Boolean).pop();
 
-      try {
-        await clearDirectoryCache({ mountId });
-        console.log(`预签名上传完成后缓存已刷新：挂载点=${mountId}, 文件=${fileName}`);
-      } catch (cacheError) {
-        console.warn(`执行缓存清理时出错: ${cacheError.message}`);
-      }
+      invalidateFsCache({ mountId, reason: "presign-commit", db });
 
       return c.json({
         code: ApiStatus.SUCCESS,

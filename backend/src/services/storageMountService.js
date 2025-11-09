@@ -5,6 +5,14 @@ import { ApiStatus } from "../constants/index.js";
 import { HTTPException } from "hono/http-exception";
 import { generateUUID } from "../utils/common.js";
 import { MountRepository, S3ConfigRepository } from "../repositories/index.js";
+import { invalidateFsCache } from "../cache/invalidation.js";
+
+const emitMountCacheInvalidation = ({ mountId, s3ConfigId = null, reason, db = null }) => {
+  if (!mountId && !s3ConfigId) {
+    return;
+  }
+  invalidateFsCache({ mountId, s3ConfigId, reason, bumpMountsVersion: true, db });
+};
 
 /**
  * 挂载点服务类
@@ -16,6 +24,7 @@ class MountService {
    * @param {D1Database} db - 数据库实例
    */
   constructor(db) {
+    this.db = db;
     this.mountRepository = new MountRepository(db);
     this.s3ConfigRepository = new S3ConfigRepository(db);
   }
@@ -146,6 +155,8 @@ class MountService {
     // 创建挂载点
     await this.mountRepository.createMount(createData);
 
+    emitMountCacheInvalidation({ mountId: id, s3ConfigId: createData.storage_config_id || null, reason: "mount-create", db: this.db });
+
     // 返回创建的挂载点信息
     return await this.mountRepository.findById(id);
   }
@@ -193,8 +204,11 @@ class MountService {
     // 更新挂载点
     await this.mountRepository.updateMount(mountId, updateData);
 
+    const updatedMount = await this.mountRepository.findById(mountId);
+    emitMountCacheInvalidation({ mountId, s3ConfigId: updatedMount?.storage_config_id || null, reason: "mount-update", db: this.db });
+
     // 返回更新后的挂载点信息
-    return await this.mountRepository.findById(mountId);
+    return updatedMount;
   }
 
   /**
@@ -219,6 +233,8 @@ class MountService {
 
     // 删除挂载点
     const result = await this.mountRepository.deleteMount(mountId);
+
+    emitMountCacheInvalidation({ mountId, s3ConfigId: existingMount.storage_config_id || null, reason: "mount-delete", db: this.db });
 
     return {
       success: true,

@@ -8,17 +8,21 @@ import {
   updateFile,
 } from "../../services/fileService.js";
 import { deleteFileFromS3 } from "../../utils/s3Utils.js";
-import { clearDirectoryCache } from "../../cache/index.js";
+import { invalidateFsCache } from "../../cache/invalidation.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { getPagination } from "../../utils/common.js";
+import { usePolicy } from "../../security/policies/policies.js";
+import { resolvePrincipal } from "../../security/helpers/principal.js";
 
-export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
-  router.get("/api/files", unifiedAuth, async (c) => {
+const requireFilesAccess = usePolicy("files.manage");
+
+const getFilesPrincipal = (c) => resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+
+export const registerFilesProtectedRoutes = (router) => {
+  router.get("/api/files", requireFilesAccess, async (c) => {
     const db = c.env.DB;
-    const userType = c.get("userType");
-    const userId = c.get("userId");
-    const apiKeyInfo = c.get("apiKeyInfo");
+    const { type: userType, userId, apiKeyInfo } = getFilesPrincipal(c);
 
     let result;
 
@@ -56,10 +60,9 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
     return c.json(response);
   });
 
-  router.get("/api/files/:id", unifiedAuth, async (c) => {
+  router.get("/api/files/:id", requireFilesAccess, async (c) => {
     const db = c.env.DB;
-    const userType = c.get("userType");
-    const userId = c.get("userId");
+    const { type: userType, userId } = getFilesPrincipal(c);
     const { id } = c.req.param();
     const encryptionSecret = getEncryptionSecret(c);
 
@@ -78,10 +81,9 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
     });
   });
 
-  router.delete("/api/files/batch-delete", unifiedAuth, async (c) => {
+  router.delete("/api/files/batch-delete", requireFilesAccess, async (c) => {
     const db = c.env.DB;
-    const userType = c.get("userType");
-    const userId = c.get("userId");
+    const { type: userType, userId } = getFilesPrincipal(c);
     const body = await c.req.json();
     const ids = body.ids;
     const deleteMode = body.delete_mode || "both";
@@ -165,13 +167,8 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
       }
     }
 
-    try {
-      for (const s3ConfigId of s3ConfigIds) {
-        await clearDirectoryCache({ db, s3ConfigId });
-      }
-      console.log(`批量删除操作完成后缓存已刷新：${s3ConfigIds.size} 个S3配置`);
-    } catch (cacheError) {
-      console.warn(`执行缓存清理时出错: ${cacheError.message}`);
+    for (const s3ConfigId of s3ConfigIds) {
+      invalidateFsCache({ s3ConfigId, reason: "files-batch-delete", db });
     }
 
     return c.json({
@@ -182,10 +179,9 @@ export const registerFilesProtectedRoutes = (router, { unifiedAuth }) => {
     });
   });
 
-  router.put("/api/files/:id", unifiedAuth, async (c) => {
+  router.put("/api/files/:id", requireFilesAccess, async (c) => {
     const db = c.env.DB;
-    const userType = c.get("userType");
-    const userId = c.get("userId");
+    const { type: userType, userId } = getFilesPrincipal(c);
     const { id } = c.req.param();
     const body = await c.req.json();
 

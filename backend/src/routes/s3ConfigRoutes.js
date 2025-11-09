@@ -2,7 +2,6 @@
  * S3存储配置路由
  */
 import { Hono } from "hono";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import {
   getS3ConfigsByAdmin,
   getPublicS3Configs,
@@ -24,16 +23,21 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { createS3Client } from "../utils/s3Utils.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
 
 const s3ConfigRoutes = new Hono();
+const requireS3Read = usePolicy("s3.config.read");
+const requireAdmin = usePolicy("admin.all");
 
 // 获取S3配置列表（管理员权限或API密钥文件权限，支持分页）
-s3ConfigRoutes.get("/api/s3-configs", authGateway.requireFile(), async (c) => {
+s3ConfigRoutes.get("/api/s3-configs", requireS3Read, async (c) => {
   const db = c.env.DB;
 
   try {
-    const isAdmin = authGateway.utils.isAdmin(c);
-    const adminId = authGateway.utils.getUserId(c);
+    const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+    const isAdmin = identity.isAdmin;
+    const adminId = identity.userId;
 
     if (isAdmin) {
       // 管理员：区分分页请求和兼容性请求
@@ -86,14 +90,15 @@ s3ConfigRoutes.get("/api/s3-configs", authGateway.requireFile(), async (c) => {
 });
 
 // 获取单个S3配置详情
-s3ConfigRoutes.get("/api/s3-configs/:id", authGateway.requireFile(), async (c) => {
+s3ConfigRoutes.get("/api/s3-configs/:id", requireS3Read, async (c) => {
   const db = c.env.DB;
   const { id } = c.req.param();
 
   try {
     let config;
-    const isAdmin = authGateway.utils.isAdmin(c);
-    const adminId = authGateway.utils.getUserId(c);
+    const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+    const isAdmin = identity.isAdmin;
+    const adminId = identity.userId;
 
     if (isAdmin) {
       // 管理员查询
@@ -119,9 +124,9 @@ s3ConfigRoutes.get("/api/s3-configs/:id", authGateway.requireFile(), async (c) =
 });
 
 // 创建S3配置（管理员权限）
-s3ConfigRoutes.post("/api/s3-configs", authGateway.requireAdmin(), async (c) => {
+s3ConfigRoutes.post("/api/s3-configs", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const encryptionSecret = getEncryptionSecret(c);
 
   try {
@@ -145,9 +150,9 @@ s3ConfigRoutes.post("/api/s3-configs", authGateway.requireAdmin(), async (c) => 
 });
 
 // 更新S3配置（管理员权限）
-s3ConfigRoutes.put("/api/s3-configs/:id", authGateway.requireAdmin(), async (c) => {
+s3ConfigRoutes.put("/api/s3-configs/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { id } = c.req.param();
   const encryptionSecret = getEncryptionSecret(c);
 
@@ -181,9 +186,9 @@ s3ConfigRoutes.put("/api/s3-configs/:id", authGateway.requireAdmin(), async (c) 
 });
 
 // 删除S3配置（管理员权限）
-s3ConfigRoutes.delete("/api/s3-configs/:id", authGateway.requireAdmin(), async (c) => {
+s3ConfigRoutes.delete("/api/s3-configs/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { id } = c.req.param();
   const encryptionSecret = getEncryptionSecret(c);
 
@@ -216,9 +221,9 @@ s3ConfigRoutes.delete("/api/s3-configs/:id", authGateway.requireAdmin(), async (
 });
 
 // 设置默认S3配置（管理员权限）
-s3ConfigRoutes.put("/api/s3-configs/:id/set-default", authGateway.requireAdmin(), async (c) => {
+s3ConfigRoutes.put("/api/s3-configs/:id/set-default", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { id } = c.req.param();
 
   try {
@@ -239,9 +244,9 @@ s3ConfigRoutes.put("/api/s3-configs/:id/set-default", authGateway.requireAdmin()
 });
 
 // 测试S3配置连接（管理员权限）
-s3ConfigRoutes.post("/api/s3-configs/:id/test", authGateway.requireAdmin(), async (c) => {
+s3ConfigRoutes.post("/api/s3-configs/:id/test", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { id } = c.req.param();
   const encryptionSecret = getEncryptionSecret(c);
   const requestOrigin = c.req.header("origin");

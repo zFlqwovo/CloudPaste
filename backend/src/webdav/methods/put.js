@@ -7,7 +7,6 @@ import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 import { handleWebDAVError } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
-import { clearDirectoryCache } from "../../cache/index.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { getSettingsByGroup } from "../../services/systemService.js";
 import { lockManager } from "../utils/LockManager.js";
@@ -136,12 +135,6 @@ export async function handlePut(c, path, userId, userType, db) {
       const result = await fileSystem.uploadFile(path, emptyFile, userId, userType, {
         useMultipart: false,
       });
-
-      // 清理缓存
-      const { mount } = await mountManager.getDriverByPath(path, userId, userType);
-      if (mount) {
-        await clearDirectoryCache({ mountId: mount.id });
-      }
 
       console.log(`WebDAV PUT - 空文件上传成功`);
 

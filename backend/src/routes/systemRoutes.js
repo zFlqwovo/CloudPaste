@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import {
   getMaxUploadSize,
   getDashboardStats,
@@ -12,8 +11,11 @@ import {
 } from "../services/systemService.js";
 import { ApiStatus } from "../constants/index.js";
 import { getQueryBool } from "../utils/common.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
 
 const systemRoutes = new Hono();
+const requireAdmin = usePolicy("admin.all");
 
 // 获取最大上传文件大小限制（公共API）
 systemRoutes.get("/api/system/max-upload-size", async (c) => {
@@ -43,9 +45,9 @@ systemRoutes.get("/api/system/max-upload-size", async (c) => {
 });
 
 // 仪表盘统计数据API
-systemRoutes.get("/api/admin/dashboard/stats", authGateway.requireAdmin(), async (c) => {
+systemRoutes.get("/api/admin/dashboard/stats", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const stats = await getDashboardStats(db, adminId);
 
   return c.json({
@@ -143,7 +145,7 @@ systemRoutes.get("/api/admin/settings", async (c) => {
 });
 
 // 获取分组列表和统计信息
-systemRoutes.get("/api/admin/settings/groups", authGateway.requireAdmin(), async (c) => {
+systemRoutes.get("/api/admin/settings/groups", requireAdmin, async (c) => {
   const db = c.env.DB;
   const groupsInfo = await getGroupsInfo(db);
 
@@ -156,7 +158,7 @@ systemRoutes.get("/api/admin/settings/groups", authGateway.requireAdmin(), async
 });
 
 // 获取设置项元数据
-systemRoutes.get("/api/admin/settings/metadata", authGateway.requireAdmin(), async (c) => {
+systemRoutes.get("/api/admin/settings/metadata", requireAdmin, async (c) => {
   const db = c.env.DB;
   const key = c.req.query("key");
   if (!key) {
@@ -177,7 +179,7 @@ systemRoutes.get("/api/admin/settings/metadata", authGateway.requireAdmin(), asy
 });
 
 // 按分组批量更新设置
-systemRoutes.put("/api/admin/settings/group/:groupId", authGateway.requireAdmin(), async (c) => {
+systemRoutes.put("/api/admin/settings/group/:groupId", requireAdmin, async (c) => {
   const db = c.env.DB;
   const groupId = parseInt(c.req.param("groupId"), 10);
   if (Number.isNaN(groupId)) {

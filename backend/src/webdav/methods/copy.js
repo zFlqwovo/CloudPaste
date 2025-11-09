@@ -8,7 +8,7 @@ import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { handleWebDAVError, createWebDAVErrorResponse } from "../utils/errorUtils.js";
 import { getStandardWebDAVHeaders } from "../utils/headerUtils.js";
 import { parseDestinationPath } from "../utils/webdavUtils.js";
-import { clearDirectoryCache } from "../../cache/index.js";
+import { invalidateFsCache } from "../../cache/invalidation.js";
 import { lockManager } from "../utils/LockManager.js";
 import { checkLockPermission } from "../utils/lockUtils.js";
 
@@ -290,16 +290,13 @@ export async function handleCopy(c, path, userId, userType, db) {
             const { mount: destMountResult } = await mountManager.getDriverByPath(destPath, userId, userType);
 
             if (sourceMountResult) {
-              await clearDirectoryCache({ mountId: sourceMountResult.id });
-              console.log(`WebDAV COPY - 已清理源挂载点 ${sourceMountResult.id} 的缓存`);
+              invalidateFsCache({ mountId: sourceMountResult.id, reason: "webdav-copy-cross", db });
             }
 
-            if (destMountResult && destMountResult.id !== sourceMountResult?.id) {
-              await clearDirectoryCache({ mountId: destMountResult.id });
-              console.log(`WebDAV COPY - 已清理目标挂载点 ${destMountResult.id} 的缓存`);
+            if (destMountResult) {
+              invalidateFsCache({ mountId: destMountResult.id, reason: "webdav-copy-cross", db });
             }
           } catch (cacheError) {
-            // 缓存清理失败不应该影响复制操作的成功响应
             console.warn(`WebDAV COPY - 跨存储复制后缓存清理失败: ${cacheError.message}`);
           }
 
@@ -336,16 +333,13 @@ export async function handleCopy(c, path, userId, userType, db) {
       const { mount: destMountResult } = await mountManager.getDriverByPath(destPath, userId, userType);
 
       if (sourceMountResult) {
-        await clearDirectoryCache({ mountId: sourceMountResult.id });
-        console.log(`WebDAV COPY - 已清理源挂载点 ${sourceMountResult.id} 的缓存`);
+        invalidateFsCache({ mountId: sourceMountResult.id, reason: "webdav-copy", db });
       }
 
-      if (destMountResult && destMountResult.id !== sourceMountResult?.id) {
-        await clearDirectoryCache({ mountId: destMountResult.id });
-        console.log(`WebDAV COPY - 已清理目标挂载点 ${destMountResult.id} 的缓存`);
+      if (destMountResult) {
+        invalidateFsCache({ mountId: destMountResult.id, reason: "webdav-copy", db });
       }
     } catch (cacheError) {
-      // 缓存清理失败不应该影响复制操作的成功响应
       console.warn(`WebDAV COPY - 缓存清理失败: ${cacheError.message}`);
     }
 

@@ -337,10 +337,8 @@ async function handleFileOverride(existingFile, overrideContext) {
 
     // 清除与文件相关的缓存（仅对S3存储类型）
     if (existingFile.storage_type === "S3" && existingFile.storage_config_id) {
-      const { clearDirectoryCache } = await import("../cache/index.js");
-      // 需要传递db参数，从repositoryFactory获取
-      const db = repositoryFactory.db || repositoryFactory._db;
-      await clearDirectoryCache({ db, s3ConfigId: existingFile.storage_config_id });
+      const { invalidateFsCache } = await import("../cache/invalidation.js");
+      invalidateFsCache({ s3ConfigId: existingFile.storage_config_id, reason: "file-override", db });
     }
   } catch (deleteError) {
     console.error(`删除旧文件记录时出错: ${deleteError.message}`);

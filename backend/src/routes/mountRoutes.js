@@ -2,10 +2,11 @@
  * 统一挂载点路由
  */
 import { Hono } from "hono";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { createMount, updateMount, deleteMount, getAllMounts } from "../services/storageMountService.js";
 import { ApiStatus } from "../constants/index.js";
-import { Permission } from "../constants/permissions.js";
+import { usePolicy } from "../security/policies/policies.js";
+import { resolvePrincipal } from "../security/helpers/principal.js";
+import { getAccessibleMountsForUser } from "../security/helpers/access.js";
 
 const mountRoutes = new Hono();
 
@@ -15,17 +16,14 @@ const mountRoutes = new Hono();
  * - 管理员：返回所有挂载点（包括禁用的）
  * - API密钥用户：返回有权限的活跃挂载点
  */
-mountRoutes.get("/api/mount/list", authGateway({
-  requireAuth: true,
-  customCheck: (authResult) => {
-    // 管理员或有挂载查看权限的API密钥用户
-    return authResult.isAdmin() || authResult.hasPermission(Permission.MOUNT_VIEW);
-  }
-}), async (c) => {
-  const db = c.env.DB;
-  const authResult = c.get("authResult");
+const requireAdmin = usePolicy("admin.all");
+const requireMountView = usePolicy("fs.base");
 
-  if (authResult.isAdmin()) {
+mountRoutes.get("/api/mount/list", requireMountView, async (c) => {
+  const db = c.env.DB;
+  const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+
+  if (identity.isAdmin) {
     const mounts = await getAllMounts(db, true);
 
     return c.json({
@@ -36,8 +34,7 @@ mountRoutes.get("/api/mount/list", authGateway({
     });
   }
 
-  const apiKeyInfo = authGateway.utils.getApiKeyInfo(c);
-  const mounts = await authGateway.utils.getAccessibleMounts(db, apiKeyInfo, "apiKey");
+  const mounts = await getAccessibleMountsForUser(db, identity.apiKeyInfo, "apiKey");
 
   return c.json({
     code: ApiStatus.SUCCESS,
@@ -50,9 +47,9 @@ mountRoutes.get("/api/mount/list", authGateway({
 /**
  * 创建挂载点（仅管理员）
  */
-mountRoutes.post("/api/mount/create", authGateway.requireAdmin(), async (c) => {
+mountRoutes.post("/api/mount/create", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
 
   const body = await c.req.json();
   const mount = await createMount(db, body, adminId);
@@ -68,9 +65,9 @@ mountRoutes.post("/api/mount/create", authGateway.requireAdmin(), async (c) => {
 /**
  * 更新挂载点（仅管理员）
  */
-mountRoutes.put("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
+mountRoutes.put("/api/mount/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { id } = c.req.param();
 
   const body = await c.req.json();
@@ -86,9 +83,9 @@ mountRoutes.put("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
 /**
  * 删除挂载点（仅管理员）
  */
-mountRoutes.delete("/api/mount/:id", authGateway.requireAdmin(), async (c) => {
+mountRoutes.delete("/api/mount/:id", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const adminId = authGateway.utils.getUserId(c);
+  const { userId: adminId } = resolvePrincipal(c, { allowedTypes: ["admin"] });
   const { id } = c.req.param();
 
   await deleteMount(db, id, adminId, true);

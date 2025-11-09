@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { authGateway } from "../middlewares/authGatewayMiddleware.js";
 import { ApiStatus } from "../constants/index.js";
+import { usePolicy } from "../security/policies/policies.js";
 import { getS3ConfigByIdForAdmin, getPublicS3ConfigById } from "../services/s3ConfigService.js";
+import { getAccessibleMountsForUser } from "../security/helpers/access.js";
 import { registerBrowseRoutes } from "./fs/browse.js";
 import { registerWriteRoutes } from "./fs/write.js";
 import { registerMultipartRoutes } from "./fs/multipart.js";
@@ -11,26 +12,34 @@ import { registerSearchShareRoutes } from "./fs/search_share.js";
 
 const fsRoutes = new Hono();
 
+// 负责把 principal 映射为 legacy FS 服务层仍在使用的 userInfo 结构。
 const unifiedFsAuthMiddleware = async (c, next) => {
-  const authResult = authGateway.utils.getAuthResult(c);
+  const principal = c.get("principal");
 
-  if (!authResult || !authResult.isAuthenticated) {
+  if (!principal || principal.type === "guest") {
     throw new HTTPException(ApiStatus.UNAUTHORIZED, { message: "需要认证访问" });
   }
 
-  if (authResult.isAdmin()) {
+  if (principal.isAdmin) {
     c.set("userInfo", {
       type: "admin",
-      id: authResult.getUserId(),
+      id: principal.id,
       hasFullAccess: true,
     });
-  } else {
-    const apiKeyInfo = authResult.keyInfo;
+  } else if (principal.type === "apikey") {
+    const apiKeyInfo = principal.attributes?.keyInfo ?? {
+      id: principal.id,
+      basicPath: principal.attributes?.basicPath ?? "/",
+      permissions: principal.authorities,
+    };
+
     c.set("userInfo", {
       type: "apiKey",
       info: apiKeyInfo,
       hasFullAccess: false,
     });
+  } else {
+    throw new HTTPException(ApiStatus.FORBIDDEN, { message: "不支持的身份类型" });
   }
 
   await next();
@@ -38,28 +47,14 @@ const unifiedFsAuthMiddleware = async (c, next) => {
 
 const FS_BASE_PATH = "/api/fs";
 
-const mountViewMiddleware = authGateway.requireMount();
-fsRoutes.use(`${FS_BASE_PATH}/*`, mountViewMiddleware, unifiedFsAuthMiddleware);
+const baseFsPolicy = usePolicy("fs.base");
+fsRoutes.use(`${FS_BASE_PATH}/*`, baseFsPolicy, unifiedFsAuthMiddleware);
 
-const applyScopedMiddleware = (paths, middleware) => {
-  paths.forEach((path) => fsRoutes.use(path, middleware));
-};
+fsRoutes.use(`${FS_BASE_PATH}/list`, usePolicy("fs.list"));
+fsRoutes.use(`${FS_BASE_PATH}/get`, usePolicy("fs.read"));
+fsRoutes.use(`${FS_BASE_PATH}/download`, usePolicy("fs.read"));
+fsRoutes.use(`${FS_BASE_PATH}/file-link`, usePolicy("fs.share-link"));
 
-const uploadPermissionPaths = [
-  `${FS_BASE_PATH}/mkdir`,
-  `${FS_BASE_PATH}/upload`,
-  `${FS_BASE_PATH}/update`,
-  `${FS_BASE_PATH}/presign`,
-  `${FS_BASE_PATH}/presign/commit`,
-  `${FS_BASE_PATH}/multipart/*`,
-];
-
-applyScopedMiddleware(uploadPermissionPaths, authGateway.requireMountUpload());
-applyScopedMiddleware([`${FS_BASE_PATH}/rename`], authGateway.requireMountRename());
-applyScopedMiddleware([`${FS_BASE_PATH}/batch-remove`], authGateway.requireMountDelete());
-applyScopedMiddleware([`${FS_BASE_PATH}/batch-copy`, `${FS_BASE_PATH}/batch-copy-commit`], authGateway.requireMountCopy());
-
-// 路径权限检查统一由 authGateway.utils 提供；此处不再重复封装
 
 const getServiceParams = (userInfo) => {
   if (userInfo.type === "admin") {
@@ -76,7 +71,8 @@ const getS3ConfigByUserType = async (db, configId, userIdOrInfo, userType, encry
 };
 
 const sharedContext = {
-  authGateway,
+  // FS 子路由只需要这三个 helper 即可完成鉴权相关操作。
+  getAccessibleMounts: getAccessibleMountsForUser,
   getServiceParams,
   getS3ConfigByUserType,
 };

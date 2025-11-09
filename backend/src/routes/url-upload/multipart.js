@@ -1,16 +1,20 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../constants/index.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
-import { authGateway } from "../../middlewares/authGatewayMiddleware.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { FileShareService } from "../../services/fileShareService.js";
+import { usePolicy } from "../../security/policies/policies.js";
+import { resolvePrincipal } from "../../security/helpers/principal.js";
+
+const requireUrlUpload = usePolicy("urlupload.manage");
 
 export const registerUrlMultipartRoutes = (router) => {
-  router.post("/api/url/multipart/init", authGateway.requireFile(), async (c) => {
+  router.post("/api/url/multipart/init", requireUrlUpload, async (c) => {
     const db = c.env.DB;
-    const isAdmin = authGateway.utils.isAdmin(c);
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+    const isAdmin = identity.isAdmin;
+    const userId = identity.userId;
+    const authType = identity.type;
 
     try {
       const body = await c.req.json();
@@ -92,11 +96,12 @@ export const registerUrlMultipartRoutes = (router) => {
     }
   });
 
-  router.post("/api/url/multipart/complete", authGateway.requireFile(), async (c) => {
+  router.post("/api/url/multipart/complete", requireUrlUpload, async (c) => {
     const db = c.env.DB;
-    const isAdmin = authGateway.utils.isAdmin(c);
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+    const isAdmin = identity.isAdmin;
+    const userId = identity.userId;
+    const authType = identity.type;
 
     try {
       const body = await c.req.json();
@@ -153,11 +158,12 @@ export const registerUrlMultipartRoutes = (router) => {
     }
   });
 
-  router.post("/api/url/multipart/abort", authGateway.requireFile(), async (c) => {
+  router.post("/api/url/multipart/abort", requireUrlUpload, async (c) => {
     const db = c.env.DB;
-    const isAdmin = authGateway.utils.isAdmin(c);
-    const userId = authGateway.utils.getUserId(c);
-    const authType = authGateway.utils.getAuthType(c);
+    const identity = resolvePrincipal(c, { allowedTypes: ["admin", "apikey"] });
+    const isAdmin = identity.isAdmin;
+    const userId = identity.userId;
+    const authType = identity.type;
 
     try {
       const body = await c.req.json();

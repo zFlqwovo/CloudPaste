@@ -15,6 +15,26 @@ import { ProxySignatureService } from "../services/ProxySignatureService.js";
 import { getEncryptionSecret } from "../utils/environmentUtils.js";
 import { getQueryBool } from "../utils/common.js";
 
+// 签名代理路径不会走 RBAC，因此这里用结构化日志补充最少可观测性。
+const emitProxyAudit = (c, details) => {
+  try {
+    const payload = {
+      type: "proxy.audit",
+      reqId: c.get?.("reqId") ?? null,
+      path: details.path,
+      decision: details.decision,
+      reason: details.reason ?? null,
+      signatureRequired: details.signatureRequired ?? false,
+      signatureProvided: details.signatureProvided ?? false,
+      mountId: details.mountId ?? null,
+      timestamp: new Date().toISOString(),
+    };
+    console.log(JSON.stringify(payload));
+  } catch (error) {
+    console.error("fsProxy audit emit failed", error);
+  }
+};
+
 const fsProxyRoutes = new Hono();
 
 /**
@@ -49,6 +69,13 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
 
     if (mountResult.error) {
       console.warn(`代理访问失败 - 挂载点查找失败: ${mountResult.error.message}`);
+      emitProxyAudit(c, {
+        path,
+        decision: "deny",
+        reason: "mount_lookup_failed",
+        signatureRequired: false,
+        signatureProvided: Boolean(c.req.query(PROXY_CONFIG.SIGN_PARAM)),
+      });
       throw new HTTPException(mountResult.error.status, { message: mountResult.error.message });
     }
 
@@ -63,6 +90,14 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
 
       if (!signature) {
         console.warn(`代理访问失败 - 缺少签名: ${path} (${signatureNeed.reason})`);
+        emitProxyAudit(c, {
+          path,
+          decision: "deny",
+          reason: "missing_signature",
+          signatureRequired: true,
+          signatureProvided: false,
+          mountId: mountResult.mount.id,
+        });
         throw new HTTPException(ApiStatus.UNAUTHORIZED, {
           message: `此文件需要签名访问 (${signatureNeed.description})`,
         });
@@ -71,6 +106,14 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
       const verifyResult = signatureService.verifyStorageSignature(path, signature);
       if (!verifyResult.valid) {
         console.warn(`代理访问失败 - 签名验证失败: ${path} (${verifyResult.reason})`);
+        emitProxyAudit(c, {
+          path,
+          decision: "deny",
+          reason: "invalid_signature",
+          signatureRequired: true,
+          signatureProvided: true,
+          mountId: mountResult.mount.id,
+        });
         throw new HTTPException(ApiStatus.UNAUTHORIZED, {
           message: `签名验证失败: ${verifyResult.reason}`,
         });
@@ -113,16 +156,36 @@ fsProxyRoutes.get(`${PROXY_CONFIG.ROUTE_PREFIX}/*`, async (c) => {
       console.log(`[fsProxy] 响应状态: ${fileResponse.status} -> ${path}`);
     }
 
-    return new Response(fileResponse.body, {
+    const response = new Response(fileResponse.body, {
       status: fileResponse.status,
       headers: responseHeaders, // 使用完整的响应头而不是c.res.headers
     });
+
+    emitProxyAudit(c, {
+      path,
+      decision: "allow",
+      reason: signatureNeed.required ? "signature_valid" : "signature_not_required",
+      signatureRequired: signatureNeed.required,
+      signatureProvided: signatureNeed.required ? Boolean(c.req.query(PROXY_CONFIG.SIGN_PARAM)) : false,
+      mountId: mountResult.mount.id,
+    });
+
+    return response;
   } catch (error) {
     console.error("文件系统代理访问错误:", error);
 
     if (error instanceof HTTPException) {
       throw error;
     }
+
+    const signatureParam = typeof c.req?.query === "function" ? c.req.query(PROXY_CONFIG.SIGN_PARAM) : null;
+    emitProxyAudit(c, {
+      path: c.req?.path ?? null,
+      decision: "deny",
+      reason: "internal_error",
+      signatureRequired: false,
+      signatureProvided: Boolean(signatureParam),
+    });
 
     throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "代理访问失败" });
   }
