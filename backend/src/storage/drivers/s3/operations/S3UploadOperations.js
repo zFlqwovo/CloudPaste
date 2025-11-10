@@ -89,7 +89,7 @@ export class S3UploadOperations {
         await updateParentDirectoriesModifiedTime(this.s3Client, this.config.bucket_name, finalS3Path);
 
         // 更新最后使用时间
-        if (db && mount.id) {
+        if (db && mount && mount.id) {
           await updateMountLastUsed(db, mount.id);
         }
 
@@ -209,7 +209,7 @@ export class S3UploadOperations {
         await updateParentDirectoriesModifiedTime(this.s3Client, this.config.bucket_name, finalS3Path);
 
         // 更新最后使用时间
-        if (db && mount.id) {
+        if (db && mount && mount.id) {
           await updateMountLastUsed(db, mount.id);
         }
 
@@ -280,7 +280,7 @@ export class S3UploadOperations {
       await updateParentDirectoriesModifiedTime(this.s3Client, this.config.bucket_name, s3SubPath, rootPrefix);
 
       // 更新最后使用时间
-      if (db && mount.id) {
+      if (db && mount && mount.id) {
         await updateMountLastUsed(db, mount.id);
       }
 
@@ -410,7 +410,7 @@ export class S3UploadOperations {
         }
 
         // 更新最后使用时间
-        if (db && mount.id) {
+        if (db && mount && mount.id) {
           await updateMountLastUsed(db, mount.id);
         }
 
@@ -487,7 +487,7 @@ export class S3UploadOperations {
         const completeResponse = await this.s3Client.send(completeCommand);
 
         // 更新最后使用时间
-        if (db && mount.id) {
+        if (db && mount && mount.id) {
           await updateMountLastUsed(db, mount.id);
         }
 
@@ -552,7 +552,7 @@ export class S3UploadOperations {
         await this.s3Client.send(abortCommand);
 
         // 更新最后使用时间
-        if (db && mount.id) {
+        if (db && mount && mount.id) {
           await updateMountLastUsed(db, mount.id);
         }
 

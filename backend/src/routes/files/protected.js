@@ -7,7 +7,6 @@ import {
   getUserFileDetail,
   updateFile,
 } from "../../services/fileService.js";
-import { deleteFileFromS3 } from "../../utils/s3Utils.js";
 import { invalidateFsCache } from "../../cache/invalidation.js";
 import { useRepositories } from "../../utils/repositories.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
@@ -139,20 +138,27 @@ export const registerFilesProtectedRoutes = (router) => {
             });
         }
 
-        if (deleteMode === "both" && file.storage_path && file.bucket_name) {
-          const s3Config = {
-            id: file.id,
-            endpoint_url: file.endpoint_url,
-            bucket_name: file.bucket_name,
-            region: file.region,
-            access_key_id: file.access_key_id,
-            secret_access_key: file.secret_access_key,
-            path_style: file.path_style,
-          };
+        // storage-first 或无 file_path 时，直接按存储配置删除对象（驱动直调）
+        if (deleteMode === "both" && file.storage_path && file.storage_config_id) {
+          const s3ConfigRepo = repositoryFactory.getS3ConfigRepository();
+          const storageConfig = await s3ConfigRepo.findById(file.storage_config_id).catch(() => null);
 
-          await deleteFileFromS3(s3Config, file.storage_path, encryptionSecret).catch((deleteError) => {
-            console.error(`删除S3文件失败 (ID: ${id}):`, deleteError);
-          });
+          if (storageConfig) {
+            try {
+              const { StorageFactory } = await import("../../storage/factory/StorageFactory.js");
+              const driver = await StorageFactory.createDriver(storageConfig.storage_type || "S3", storageConfig, encryptionSecret);
+              await driver.initialize?.();
+              if (typeof driver.deleteObjectByStoragePath === "function") {
+                await driver.deleteObjectByStoragePath(file.storage_path, { db });
+              } else if (typeof driver.batchRemoveItems === "function") {
+                await driver.batchRemoveItems([file.storage_path], { subPath: file.storage_path, db });
+              }
+            } catch (deleteError) {
+              console.error(`删除存储文件失败 (ID: ${id}):`, deleteError);
+            }
+          } else {
+            console.warn(`未找到存储配置，跳过对象删除 (fileId: ${id}, storage_config_id: ${file.storage_config_id})`);
+          }
         }
       })().catch((deleteError) => {
         console.error(`删除文件存储失败 (ID: ${id}):`, deleteError);

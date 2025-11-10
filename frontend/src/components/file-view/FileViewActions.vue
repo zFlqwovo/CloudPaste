@@ -137,6 +137,7 @@ import ErrorToast from "../common/ErrorToast.vue";
 import ShareModal from "./ShareModal.vue";
 import { useAuthStore } from "@/stores/authStore.js";
 import { FileType } from "@/utils/fileTypes.js";
+import { useDeleteSettingsStore } from "@/stores/deleteSettingsStore.js";
 
 const { t } = useI18n();
 
@@ -448,7 +449,8 @@ const deleteFile = async () => {
 
     // 使用统一的批量删除 API
     if (isAdmin.value || (hasApiKey.value && hasFilePermission.value && isCreator.value)) {
-      response = await api.file.batchDeleteFiles([props.fileInfo.id]);
+      const deleteSettingsStore = useDeleteSettingsStore();
+      response = await api.file.batchDeleteFiles([props.fileInfo.id], deleteSettingsStore.getDeleteMode());
     } else {
       throw new Error(t("fileView.actions.noPermission"));
     }

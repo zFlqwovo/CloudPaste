@@ -8,6 +8,7 @@ import { CAPABILITIES } from "../../interfaces/capabilities/index.js";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../../constants/index.js";
 import { createS3Client } from "../../../utils/s3Utils.js";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath, isCompleteFilePath } from "./utils/S3PathUtils.js";
 import { updateMountLastUsed, findMountPointByPath } from "../../fs/utils/MountResolver.js";
 import { buildFullProxyUrl, buildSignedProxyUrl } from "../../../constants/proxy.js";
@@ -344,6 +345,28 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
+   * 通过存储路径直接删除对象（storage-first 场景）
+   * @param {string} storagePath - 对象 Key
+   * @param {Object} options - 扩展选项（预留）
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteObjectByStoragePath(storagePath, options = {}) {
+    this._ensureInitialized();
+
+    try {
+      const params = {
+        Bucket: this.config.bucket_name,
+        Key: storagePath,
+      };
+      const cmd = new DeleteObjectCommand(params);
+      await this.s3Client.send(cmd);
+      return { success: true };
+    } catch (error) {
+      throw asHTTPException(error, "删除对象失败");
+    }
+  }
+
+  /**
    * 复制文件或目录
    * @param {string} sourcePath - 源路径
    * @param {string} targetPath - 目标路径
@@ -427,6 +450,41 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
+   * 处理上传完成后的逻辑（用于预签名上传后端对齐）
+   * @param {string} path - 目标路径
+   * @param {Object} options - 选项 { mount, subPath, db, fileName, fileSize, contentType, etag }
+   * @returns {Promise<Object>} 处理结果
+   */
+  async handleUploadComplete(path, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, subPath, db, fileName, fileSize, contentType, etag } = options;
+
+    // 规范化S3子路径
+    const s3SubPath = normalizeS3SubPath(subPath, false);
+
+    try {
+      const result = await this.uploadOps.handleUploadComplete(s3SubPath, {
+        mount,
+        db,
+        fileName,
+        fileSize,
+        contentType,
+        etag,
+      });
+
+      // 更新挂载点的最后使用时间
+      if (db && mount?.id) {
+        await updateMountLastUsed(db, mount.id);
+      }
+
+      return result;
+    } catch (error) {
+      throw asHTTPException(error, "处理上传完成失败");
+    }
+  }
+
+  /**
    * 更新文件内容
    * @param {string} path - 文件路径
    * @param {string} content - 新内容
@@ -448,7 +506,6 @@ export class S3StorageDriver extends BaseDriver {
     const result = await this.fileOps.updateFile(s3SubPath, content, {
       fileName,
     });
-
 
     // 更新挂载点的最后使用时间
     if (db && mount.id) {

@@ -833,13 +833,13 @@ async function executeFrontendSimulationTest(testResult, strategy) {
     try {
       // 获取预签名URL
       const presignedUrl = await getSignedUrl(
-          strategy.s3Client,
-          new PutObjectCommand({
-            Bucket: strategy.config.bucket_name,
-            Key: testKey,
-            ContentType: testContentType,
-          }),
-          { expiresIn: strategy.config.signature_expires_in || 300 }
+        strategy.s3Client,
+        new PutObjectCommand({
+          Bucket: strategy.config.bucket_name,
+          Key: testKey,
+          ContentType: testContentType,
+        }),
+        { expiresIn: strategy.config.signature_expires_in || 300 }
       );
 
       // 模拟前端上传请求头（根据不同提供商定制）

@@ -219,11 +219,13 @@ export const registerMultipartRoutes = (router, helpers) => {
   });
 
   router.post("/api/fs/presign/commit", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver("targetPath") }), async (c) => {
-    const { db } = requireUserContext(c);
+    const { db, encryptionSecret, repositoryFactory, userIdOrInfo, userType } = requireUserContext(c);
     const body = c.get("jsonBody");
     const targetPath = body.targetPath;
     const mountId = body.mountId;
     const fileSize = body.fileSize || 0;
+    const etag = body.etag || null;
+    const contentType = body.contentType || undefined;
 
     if (!targetPath || !mountId) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "请提供完整的上传信息" });
@@ -231,12 +233,24 @@ export const registerMultipartRoutes = (router, helpers) => {
 
     const fileName = targetPath.split("/").filter(Boolean).pop();
 
+    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
+    const fileSystem = new FileSystem(mountManager);
+
+    // 使用 FileSystem 对齐目录标记与缓存逻辑
+    const result = await fileSystem.commitPresignedUpload(targetPath, fileName, userIdOrInfo, userType, {
+      fileSize,
+      etag,
+      contentType,
+    });
+
+    // 同时触发目录缓存失效（冗余保护，确保一致性）
     invalidateFsCache({ mountId, reason: "presign-commit", db });
 
     return c.json({
       code: ApiStatus.SUCCESS,
       message: "文件上传完成",
       data: {
+        ...result,
         fileName,
         targetPath,
         fileSize,

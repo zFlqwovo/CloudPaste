@@ -6,6 +6,35 @@ import { useRepositories } from "../../utils/repositories.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 
 export const registerFilesPublicRoutes = (router) => {
+  router.get("/api/file-view/:slug", async (c) => {
+    const db = c.env.DB;
+    const { slug } = c.req.param();
+    const encryptionSecret = getEncryptionSecret(c);
+
+    const file = await getFileBySlug(db, slug);
+    const accessCheck = await isFileAccessible(db, file, encryptionSecret);
+    if (!accessCheck.accessible) {
+      if (accessCheck.reason === "expired") {
+        throw new HTTPException(ApiStatus.GONE, { message: "文件已过期" });
+      }
+      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "文件不存在" });
+    }
+
+    const requiresPassword = !!file.password;
+    if (!requiresPassword) {
+      const result = await incrementAndCheckFileViews(db, file, encryptionSecret);
+      if (result.isExpired) {
+        throw new HTTPException(ApiStatus.GONE, { message: "文件已达到最大查看次数" });
+      }
+      const urlsObj = await generateFileDownloadUrl(db, result.file, encryptionSecret, c.req.raw);
+      const publicInfo = await getPublicFileInfo(result.file, requiresPassword, urlsObj);
+      return c.json({ code: ApiStatus.SUCCESS, message: "获取文件成功", data: publicInfo, success: true });
+    }
+
+    const publicInfo = await getPublicFileInfo(file, true);
+    return c.json({ code: ApiStatus.SUCCESS, message: "获取文件成功", data: publicInfo, success: true });
+  });
+
   router.get("/api/public/files/:slug", async (c) => {
     const db = c.env.DB;
     const { slug } = c.req.param();

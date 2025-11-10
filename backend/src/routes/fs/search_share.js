@@ -3,6 +3,7 @@ import { ApiStatus } from "../../constants/index.js";
 import { MountManager } from "../../storage/managers/MountManager.js";
 import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { useRepositories } from "../../utils/repositories.js";
+import { FileShareService } from "../../services/fileShareService.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { usePolicy } from "../../security/policies/policies.js";
 
@@ -50,10 +51,9 @@ export const registerSearchShareRoutes = (router, helpers) => {
         throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "文件路径不能为空" });
       }
 
-      const { FileShareService } = await import("../../services/fileShareService.js");
       const repositoryFactory = useRepositories(c);
-      const fileShareService = new FileShareService(db, repositoryFactory, encryptionSecret);
-      const result = await fileShareService.createShareFromFileSystem(path, userIdOrInfo, userType);
+      const svc = new FileShareService(db, encryptionSecret, repositoryFactory);
+      const result = await svc.createShareFromFileSystem(path, userIdOrInfo, userType);
 
       return c.json({
         code: ApiStatus.SUCCESS,
