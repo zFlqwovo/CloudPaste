@@ -543,7 +543,7 @@ export async function testS3Connection(db, id, adminId, encryptionSecret, reques
   await executeFrontendSimulationTest(testResult, strategy);
 
   // 更新最后使用时间
-  await updateLastUsedTime(db, id, this.repositoryFactory);
+  await updateLastUsedTime(db, id, factory);
 
   // 生成测试结果摘要
   const summary = generateTestSummary(testResult);
@@ -833,13 +833,13 @@ async function executeFrontendSimulationTest(testResult, strategy) {
     try {
       // 获取预签名URL
       const presignedUrl = await getSignedUrl(
-        strategy.s3Client,
-        new PutObjectCommand({
-          Bucket: strategy.config.bucket_name,
-          Key: testKey,
-          ContentType: testContentType,
-        }),
-        { expiresIn: strategy.config.signature_expires_in || 300 }
+          strategy.s3Client,
+          new PutObjectCommand({
+            Bucket: strategy.config.bucket_name,
+            Key: testKey,
+            ContentType: testContentType,
+          }),
+          { expiresIn: strategy.config.signature_expires_in || 300 }
       );
 
       // 模拟前端上传请求头（根据不同提供商定制）
