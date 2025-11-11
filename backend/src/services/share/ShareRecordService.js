@@ -64,25 +64,16 @@ export class ShareRecordService {
     const now = new Date().toISOString();
     const expiresAt = expiresInHours > 0 ? new Date(Date.now() + expiresInHours * 3600000).toISOString() : null;
     const maxViewsValue = maxViews > 0 ? maxViews : null;
-    // use_proxy 默认使用系统设置 default_use_proxy（当调用方未显式提供时）
-    let useProxyFlag;
-    if (useProxy === undefined) {
-      try {
-        const systemRepo = this.repositoryFactory.getSystemRepository();
-        const setting = await systemRepo.getSettingMetadata("default_use_proxy");
-        const v = String(setting?.value ?? "false").toLowerCase();
-        useProxyFlag = v === "true" || v === "1" ? 1 : 0;
-      } catch {
-        useProxyFlag = 0;
-      }
-    } else {
-      useProxyFlag = useProxy ? 1 : 0;
-    }
+    // use_proxy 默认关闭代理，未显式传入时走直链
+    const useProxyFlag = useProxy ? 1 : 0;
     const passwordHash = password ? await hashPassword(password) : null;
 
     const relativePath = (storageSubPath || "").replace(/^\/+/u, "");
-    const storagePath = mount?.storage_config_id ? relativePath : (uploadResult?.s3Path || fsPath || filename);
-    const storageType = mount?.storage_type || storageConfig?.storage_type || "S3";
+    const storagePath = mount?.storage_config_id ? relativePath : (uploadResult?.storagePath || fsPath || filename);
+    const storageType = mount?.storage_type || storageConfig?.storage_type;
+    if (!storageType) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+    }
     const storageConfigId = mount?.storage_config_id || storageConfig?.id;
 
     let finalFileId = fileId;
@@ -126,7 +117,7 @@ export class ShareRecordService {
           storage_path: storagePath,
           file_path: fsPath,
           use_proxy: useProxyFlag,
-          s3_url: uploadResult?.s3Url || null,
+          public_url: uploadResult?.publicUrl || null,
           etag: uploadResult?.etag || null,
           max_views: maxViewsValue,
           expires_at: expiresAt,
@@ -134,6 +125,7 @@ export class ShareRecordService {
           created_by: existing.created_by,
         };
 
+        fileForUrl.password_plain = password || null;
         const urls = await generateFileDownloadUrl(this.db, fileForUrl, this.encryptionSecret, request);
 
         return {
@@ -151,8 +143,7 @@ export class ShareRecordService {
           url: `/file/${existing.slug}`,
           previewUrl: useProxyFlag ? urls.proxyPreviewUrl : urls.previewUrl,
           downloadUrl: useProxyFlag ? urls.proxyDownloadUrl : urls.downloadUrl,
-          s3_direct_preview_url: urls.previewUrl,
-          s3_direct_download_url: urls.downloadUrl,
+          // 直链字段统一移除，仅保留代理与通用字段
           proxy_preview_url: urls.proxyPreviewUrl,
           proxy_download_url: urls.proxyDownloadUrl,
           use_proxy: useProxyFlag,
@@ -160,7 +151,6 @@ export class ShareRecordService {
           used_original_filename: originalFilenameUsed,
           storage_path: storagePath,
           storage_type: storageType,
-          s3_path: uploadResult?.s3Path || storagePath,
         };
       }
     }
@@ -204,12 +194,13 @@ export class ShareRecordService {
       storage_path: storagePath,
       file_path: fsPath,
       use_proxy: useProxyFlag,
-      s3_url: uploadResult?.s3Url || null,
+      public_url: uploadResult?.publicUrl || null,
       etag: uploadResult?.etag || null,
       max_views: maxViewsValue,
       expires_at: expiresAt,
       views: 0,
       created_by: createdBy,
+      password_plain: password || null,
     };
 
     const urls = await generateFileDownloadUrl(this.db, fileForUrl, this.encryptionSecret, request);
@@ -229,8 +220,7 @@ export class ShareRecordService {
       url: `/file/${finalSlug}`,
       previewUrl: useProxyFlag ? urls.proxyPreviewUrl : urls.previewUrl,
       downloadUrl: useProxyFlag ? urls.proxyDownloadUrl : urls.downloadUrl,
-      s3_direct_preview_url: urls.previewUrl,
-      s3_direct_download_url: urls.downloadUrl,
+      // 直链字段统一移除，仅保留代理与通用字段
       proxy_preview_url: urls.proxyPreviewUrl,
       proxy_download_url: urls.proxyDownloadUrl,
       use_proxy: useProxyFlag,
@@ -238,7 +228,6 @@ export class ShareRecordService {
       used_original_filename: originalFilenameUsed,
       storage_path: storagePath,
       storage_type: storageType,
-      s3_path: uploadResult?.s3Path || storagePath,
     };
 
     return response;

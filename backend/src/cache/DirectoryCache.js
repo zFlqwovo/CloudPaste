@@ -149,8 +149,8 @@ const directoryCacheManager = new DirectoryCacheManager();
  * 统一的缓存清理函数 - 可根据挂载点ID或S3配置ID清理缓存
  * @param {Object} options - 清理选项
  * @param {string} [options.mountId] - 要清理的挂载点ID
- * @param {D1Database} [options.db] - 数据库连接（当使用s3ConfigId时必需）
- * @param {string} [options.s3ConfigId] - S3配置ID，将清理所有关联的挂载点
+ * @param {D1Database} [options.db] - 数据库连接（当使用storageConfigId时必需）
+ * @param {string} [options.storageConfigId] - 存储配置ID，将清理所有关联的挂载点
  * @returns {Promise<number>} 清除的缓存项数量
  */
 // 导出单例实例和类 (单例用于实际应用，类用于测试和特殊场景)

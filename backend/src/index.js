@@ -4,7 +4,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import apiKeyRoutes from "./routes/apiKeyRoutes.js";
 import { backupRoutes } from "./routes/backupRoutes.js";
 
-import s3ConfigRoutes from "./routes/s3ConfigRoutes.js";
+import storageConfigRoutes from "./routes/storageConfigRoutes.js";
 import systemRoutes from "./routes/systemRoutes.js";
 import mountRoutes from "./routes/mountRoutes.js";
 import webdavRoutes from "./routes/webdavRoutes.js";
@@ -175,7 +175,7 @@ app.route("/", fileViewRoutes);
 app.route("/", filesRoutes);
 app.route("/", shareUploadRoutes);
 app.route("/", pastesRoutes);
-app.route("/", s3ConfigRoutes);
+app.route("/", storageConfigRoutes);
 app.route("/", systemRoutes);
 app.route("/", mountRoutes);
 app.route("/", webdavRoutes);

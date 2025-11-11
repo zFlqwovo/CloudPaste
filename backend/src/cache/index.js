@@ -9,8 +9,8 @@ export { BaseCache } from "./BaseCache.js";
 // ==================== 目录缓存 ====================
 export { DirectoryCacheManager, directoryCacheManager } from "./DirectoryCache.js";
 
-// ==================== S3 URL缓存 ====================
-export { S3UrlCacheManager, s3UrlCacheManager, clearS3UrlCache } from "./S3UrlCache.js";
+// ==================== URL缓存 ====================
+export { UrlCacheManager, urlCacheManager, clearUrlCache } from "./UrlCache.js";
 
 // ==================== 搜索缓存 ====================
 export { SearchCacheManager, searchCacheManager, clearSearchCache } from "./SearchCache.js";

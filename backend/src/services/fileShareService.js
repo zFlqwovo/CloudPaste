@@ -12,27 +12,48 @@ export class FileShareService {
     this.records = new ShareRecordService(db, encryptionSecret, repositoryFactory);
   }
 
+  async resolveStorageConfig({ storageConfigId = null, userType = UserType.ADMIN, withSecrets = false } = {}) {
+    const repo = this.repositoryFactory.getStorageConfigRepository();
+    if (!repo) {
+      return null;
+    }
+    const requirePublic = userType === UserType.API_KEY;
+    const findByIdFn = withSecrets && typeof repo.findByIdWithSecrets === "function" ? repo.findByIdWithSecrets.bind(repo) : repo.findById.bind(repo);
+
+    if (storageConfigId) {
+      const existing = await findByIdFn(storageConfigId).catch(() => null);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    let config = await repo.findDefault({ requirePublic, withSecrets }).catch(() => null);
+    if (config) {
+      return config;
+    }
+
+    const fallbackList = requirePublic ? await repo.findPublic().catch(() => []) : await repo.findAll().catch(() => []);
+    if (Array.isArray(fallbackList) && fallbackList.length > 0) {
+      return fallbackList[0];
+    }
+    return null;
+  }
+
   // 预签名初始化
   async createPresignedShareUpload({ filename, fileSize, contentType, path = null, storage_config_id = null, userIdOrInfo, userType }) {
     if (!filename) throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少 filename" });
     await this.limit.check(fileSize);
 
     const { ObjectStore } = await import("../storage/object/ObjectStore.js");
-    const s3Repo = this.repositoryFactory.getS3ConfigRepository();
-    let cfg = null;
-    if (storage_config_id) cfg = await s3Repo.findById(storage_config_id).catch(() => null);
-    if (!cfg) {
-      const pub = userType === UserType.API_KEY ? "AND is_public = 1" : "";
-      cfg = await s3Repo.queryFirst(`SELECT * FROM s3_configs WHERE is_default = 1 ${pub} ORDER BY updated_at DESC`).catch(() => null)
-         || await s3Repo.findPublic().then(x => x?.[0]).catch(() => null);
-    }
+    const cfg = await this.resolveStorageConfig({ storageConfigId: storage_config_id, userType });
     if (!cfg) throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "未找到可用的存储配置，无法生成预签名URL" });
 
     const store = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
     const presign = await store.presignUpload({ storage_config_id: cfg.id, directory: path, filename, fileSize, contentType });
     // 配额校验：考虑覆盖同路径时排除旧记录体积
     const fileRepo = this.repositoryFactory.getFileRepository();
-    const existing = await fileRepo.findByStoragePath(cfg.id, presign.key, "S3").catch(() => null);
+    if (!cfg.storage_type) throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+    const existing = await fileRepo.findByStoragePath(cfg.id, presign.key, cfg.storage_type).catch(() => null);
     await this.limit.checkStorageQuota(cfg.id, Number(fileSize) || 0, { excludeFileId: existing?.id || null });
     return {
       uploadUrl: presign.uploadUrl,
@@ -60,8 +81,10 @@ export class FileShareService {
     const store = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
     const commit = await store.commitUpload({ storage_config_id: finalStorageConfigId, key: finalKey, filename, size, etag });
 
-    const s3Repo = this.repositoryFactory.getS3ConfigRepository();
-    const storageConfig = await s3Repo.findById(finalStorageConfigId);
+    const storageConfig = await this.resolveStorageConfig({ storageConfigId: finalStorageConfigId, userType });
+    if (!storageConfig) {
+      throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
+    }
     const { getEffectiveMimeType } = await import("../utils/fileUtils.js");
     const mimeType = getEffectiveMimeType(undefined, filename);
 
@@ -104,24 +127,15 @@ export class FileShareService {
     const mimeType = getEffectiveMimeType(options.contentType, storedFilename);
 
     // 选择 storage_config：显式优先，否则选默认（API Key 需公开）
-    const s3Repo = this.repositoryFactory.getS3ConfigRepository();
-    let cfg = null;
-    if (options.storage_config_id) cfg = await s3Repo.findById(options.storage_config_id).catch(() => null);
-    if (!cfg) {
-      const pub = userType === UserType.API_KEY ? "AND is_public = 1" : "";
-      cfg = await s3Repo.queryFirst(`SELECT * FROM s3_configs WHERE is_default = 1 ${pub} ORDER BY updated_at DESC`).catch(() => null)
-         || await s3Repo.findPublic().then(x => x?.[0]).catch(() => null);
-    }
+    const cfg = await this.resolveStorageConfig({ storageConfigId: options.storage_config_id, userType });
     if (!cfg) throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "未找到可用的存储配置，无法上传" });
 
     const store = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
     // 预先计算最终Key用于配额校验（考虑命名策略与冲突重命名）
-    const plannedKey = await (async () => {
-      const store = new (await import("../storage/object/ObjectStore.js")).ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
-      return await store.getPlannedKey(cfg.id, options.path || null, storedFilename);
-    })();
+    const plannedKey = await store.getPlannedKey(cfg.id, options.path || null, storedFilename);
     const fileRepo = this.repositoryFactory.getFileRepository();
-    const existing = await fileRepo.findByStoragePath(cfg.id, plannedKey, "S3").catch(() => null);
+    if (!cfg.storage_type) throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+    const existing = await fileRepo.findByStoragePath(cfg.id, plannedKey, cfg.storage_type).catch(() => null);
     await this.limit.checkStorageQuota(cfg.id, normalizedSize, { excludeFileId: existing?.id || null });
     const result = await store.uploadDirect({
       storage_config_id: cfg.id,
@@ -137,7 +151,7 @@ export class FileShareService {
     return await this.records.createShareRecord({
       mount: null,
       fsPath: null,
-      storageSubPath: result.s3Path,
+      storageSubPath: result.storagePath,
       filename,
       size: normalizedSize,
       remark: options.remark || "",
@@ -151,7 +165,7 @@ export class FileShareService {
       useProxy: options.useProxy,
       mimeType,
       request: options.request || null,
-      uploadResult: { s3Path: result.s3Path, s3Url: result.s3Url, etag: result.etag },
+      uploadResult: { storagePath: result.storagePath, publicUrl: result.publicUrl, etag: result.etag },
       originalFilenameUsed: Boolean(options.originalFilename),
       storageConfig: cfg,
       updateIfExists: !useRandom,

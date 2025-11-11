@@ -1,6 +1,6 @@
 import { DEFAULT_MAX_UPLOAD_SIZE_MB } from "../constants/index.js";
 import { SETTING_GROUPS } from "../constants/settings.js";
-import { getS3ConfigsWithUsage } from "./s3ConfigService.js";
+import { getStorageConfigsWithUsage } from "./storageConfigService.js";
 import { ensureRepositoryFactory } from "../utils/repositories.js";
 import { previewSettingsCache } from "../cache/index.js";
 import { processWeeklyData } from "../utils/common.js";
@@ -49,8 +49,8 @@ export async function getDashboardStats(db, adminId, repositoryFactory) {
     // 获取基础统计数据
     const basicStats = await systemRepository.getDashboardStats();
 
-    // 获取所有S3存储配置的使用情况
-    const s3ConfigsWithUsage = await getS3ConfigsWithUsage(db);
+    // 获取所有存储配置的使用情况（通用命名）
+    const storageConfigsWithUsage = await getStorageConfigsWithUsage(db);
 
     // 获取最近一周的趋势数据
     const weeklyTrends = await systemRepository.getWeeklyTrends();
@@ -60,10 +60,10 @@ export async function getDashboardStats(db, adminId, repositoryFactory) {
     const lastWeekFiles = processWeeklyData(weeklyTrends.files);
 
     // 总体存储使用情况
-    const totalStorageUsed = s3ConfigsWithUsage.reduce((total, config) => total + (config.usage?.total_size || 0), 0);
+    const totalStorageUsed = storageConfigsWithUsage.reduce((total, config) => total + (config.usage?.total_size || 0), 0);
 
-    // 转换S3配置数据格式
-    const s3Buckets = s3ConfigsWithUsage.map((config) => {
+    // 统一输出结构（通用命名）
+    const storages = storageConfigsWithUsage.map((config) => {
       const usedStorage = config.usage?.total_size || 0;
       const totalStorage = config.total_storage_bytes || 0;
 
@@ -84,9 +84,9 @@ export async function getDashboardStats(db, adminId, repositoryFactory) {
       totalPastes: basicStats.totalPastes,
       totalFiles: basicStats.totalFiles,
       totalApiKeys: basicStats.totalApiKeys,
-      totalS3Configs: basicStats.totalS3Configs,
+      totalStorageConfigs: basicStats.totalS3Configs,
       totalStorageUsed,
-      s3Buckets,
+      storages,
       lastWeekPastes,
       lastWeekFiles,
     };

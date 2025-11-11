@@ -115,7 +115,7 @@ router.post("/api/share/commit", requireFilesAccess, async (c) => {
     throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少 filename" });
   }
 
-  //必须 key + storage_config_id
+  // 新协议：必须 key + storage_config_id
   const finalKey = key || null;
   const finalStorageConfigId = storage_config_id || null;
   if (!finalKey || !finalStorageConfigId) {

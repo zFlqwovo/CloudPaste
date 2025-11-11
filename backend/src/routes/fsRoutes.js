@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus, UserType } from "../constants/index.js";
 import { usePolicy } from "../security/policies/policies.js";
-import { getS3ConfigByIdForAdmin, getPublicS3ConfigById } from "../services/s3ConfigService.js";
+import { getStorageConfigByIdForAdmin, getPublicStorageConfigById } from "../services/storageConfigService.js";
 import { getAccessibleMountsForUser } from "../security/helpers/access.js";
 import { registerBrowseRoutes } from "./fs/browse.js";
 import { registerWriteRoutes } from "./fs/write.js";
@@ -63,18 +63,19 @@ const getServiceParams = (userInfo) => {
   return { userIdOrInfo: userInfo.info, userType: UserType.API_KEY };
 };
 
-const getS3ConfigByUserType = async (db, configId, userIdOrInfo, userType, encryptionSecret) => {
+// 统一命名：根据用户类型获取“存储配置”（保持实现不变）
+const getStorageConfigByUserType = async (db, configId, userIdOrInfo, userType, encryptionSecret) => {
   if (userType === UserType.ADMIN) {
-    return await getS3ConfigByIdForAdmin(db, configId, userIdOrInfo);
+    return await getStorageConfigByIdForAdmin(db, configId, userIdOrInfo);
   }
-  return await getPublicS3ConfigById(db, configId);
+  return await getPublicStorageConfigById(db, configId);
 };
 
 const sharedContext = {
   // FS 子路由只需要这三个 helper 即可完成鉴权相关操作。
   getAccessibleMounts: getAccessibleMountsForUser,
   getServiceParams,
-  getS3ConfigByUserType,
+  getStorageConfigByUserType,
 };
 
 registerBrowseRoutes(fsRoutes, sharedContext);

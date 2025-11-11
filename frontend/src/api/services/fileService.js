@@ -93,7 +93,7 @@ export async function completeFileUpload(data) {
 }
 
 /**
- * 直接上传文件到S3（前端直接上传）
+ * 直接上传文件到对象存储（前端直接上传）
  * @param {File} file - 要上传的文件
  * @param {Object} options - 上传选项
  * @param {Function} onProgress - 上传进度回调函数，参数为0-100的进度百分比、已加载字节数和总字节数
@@ -220,7 +220,7 @@ export async function directUploadFile(file, options = {}, onProgress, onXhrRead
 
     return completeData;
   } catch (error) {
-    console.error("直接上传文件到S3失败:", error);
+    console.error("直接上传文件到存储失败:", error);
     throw error;
   }
 }

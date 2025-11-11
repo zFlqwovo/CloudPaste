@@ -110,10 +110,12 @@ export const registerFilesPublicRoutes = (router) => {
     }
 
     if (!file.password) {
+      const urlsObj = await generateFileDownloadUrl(db, file, encryptionSecret, c.req.raw);
+      const publicInfo = await getPublicFileInfo(file, false, urlsObj);
       return c.json({
         code: ApiStatus.BAD_REQUEST,
         message: "此文件不需要密码",
-        data: { url: file.s3_url },
+        data: publicInfo,
         success: true,
       });
     }
@@ -144,7 +146,7 @@ export const registerFilesPublicRoutes = (router) => {
       }
     }
 
-    const publicInfo = await getPublicFileInfo(fileWithPassword, false, urlsObj);
+      const publicInfo = await getPublicFileInfo(fileWithPassword, false, urlsObj);
 
     return c.json({
       code: ApiStatus.SUCCESS,

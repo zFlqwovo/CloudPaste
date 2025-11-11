@@ -1,6 +1,6 @@
 import cacheBus, { CACHE_EVENTS } from "./cacheBus.js";
 import { directoryCacheManager } from "./DirectoryCache.js";
-import { clearS3UrlCache } from "./S3UrlCache.js";
+import { clearUrlCache } from "./UrlCache.js";
 import { clearSearchCache } from "./SearchCache.js";
 import { previewSettingsCache } from "./PreviewSettingsCache.js";
 import { bumpMountsVersion } from "./cacheState.js";
@@ -31,8 +31,8 @@ const invalidateDirectoryCache = ({ mountId, paths = [] }) => {
   }
 };
 
-const resolveMountsByS3Config = async (db, s3ConfigId) => {
-  if (!db || !s3ConfigId) {
+const resolveMountsByStorageConfig = async (db, storageConfigId) => {
+  if (!db || !storageConfigId) {
     return [];
   }
 
@@ -42,7 +42,7 @@ const resolveMountsByS3Config = async (db, s3ConfigId) => {
         `SELECT id FROM storage_mounts
          WHERE storage_type = 'S3' AND storage_config_id = ?`
       )
-      .bind(s3ConfigId)
+      .bind(storageConfigId)
       .all();
     return result?.results?.map((row) => row.id).filter(Boolean) ?? [];
   } catch (error) {
@@ -57,7 +57,7 @@ cacheBus.on(CACHE_EVENTS.INVALIDATE, async (payload = {}) => {
       target = "fs",
       mountId = null,
       paths = [],
-      s3ConfigId = null,
+      storageConfigId = null,
       userType = null,
       userId = null,
       reason = "unknown",
@@ -72,7 +72,7 @@ cacheBus.on(CACHE_EVENTS.INVALIDATE, async (payload = {}) => {
 
     if (invalidateAll) {
       directoryCacheManager.invalidateAll();
-      await clearS3UrlCache();
+      await clearUrlCache();
       clearSearchCache();
       logEvent(`缓存全量失效(原因:${reason})`, payload);
       return;
@@ -85,13 +85,13 @@ cacheBus.on(CACHE_EVENTS.INVALIDATE, async (payload = {}) => {
       }
     }
 
-    if (s3ConfigId) {
-      const relatedMounts = await resolveMountsByS3Config(db, s3ConfigId);
+    if (payload.storageConfigId) {
+      const relatedMounts = await resolveMountsByStorageConfig(db, payload.storageConfigId);
       for (const relatedMountId of relatedMounts) {
         invalidateDirectoryCache({ mountId: relatedMountId });
         clearSearchCache({ mountId: relatedMountId });
       }
-      await clearS3UrlCache({ s3ConfigId });
+      await clearUrlCache({ storageConfigId: payload.storageConfigId });
     }
 
     if (target === "preview") {

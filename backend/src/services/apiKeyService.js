@@ -281,7 +281,7 @@ export async function getAccessibleMountsByBasicPath(db, basicPath, repositoryFa
   // 使用 Repository 获取数据
   const factory = resolveRepositoryFactory(db, repositoryFactory);
   const mountRepository = factory.getMountRepository();
-  const s3ConfigRepository = factory.getS3ConfigRepository();
+  const s3ConfigRepository = factory.getStorageConfigRepository();
 
   // 获取所有活跃的挂载点
   const allMounts = await mountRepository.findMany(DbTables.STORAGE_MOUNTS, { is_active: 1 }, { orderBy: "sort_order ASC, name ASC" });
@@ -291,7 +291,7 @@ export async function getAccessibleMountsByBasicPath(db, basicPath, repositoryFa
   // 为每个挂载点获取S3配置信息
   const mountsWithS3Info = await Promise.all(
     allMounts.map(async (mount) => {
-      if (mount.storage_type === "S3" && mount.storage_config_id) {
+      if (mount.storage_config_id) {
         const s3Config = await s3ConfigRepository.findById(mount.storage_config_id);
         return {
           ...mount,
@@ -310,7 +310,7 @@ export async function getAccessibleMountsByBasicPath(db, basicPath, repositoryFa
   const accessibleMounts = mountsWithS3Info.filter((mount) => {
     // 首先检查S3配置的公开性
     // 对于S3类型的挂载点，必须使用公开的S3配置
-    if (mount.storage_type === "S3" && mount.is_public !== 1) {
+    if (mount.storage_config_id && mount.is_public !== 1) {
       inaccessibleMounts.push(mount.name);
       return false;
     }

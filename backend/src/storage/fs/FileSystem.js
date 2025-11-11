@@ -573,7 +573,7 @@ export class FileSystem {
   /**
    * 提交跨存储复制（客户端已完成复制后，通知后端进行缓存失效等收尾）
    * @param {Object} mount - 目标挂载点对象
-   * @param {Array<Object>} files - 提交的文件列表，包含 targetPath 与 s3Path
+   * @param {Array<Object>} files - 提交的文件列表，包含 targetPath 与 storagePath
    * @returns {Promise<{success: Array, failed: Array}>}
    */
   async commitCrossStorageCopy(mount, files) {
@@ -582,14 +582,14 @@ export class FileSystem {
 
   emitCacheInvalidation(payload = {}) {
     try {
-      const { mount = null, mountId = null, s3ConfigId = null, paths = [], reason = "fs_operation" } = payload;
+      const { mount = null, mountId = null, storageConfigId = null, paths = [], reason = "fs_operation" } = payload;
       const resolvedMountId = mount?.id ?? mountId ?? null;
-      const resolvedS3ConfigId = mount?.storage_config_id ?? s3ConfigId ?? null;
+      const resolvedStorageConfigId = mount?.storage_config_id ?? storageConfigId ?? null;
       const normalizedPaths = Array.isArray(paths) ? paths.filter((path) => typeof path === "string" && path.length > 0) : [];
       cacheBus.emit(CACHE_EVENTS.INVALIDATE, {
         target: "fs",
         mountId: resolvedMountId,
-        s3ConfigId: resolvedS3ConfigId,
+        storageConfigId: resolvedStorageConfigId,
         paths: normalizedPaths,
         reason,
         db: this.mountManager.db,

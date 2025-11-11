@@ -4,14 +4,14 @@
 import { ApiStatus } from "../constants/index.js";
 import { HTTPException } from "hono/http-exception";
 import { generateUUID } from "../utils/common.js";
-import { MountRepository, S3ConfigRepository } from "../repositories/index.js";
+import { MountRepository, StorageConfigRepository } from "../repositories/index.js";
 import { invalidateFsCache } from "../cache/invalidation.js";
 
-const emitMountCacheInvalidation = ({ mountId, s3ConfigId = null, reason, db = null }) => {
-  if (!mountId && !s3ConfigId) {
+const emitMountCacheInvalidation = ({ mountId, storageConfigId = null, reason, db = null }) => {
+  if (!mountId && !storageConfigId) {
     return;
   }
-  invalidateFsCache({ mountId, s3ConfigId, reason, bumpMountsVersion: true, db });
+  invalidateFsCache({ mountId, storageConfigId, reason, bumpMountsVersion: true, db });
 };
 
 /**
@@ -26,7 +26,7 @@ class MountService {
   constructor(db) {
     this.db = db;
     this.mountRepository = new MountRepository(db);
-    this.s3ConfigRepository = new S3ConfigRepository(db);
+    this.storageConfigRepository = new StorageConfigRepository(db);
   }
 
   /**
@@ -72,17 +72,15 @@ class MountService {
       throw new HTTPException(ApiStatus.CONFLICT, { message: "挂载路径已被使用" });
     }
 
-    // 如果是S3类型，验证storage_config_id是否存在
-    if (mountData.storage_type === "S3" && mountData.storage_config_id) {
-      const s3Config = await this.s3ConfigRepository.findById(mountData.storage_config_id);
-      if (!s3Config) {
-        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "指定的S3配置不存在" });
+    // 如绑定了存储配置，验证配置是否存在（通用存储）
+    if (mountData.storage_config_id) {
+      const cfg = await this.storageConfigRepository.findById(mountData.storage_config_id);
+      if (!cfg) {
+        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "指定的存储配置不存在" });
       }
-      console.log(`创建挂载点: ${mountData.name}, 类型: S3, 使用S3配置ID: ${mountData.storage_config_id}`);
-    } else if (mountData.storage_type === "S3" && !mountData.storage_config_id) {
-      console.log(`创建S3类型挂载点: ${mountData.name}，但未指定S3配置ID`);
+      console.log(`创建挂载点: ${mountData.name}, 类型: ${mountData.storage_type}, 使用存储配置ID: ${mountData.storage_config_id}`);
     } else {
-      console.log(`创建挂载点: ${mountData.name}, 类型: ${mountData.storage_type}, 路径: ${mountData.mount_path}`);
+      console.log(`创建挂载点: ${mountData.name}, 类型: ${mountData.storage_type}（未绑定存储配置）`);
     }
   }
 
@@ -155,7 +153,7 @@ class MountService {
     // 创建挂载点
     await this.mountRepository.createMount(createData);
 
-    emitMountCacheInvalidation({ mountId: id, s3ConfigId: createData.storage_config_id || null, reason: "mount-create", db: this.db });
+    emitMountCacheInvalidation({ mountId: id, storageConfigId: createData.storage_config_id || null, reason: "mount-create", db: this.db });
 
     // 返回创建的挂载点信息
     return await this.mountRepository.findById(id);
@@ -193,11 +191,11 @@ class MountService {
       }
     }
 
-    // 如果更新S3配置，需要验证
+    // 如果更新存储配置，需要验证
     if (updateData.storage_config_id && updateData.storage_config_id !== existingMount.storage_config_id) {
-      const s3Config = await this.s3ConfigRepository.findById(updateData.storage_config_id);
-      if (!s3Config) {
-        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "指定的S3配置不存在" });
+      const cfg = await this.storageConfigRepository.findById(updateData.storage_config_id);
+      if (!cfg) {
+        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "指定的存储配置不存在" });
       }
     }
 
@@ -205,7 +203,7 @@ class MountService {
     await this.mountRepository.updateMount(mountId, updateData);
 
     const updatedMount = await this.mountRepository.findById(mountId);
-    emitMountCacheInvalidation({ mountId, s3ConfigId: updatedMount?.storage_config_id || null, reason: "mount-update", db: this.db });
+    emitMountCacheInvalidation({ mountId, storageConfigId: updatedMount?.storage_config_id || null, reason: "mount-update", db: this.db });
 
     // 返回更新后的挂载点信息
     return updatedMount;
@@ -234,7 +232,7 @@ class MountService {
     // 删除挂载点
     const result = await this.mountRepository.deleteMount(mountId);
 
-    emitMountCacheInvalidation({ mountId, s3ConfigId: existingMount.storage_config_id || null, reason: "mount-delete", db: this.db });
+    emitMountCacheInvalidation({ mountId, storageConfigId: existingMount.storage_config_id || null, reason: "mount-delete", db: this.db });
 
     return {
       success: true,

@@ -5,7 +5,7 @@
 
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../../../constants/index.js";
-import { generatePresignedPutUrl, buildS3Url } from "../../../../utils/s3Utils.js";
+import { generatePresignedPutUrl, buildS3Url } from "../utils/s3Utils.js";
 import { S3Client, PutObjectCommand, ListMultipartUploadsCommand, ListPartsCommand, UploadPartCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
@@ -80,8 +80,8 @@ export class S3UploadOperations {
         const putCommand = new PutObjectCommand(putParams);
         const result = await this.s3Client.send(putCommand);
 
-        // 构建S3 URL
-        const { buildS3Url } = await import("../../../../utils/s3Utils.js");
+        // 构建公共URL
+        const { buildS3Url } = await import("../utils/s3Utils.js");
         const s3Url = buildS3Url(this.config, finalS3Path);
 
         // 更新父目录的修改时间
@@ -98,8 +98,8 @@ export class S3UploadOperations {
           fileName: fileName,
           size: file.size,
           contentType: contentType,
-          s3Path: finalS3Path,
-          s3Url: s3Url,
+          storagePath: finalS3Path,
+          publicUrl: s3Url,
           etag: result.ETag ? result.ETag.replace(/"/g, "") : null,
           message: "文件上传成功",
         };
@@ -213,14 +213,14 @@ export class S3UploadOperations {
           await updateMountLastUsed(db, mount.id);
         }
 
-        // 构建S3 URL
+        // 构建公共URL
         const s3Url = buildS3Url(this.config, finalS3Path);
 
         return {
           success: true,
           message: useMultipart ? "流式分片上传成功" : "流式直接上传成功",
-          s3Path: finalS3Path,
-          s3Url: s3Url,
+          storagePath: finalS3Path,
+          publicUrl: s3Url,
           etag: etag,
           contentType: contentType,
         };
@@ -252,10 +252,10 @@ export class S3UploadOperations {
         return {
           success: true,
           uploadUrl: presignedUrl,
-          s3Url: s3Url,
+          publicUrl: s3Url,
           contentType: contentType,
           expiresIn: expiresIn,
-          s3Path: s3SubPath,
+          storagePath: s3SubPath,
           fileName: fileName,
           fileSize: fileSize,
         };
@@ -285,7 +285,7 @@ export class S3UploadOperations {
       }
 
 
-      // 构建S3 URL
+      // 构建公共URL
       const s3Url = buildS3Url(this.config, s3SubPath);
 
       return {
@@ -294,8 +294,8 @@ export class S3UploadOperations {
         fileName: fileName,
         size: fileSize,
         contentType: contentType,
-        s3Path: s3SubPath,
-        s3Url: s3Url,
+        storagePath: s3SubPath,
+        publicUrl: s3Url,
         etag: etag ? etag.replace(/"/g, "") : null,
       };
     } catch (error) {
@@ -494,7 +494,7 @@ export class S3UploadOperations {
         // 推断MIME类型
         const contentType = getMimeTypeFromFilename(fileName);
 
-        // 构建S3 URL
+        // 构建公共URL
         const s3Url = buildS3Url(this.config, finalS3Path);
 
         // 文件上传完成，无需数据库操作
@@ -504,8 +504,8 @@ export class S3UploadOperations {
           fileName: fileName,
           size: fileSize,
           contentType: contentType,
-          s3Path: finalS3Path,
-          s3Url: s3Url,
+          storagePath: finalS3Path,
+          publicUrl: s3Url,
           etag: completeResponse.ETag ? completeResponse.ETag.replace(/"/g, "") : null,
           location: completeResponse.Location,
           message: "前端分片上传完成",

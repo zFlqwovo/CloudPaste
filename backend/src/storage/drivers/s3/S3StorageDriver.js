@@ -7,7 +7,7 @@ import { BaseDriver } from "../../interfaces/capabilities/BaseDriver.js";
 import { CAPABILITIES } from "../../interfaces/capabilities/index.js";
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../../constants/index.js";
-import { createS3Client } from "../../../utils/s3Utils.js";
+import { createS3Client } from "./utils/s3Utils.js";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath, isCompleteFilePath } from "./utils/S3PathUtils.js";
 import { updateMountLastUsed, findMountPointByPath } from "../../fs/utils/MountResolver.js";
@@ -363,6 +363,26 @@ export class S3StorageDriver extends BaseDriver {
       return { success: true };
     } catch (error) {
       throw asHTTPException(error, "删除对象失败");
+    }
+  }
+
+  /**
+   * 通过存储路径生成下载直链
+   * @param {string} storagePath
+   * @param {Object} options
+   * @param {boolean} options.forceDownload
+   * @param {string} options.contentType
+   * @returns {Promise<string>} 预签名URL
+   */
+  async generateDownloadUrlByStoragePath(storagePath, options = {}) {
+    this._ensureInitialized();
+    try {
+      const { forceDownload = false, contentType = null, expiresIn = null } = options || {};
+      const { generatePresignedUrl } = await import("./utils/s3Utils.js");
+      const url = await generatePresignedUrl(this.config, storagePath, this.encryptionSecret, expiresIn, forceDownload, contentType, { enableCache: false });
+      return url;
+    } catch (error) {
+      throw asHTTPException(error, "生成下载URL失败");
     }
   }
 

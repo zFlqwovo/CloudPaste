@@ -7,15 +7,15 @@ const emit = (payload) => {
 export const invalidateFsCache = ({
   mountId = null,
   paths = [],
-  s3ConfigId = null,
+  storageConfigId = null,
   reason = "manual",
   bumpMountsVersion = false,
   db = null,
 }) => {
-  if (!mountId && !s3ConfigId && !paths.length) {
+  if (!mountId && !storageConfigId && !paths.length) {
     return;
   }
-  emit({ target: "fs", mountId, paths, s3ConfigId, reason, bumpMountsVersion, db });
+  emit({ target: "fs", mountId, paths, storageConfigId, reason, bumpMountsVersion, db });
 };
 
 export const invalidatePreviewCache = ({ db = null, reason = "manual" } = {}) => {

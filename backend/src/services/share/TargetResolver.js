@@ -23,7 +23,12 @@ export class TargetResolver {
     }
     if (storage_config_id) {
       const mountRepo = this.repositoryFactory.getMountRepository();
-      const mounts = await mountRepo.findByStorageConfig(storage_config_id, "S3");
+      const sRepo = this.repositoryFactory.getStorageConfigRepository?.();
+      const scfg = await sRepo.findById(storage_config_id);
+      if (!scfg?.storage_type) {
+        throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+      }
+      const mounts = await mountRepo.findByStorageConfig(storage_config_id, scfg.storage_type);
       if (Array.isArray(mounts) && mounts.length > 0) {
         const chosen = mounts[0];
         return { mount: chosen, resolvedPath: chosen.mount_path };
@@ -34,7 +39,7 @@ export class TargetResolver {
 
   async resolveForDirect({ path, storage_config_id }, userIdOrInfo, userType) {
     // 复用现有仓库，简化：若传 path 则返回 mount + path；未传 path 则尝试按 storage_config_id 选默认配置，标记 fallback
-    const s3ConfigRepo = this.repositoryFactory.getS3ConfigRepository();
+    const s3ConfigRepo = this.repositoryFactory.getStorageConfigRepository?.();
     if (path) {
       const { mount } = await this.getMountAndSubPath(path, userIdOrInfo, userType);
       return { mount, resolvedPath: path, usedFallback: false, storageConfig: null };
@@ -44,7 +49,11 @@ export class TargetResolver {
       return { mount: null, resolvedPath: null, usedFallback: true, storageConfig };
     }
     // 未提供则尝试查默认
-    const storageConfig = await s3ConfigRepo.queryFirst(`SELECT * FROM s3_configs WHERE is_public = 1 AND is_default = 1`);
+    let storageConfig = await s3ConfigRepo.findDefault({ requirePublic: true }).catch(() => null);
+    if (!storageConfig) {
+      const publicConfigs = await s3ConfigRepo.findPublic().catch(() => []);
+      storageConfig = Array.isArray(publicConfigs) && publicConfigs.length > 0 ? publicConfigs[0] : null;
+    }
     return { mount: null, resolvedPath: null, usedFallback: true, storageConfig };
   }
 }

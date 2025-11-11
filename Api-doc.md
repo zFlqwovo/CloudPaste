@@ -848,7 +848,7 @@ X-Custom-Auth-Key: <api_key>
             "hitRate": 0.85,
             "missRate": 0.15
           },
-          "s3Url": {
+          "url": {
             "totalEntries": 50,
             "hitRate": 0.9,
             "missRate": 0.1
@@ -877,14 +877,14 @@ X-Custom-Auth-Key: <api_key>
 
 - `POST /api/admin/cache/clear`
 
-  - 描述：清理系统缓存（支持目录缓存、S3URL 缓存和搜索缓存）
+  - 描述：清理系统缓存（支持目录缓存、URL 缓存和搜索缓存）
   - 授权：需要管理员令牌
   - 请求体：
     ```json
     {
       "mountId": "挂载点ID", // 可选，清理特定挂载点的缓存
-      "s3ConfigId": "S3配置ID" // 可选，清理特定S3配置相关的缓存
-      // 注意：如果两个参数都不提供，将清理所有缓存（目录、S3URL、搜索）
+      "storageConfigId": "存储配置ID" // 可选，清理特定存储配置相关的缓存
+      // 注意：如果两个参数都不提供，将清理所有缓存（目录、URL、搜索）
     }
     ```
   - 响应：清理结果
@@ -1164,14 +1164,14 @@ X-Custom-Auth-Key: <api_key>
         // 必填，已复制文件列表
         {
           "targetPath": "目标路径1", // 必填
-          "s3Path": "S3存储路径1", // 必填
+          "storagePath": "存储路径1", // 必填
           "contentType": "文件MIME类型", // 可选
           "fileSize": 1024000, // 可选，文件大小（字节）
           "etag": "文件ETag" // 可选
         },
         {
           "targetPath": "目标路径2",
-          "s3Path": "S3存储路径2"
+          "storagePath": "存储路径2"
         }
       ]
     }

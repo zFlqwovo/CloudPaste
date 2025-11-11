@@ -455,7 +455,7 @@ export function useFileManagement(userType = "admin") {
       if (file.slug) {
         window.open(getPermanentDownloadUrl(file), "_blank");
       } else {
-        window.open(file.s3_url, "_blank");
+        window.open(file.publicUrl || "", "_blank");
       }
     }
   };

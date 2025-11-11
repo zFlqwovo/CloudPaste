@@ -94,13 +94,11 @@ export function generateFileId() {
 }
 
 /**
- * 生成唯一的S3配置ID
- * @returns {string} 生成的S3配置ID
+ * 生成统一的存储配置ID
  */
-export function generateS3ConfigId() {
+export function generateStorageConfigId() {
   return crypto.randomUUID();
 }
-
 /**
  * 生成短ID作为文件路径前缀
  * @returns {string} 生成的短ID
@@ -262,11 +260,16 @@ async function handleFileOverride(existingFile, overrideContext) {
 
   if (existingFile.storage_path && existingFile.storage_config_id) {
     try {
-      const s3ConfigRepository = repositoryFactory.getS3ConfigRepository?.();
-      const storageConfig = s3ConfigRepository ? await s3ConfigRepository.findById(existingFile.storage_config_id) : null;
+      const storageConfigRepository = repositoryFactory.getStorageConfigRepository?.();
+      const storageConfig = storageConfigRepository
+        ? (storageConfigRepository.findByIdWithSecrets
+            ? await storageConfigRepository.findByIdWithSecrets(existingFile.storage_config_id)
+            : await storageConfigRepository.findById(existingFile.storage_config_id))
+        : null;
       if (storageConfig) {
         const { StorageFactory } = await import("../storage/factory/StorageFactory.js");
-        const driver = await StorageFactory.createDriver(storageConfig.storage_type || "S3", storageConfig, encryptionSecret);
+        if (!storageConfig.storage_type) throw new Error("存储配置缺少 storage_type");
+        const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, encryptionSecret);
         await driver.initialize?.();
         if (typeof driver.deleteObjectByStoragePath === "function") {
           await driver.deleteObjectByStoragePath(existingFile.storage_path, { db });
@@ -289,7 +292,7 @@ async function handleFileOverride(existingFile, overrideContext) {
 
   if (existingFile.storage_config_id) {
     const { invalidateFsCache } = await import("../cache/invalidation.js");
-    await invalidateFsCache({ s3ConfigId: existingFile.storage_config_id, reason: "file-override", db });
+    await invalidateFsCache({ storageConfigId: existingFile.storage_config_id, reason: "file-override", db });
   }
 }
 

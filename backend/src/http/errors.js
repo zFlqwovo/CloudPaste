@@ -1,7 +1,18 @@
 import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../constants/index.js";
 
-const SENSITIVE_KEYS = ["authorization", "x-api-key", "x-api-key-id", "access_key", "secret_key", "token", "signature", "password"];
+const SENSITIVE_KEYS = [
+  "authorization",
+  "x-api-key",
+  "x-api-key-id",
+  "access_key",
+  "secret_key",
+  "access_key_id",
+  "secret_access_key",
+  "token",
+  "signature",
+  "password",
+];
 
 //  AppError 用于处理应用程序错误
 export class AppError extends Error {
@@ -84,4 +95,3 @@ export const normalizeError = (error, context = {}) => {
     context,
   };
 };
-

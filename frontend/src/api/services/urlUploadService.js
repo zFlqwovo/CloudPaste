@@ -160,7 +160,7 @@ export async function getUrlUploadPresignedUrl(options) {
 }
 
 /**
- * 使用预签名URL从原始URL上传文件到S3
+ * 使用预签名URL从原始URL上传文件到指定存储
  * @param {Object} options - 上传选项
  * @param {string} options.url - 源URL
  * @param {string} options.uploadUrl - 预签名上传URL
@@ -168,7 +168,7 @@ export async function getUrlUploadPresignedUrl(options) {
  * @param {Function} [options.setXhr] - 设置xhr引用的回调函数，用于取消上传
  * @returns {Promise<Object>} 上传结果
  */
-export async function uploadFromUrlToS3(options) {
+export async function uploadUrlContentToStorage(options) {
   return new Promise(async (resolve, reject) => {
     try {
       // 首先从源URL获取内容，使用通用的URL内容获取函数
@@ -178,7 +178,7 @@ export async function uploadFromUrlToS3(options) {
         setXhr: options.setXhr,
       });
 
-      // 现在将获取的内容上传到S3
+      // 现在将获取的内容上传到目标存储
       const uploadXhr = new XMLHttpRequest();
       uploadXhr.open("PUT", options.uploadUrl);
 
@@ -197,7 +197,7 @@ export async function uploadFromUrlToS3(options) {
       };
 
       uploadXhr.onerror = () => {
-        reject(new Error("上传到S3失败"));
+        reject(new Error("上传到存储失败"));
       };
 
       uploadXhr.onload = () => {
@@ -216,7 +216,7 @@ export async function uploadFromUrlToS3(options) {
             size: blob.size,
           });
         } else {
-          reject(new Error(`上传到S3失败: HTTP ${uploadXhr.status}`));
+          reject(new Error(`上传到存储失败: HTTP ${uploadXhr.status}`));
         }
       };
 

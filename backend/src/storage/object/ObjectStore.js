@@ -16,14 +16,20 @@ export class ObjectStore {
     this.db = db;
     this.encryptionSecret = encryptionSecret;
     this.repositoryFactory = repositoryFactory;
-    this.s3ConfigRepo = repositoryFactory.getS3ConfigRepository();
+    this.storageConfigRepo = repositoryFactory.getStorageConfigRepository?.();
   }
 
   async _getStorageConfig(storage_config_id) {
     if (!storage_config_id) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "缺少 storage_config_id" });
     }
-    const storageConfig = await this.s3ConfigRepo.findById(storage_config_id);
+    // 优先读取带密钥版本，确保驱动初始化可用
+    let storageConfig = null;
+    if (this.storageConfigRepo?.findByIdWithSecrets) {
+      storageConfig = await this.storageConfigRepo.findByIdWithSecrets(storage_config_id);
+    } else {
+      storageConfig = await this.storageConfigRepo.findById(storage_config_id);
+    }
     if (!storageConfig) {
       throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
     }
@@ -39,7 +45,8 @@ export class ObjectStore {
       const useRandom = await shouldUseRandomSuffix(this.db).catch(() => false);
       if (useRandom) {
         const fileRepo = this.repositoryFactory.getFileRepository();
-        const exists = await fileRepo.findByStoragePath(storageConfig.id, key, "S3");
+        if (!storageConfig.storage_type) throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+        const exists = await fileRepo.findByStoragePath(storageConfig.id, key, storageConfig.storage_type);
         if (exists) {
           const { name, ext } = getFileNameAndExt(filename);
           const shortId = generateShortId();
@@ -60,7 +67,10 @@ export class ObjectStore {
 
   async presignUpload({ storage_config_id, directory, filename, fileSize, contentType }) {
     const storageConfig = await this._getStorageConfig(storage_config_id);
-    const driver = await StorageFactory.createDriver(storageConfig.storage_type || "S3", storageConfig, this.encryptionSecret);
+    if (!storageConfig.storage_type) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+    }
+    const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
 
     const key = await this._composeKeyWithStrategy(storageConfig, directory, filename);
     const presign = await driver.uploadOps.generatePresignedUploadUrl(key, {
@@ -82,7 +92,10 @@ export class ObjectStore {
 
   async uploadDirect({ storage_config_id, directory, filename, bodyStream, size, contentType }) {
     const storageConfig = await this._getStorageConfig(storage_config_id);
-    const driver = await StorageFactory.createDriver(storageConfig.storage_type || "S3", storageConfig, this.encryptionSecret);
+    if (!storageConfig.storage_type) {
+      throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "存储配置缺少 storage_type" });
+    }
+    const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
 
     const key = await this._composeKeyWithStrategy(storageConfig, directory, filename);
     const result = await driver.uploadOps.uploadStream(key, bodyStream, {
@@ -92,15 +105,15 @@ export class ObjectStore {
       useMultipart: false,
     });
 
-    // 触发与存储配置相关的缓存失效（清理S3 URL缓存，联动关联挂载目录缓存）
+    // 触发与存储配置相关的缓存失效（清理URL缓存，联动关联挂载目录缓存）
     try {
-      invalidateFsCache({ s3ConfigId: storage_config_id, reason: "upload-direct", db: this.db });
+      invalidateFsCache({ storageConfigId: storage_config_id, reason: "upload-direct", db: this.db });
     } catch {}
 
     return {
       key,
-      s3Path: result.s3Path || key,
-      s3Url: result.s3Url || null,
+      storagePath: result.storagePath || key,
+      publicUrl: result.publicUrl || null,
       etag: result.etag || null,
       contentType: result.contentType || contentType,
       storage_config_id,
@@ -112,14 +125,14 @@ export class ObjectStore {
     // 这里仅将必要信息汇总给上层记录建档
     // 通知缓存失效（上传完成）
     try {
-      invalidateFsCache({ s3ConfigId: storage_config_id, reason: "upload-complete", db: this.db });
+      invalidateFsCache({ storageConfigId: storage_config_id, reason: "upload-complete", db: this.db });
     } catch {}
 
     return {
       key,
       uploadResult: {
-        s3Path: key,
-        s3Url: null,
+        storagePath: key,
+        publicUrl: null,
         etag: etag || null,
       },
       filename,

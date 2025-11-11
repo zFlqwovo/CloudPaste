@@ -8,13 +8,20 @@ import { ApiStatus } from "../../../../constants/index.js";
 import { S3Client, DeleteObjectCommand, CopyObjectCommand, ListObjectsV2Command, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath } from "../utils/S3PathUtils.js";
 import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
-import { generatePresignedUrl, generatePresignedPutUrl, createS3Client, getDirectoryPresignedUrls } from "../../../../utils/s3Utils.js";
+import { generatePresignedUrl, generatePresignedPutUrl, createS3Client, getDirectoryPresignedUrls } from "../utils/s3Utils.js";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 import { findMountPointByPath } from "../../../fs/utils/MountResolver.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { normalizePath } from "../../../fs/utils/PathResolver.js";
 import { shouldUseRandomSuffix, generateShortId } from "../../../../utils/common.js";
+import { StorageConfigUtils } from "../../../utils/StorageConfigUtils.js";
+
+const DEFAULT_STORAGE_TYPE = "S3";
+
+const loadStorageConfigById = async (db, storageConfigId, storageType = DEFAULT_STORAGE_TYPE) => {
+  return await StorageConfigUtils.getStorageConfig(db, storageType || DEFAULT_STORAGE_TYPE, storageConfigId);
+};
 
 export class S3BatchOperations {
   /**
@@ -116,11 +123,13 @@ export class S3BatchOperations {
         const { mount: itemMount, subPath } = mountResult;
 
         // 获取S3配置
-        const s3Config = await db.prepare("SELECT * FROM s3_configs WHERE id = ?").bind(itemMount.storage_config_id).first();
-        if (!s3Config) {
+        let s3Config;
+        try {
+          s3Config = await loadStorageConfigById(db, itemMount.storage_config_id, itemMount.storage_type);
+        } catch (error) {
           result.failed.push({
             path: path,
-            error: "存储配置不存在",
+            error: error?.message || "存储配置不存在",
           });
           continue;
         }
@@ -345,12 +354,8 @@ export class S3BatchOperations {
    */
   async _handleSameStorageCopy(db, sourcePath, targetPath, sourceMount, targetMount, sourceSubPath, targetSubPath) {
     // 获取源和目标的S3配置
-    const sourceS3Config = await db.prepare("SELECT * FROM s3_configs WHERE id = ?").bind(sourceMount.storage_config_id).first();
-    const targetS3Config = await db.prepare("SELECT * FROM s3_configs WHERE id = ?").bind(targetMount.storage_config_id).first();
-
-    if (!sourceS3Config || !targetS3Config) {
-      throw new Error("S3配置不存在");
-    }
+    const sourceS3Config = await loadStorageConfigById(db, sourceMount.storage_config_id, sourceMount.storage_type);
+    const targetS3Config = await loadStorageConfigById(db, targetMount.storage_config_id, targetMount.storage_type);
 
     const isDirectory = sourcePath.endsWith("/");
     const s3SourcePath = normalizeS3SubPath(sourceSubPath, isDirectory);
@@ -703,12 +708,8 @@ export class S3BatchOperations {
         const { mount: targetMount, subPath: targetSubPath } = targetMountResult;
 
         // 获取源和目标S3配置
-        const sourceS3Config = await db.prepare("SELECT * FROM s3_configs WHERE id = ?").bind(sourceMount.storage_config_id).first();
-        const targetS3Config = await db.prepare("SELECT * FROM s3_configs WHERE id = ?").bind(targetMount.storage_config_id).first();
-
-        if (!sourceS3Config || !targetS3Config) {
-          throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
-        }
+        const sourceS3Config = await loadStorageConfigById(db, sourceMount.storage_config_id, sourceMount.storage_type);
+        const targetS3Config = await loadStorageConfigById(db, targetMount.storage_config_id, targetMount.storage_type);
 
         // 创建源S3客户端
         const sourceS3Client = await createS3Client(sourceS3Config, this.encryptionSecret);
@@ -885,7 +886,7 @@ export class S3BatchOperations {
             sourceMount: sourceMount.id,
             targetMount: targetMount.id,
             sourceS3Path: s3SourcePath,
-            targetS3Path: finalS3TargetPath,
+            storagePath: finalS3TargetPath,
             fileName,
             contentType,
             downloadUrl,
@@ -948,11 +949,7 @@ export class S3BatchOperations {
         }
 
         const { subPath: newSubPath } = newMountResult;
-        const s3Config = await db.prepare("SELECT * FROM s3_configs WHERE id = ?").bind(mount.storage_config_id).first();
-
-        if (!s3Config) {
-          throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
-        }
+        const s3Config = await loadStorageConfigById(db, mount.storage_config_id, mount.storage_type);
 
         const oldS3SubPath = normalizeS3SubPath(oldSubPath, oldIsDirectory);
         const newS3SubPath = normalizeS3SubPath(newSubPath, newIsDirectory);

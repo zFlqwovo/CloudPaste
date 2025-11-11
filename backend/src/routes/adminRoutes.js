@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { login, logout, changePassword, testAdminToken } from "../services/adminService.js";
 import { ApiStatus, UserType } from "../constants/index.js";
-import { directoryCacheManager, s3UrlCacheManager, searchCacheManager } from "../cache/index.js";
+import { directoryCacheManager, urlCacheManager, searchCacheManager } from "../cache/index.js";
 import { invalidateFsCache, invalidateAllCaches } from "../cache/invalidation.js";
 import { usePolicy } from "../security/policies/policies.js";
 import { resolvePrincipal } from "../security/helpers/principal.js";
@@ -91,7 +91,7 @@ adminRoutes.get("/api/test/admin-token", requireAdmin, async (c) => {
 // 获取系统监控信息（包括缓存统计和系统内存）
 adminRoutes.get("/api/admin/cache/stats", requireAdmin, async (c) => {
   const dirStats = directoryCacheManager.getStats();
-  const s3UrlStats = await readCacheStats("S3URL缓存模块", () => s3UrlCacheManager.getStats());
+  const urlStats = await readCacheStats("URL缓存模块", () => urlCacheManager.getStats());
   const searchStats = await readCacheStats("搜索缓存模块", () => searchCacheManager.getStats());
 
   const memUsage = process.memoryUsage();
@@ -110,7 +110,7 @@ adminRoutes.get("/api/admin/cache/stats", requireAdmin, async (c) => {
     data: {
       cache: {
         directory: dirStats,
-        s3Url: s3UrlStats,
+        url: urlStats,
         search: searchStats,
       },
       system: {
@@ -126,17 +126,17 @@ adminRoutes.get("/api/admin/cache/stats", requireAdmin, async (c) => {
 // 清理目录缓存（管理员）
 adminRoutes.post("/api/admin/cache/clear", requireAdmin, async (c) => {
   const db = c.env.DB;
-  const { mountId, s3ConfigId } = await c.req.json().catch(() => ({}));
+  const { mountId, storageConfigId } = await c.req.json().catch(() => ({}));
   let clearedScope = null;
 
   if (mountId) {
     invalidateFsCache({ mountId, reason: "admin-manual", db });
     clearedScope = `mount:${mountId}`;
     console.log(`管理员手动清理挂载点缓存 - 挂载点ID: ${mountId}`);
-  } else if (s3ConfigId) {
-    invalidateFsCache({ s3ConfigId, reason: "admin-manual", db });
-    clearedScope = `s3Config:${s3ConfigId}`;
-    console.log(`管理员手动清理S3配置缓存 - S3配置ID: ${s3ConfigId}`);
+  } else if (storageConfigId) {
+    invalidateFsCache({ storageConfigId, reason: "admin-manual", db });
+    clearedScope = `storageConfig:${storageConfigId}`;
+    console.log(`管理员手动清理存储配置缓存 - 存储配置ID: ${storageConfigId}`);
   } else {
     invalidateAllCaches({ reason: "admin-manual-all" });
     clearedScope = "all";
@@ -160,17 +160,17 @@ adminRoutes.post("/api/user/cache/clear", requireMountView, async (c) => {
   const identity = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
   const apiKeyInfo = identity.apiKeyInfo;
 
-  const { mountId, s3ConfigId } = await c.req.json().catch(() => ({}));
+  const { mountId, storageConfigId } = await c.req.json().catch(() => ({}));
   let clearedScope = null;
 
   if (mountId) {
     invalidateFsCache({ mountId, reason: "user-manual", db });
     clearedScope = `mount:${mountId}`;
     console.log(`API密钥用户手动清理挂载点缓存 - 用户: ${apiKeyInfo?.name || identity.type}, 挂载点ID: ${mountId}`);
-  } else if (s3ConfigId) {
-    invalidateFsCache({ s3ConfigId, reason: "user-manual", db });
-    clearedScope = `s3Config:${s3ConfigId}`;
-    console.log(`API密钥用户手动清理S3配置缓存 - 用户: ${apiKeyInfo?.name || identity.type}, S3配置ID: ${s3ConfigId}`);
+  } else if (storageConfigId) {
+    invalidateFsCache({ storageConfigId, reason: "user-manual", db });
+    clearedScope = `storageConfig:${storageConfigId}`;
+    console.log(`API密钥用户手动清理存储配置缓存 - 用户: ${apiKeyInfo?.name || identity.type}, 存储配置ID: ${storageConfigId}`);
   } else {
     invalidateAllCaches({ reason: "user-manual-all" });
     clearedScope = "all";

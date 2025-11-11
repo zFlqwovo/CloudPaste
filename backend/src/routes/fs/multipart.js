@@ -84,12 +84,12 @@ export const registerMultipartRoutes = (router, helpers) => {
 
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
-    const result = await fileSystem.completeFrontendMultipartUpload(path, uploadId, parts, fileName, fileSize, userIdOrInfo, userType);
+  const result = await fileSystem.completeFrontendMultipartUpload(path, uploadId, parts, fileName, fileSize, userIdOrInfo, userType);
 
     return c.json({
       code: ApiStatus.SUCCESS,
       message: "前端分片上传完成",
-      data: result,
+      data: { ...result, publicUrl: result.publicUrl || null },
       success: true,
     });
   });
@@ -187,7 +187,7 @@ export const registerMultipartRoutes = (router, helpers) => {
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const { mount } = await mountManager.getDriverByPath(path, userIdOrInfo, userType);
 
-    if (!mount || mount.storage_type !== "S3") {
+    if (!mount || !mount.storage_config_id) {
       throw new HTTPException(ApiStatus.BAD_REQUEST, { message: "当前路径不支持预签名URL上传" });
     }
 
@@ -201,16 +201,16 @@ export const registerMultipartRoutes = (router, helpers) => {
 
     const fileId = generateFileId();
 
-    return c.json({
+  return c.json({
       code: ApiStatus.SUCCESS,
       message: "获取预签名URL成功",
       data: {
         presignedUrl: result.uploadUrl,
         fileId,
-        s3Path: result.s3Path,
-        s3Url: result.s3Url,
+        storagePath: result.storagePath,
+        publicUrl: result.publicUrl || null,
         mountId: mount.id,
-        s3ConfigId: mount.storage_config_id,
+        storageConfigId: mount.storage_config_id,
         targetPath,
         contentType: result.contentType,
       },
@@ -251,6 +251,7 @@ export const registerMultipartRoutes = (router, helpers) => {
       message: "文件上传完成",
       data: {
         ...result,
+        publicUrl: result.publicUrl || null,
         fileName,
         targetPath,
         fileSize,

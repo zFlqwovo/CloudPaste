@@ -26,19 +26,21 @@ export class LimitGuard {
   async checkStorageQuota(storageConfigId, incomingBytes, options = {}) {
     const { excludeFileId = null } = options;
     if (!storageConfigId || !incomingBytes || incomingBytes <= 0) return;
-    const s3Repo = this.repositoryFactory?.getS3ConfigRepository?.();
+    const s3Repo = this.repositoryFactory?.getStorageConfigRepository?.();
     const fileRepo = this.repositoryFactory?.getFileRepository?.();
     if (!s3Repo || !fileRepo) return;
 
     const cfg = await s3Repo.findById(storageConfigId).catch(() => null);
     if (!cfg) return;
+    const storageType = cfg.storage_type;
+    if (!storageType) return;
     const cap = parseInt(cfg.total_storage_bytes || 0, 10);
     if (!Number.isFinite(cap) || cap <= 0) return; // 0或无值表示不限额
 
-    let used = await fileRepo.getTotalSize({ storage_type: "S3", storage_config_id: storageConfigId }).catch(() => 0);
+    let used = await fileRepo.getTotalSize({ storage_type: storageType, storage_config_id: storageConfigId }).catch(() => 0);
     // 当覆盖同一路径的已有文件时，可排除该文件记录的体积，避免误判
     if (excludeFileId) {
-      const excluded = await fileRepo.getTotalSizeByStorageConfigExcludingFile(storageConfigId, excludeFileId, "S3").catch(() => ({ total_used: used }));
+      const excluded = await fileRepo.getTotalSizeByStorageConfigExcludingFile(storageConfigId, excludeFileId, storageType).catch(() => ({ total_used: used }));
       if (excluded && Number.isFinite(excluded.total_used)) {
         used = excluded.total_used;
       }

@@ -40,6 +40,8 @@ class SearchCacheManager extends BaseCache {
       scope: searchParams.scope || "global",
       mountId: searchParams.mountId || "",
       path: searchParams.path || "",
+      limit: Number.isFinite(searchParams.limit) ? Number(searchParams.limit) : 50,
+      offset: Number.isFinite(searchParams.offset) ? Number(searchParams.offset) : 0,
       filters: searchParams.filters || {},
       userType: userType,
       mountsVersion: meta.mountsVersion || 0,

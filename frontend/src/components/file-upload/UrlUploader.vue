@@ -170,7 +170,7 @@
     <!-- 上传选项表单 -->
     <div class="upload-form">
       <form @submit.prevent="submitUpload">
-        <!-- S3配置选择 -->
+        <!-- 存储配置选择 -->
         <div class="mb-6">
           <h3 class="text-lg font-medium mb-4" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">{{ t("file.storage") }}</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -185,11 +185,11 @@
                       ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-600 focus:ring-offset-gray-800'
                       : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:ring-offset-white',
                   ]"
-                  :disabled="!s3Configs.length || loading || isUploading"
+                  :disabled="!storageConfigs.length || loading || isUploading"
                   required
                 >
-                  <option value="" disabled selected>{{ s3Configs.length ? t("file.selectStorage") : t("file.noStorage") }}</option>
-                  <option v-for="config in s3Configs" :key="config.id" :value="config.id">{{ config.name }} ({{ config.provider_type }})</option>
+                  <option value="" disabled selected>{{ storageConfigs.length ? t("file.selectStorage") : t("file.noStorage") }}</option>
+                  <option v-for="config in storageConfigs" :key="config.id" :value="config.id">{{ formatStorageOptionLabel(config) }}</option>
                 </select>
                 <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <svg
@@ -458,7 +458,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  s3Configs: {
+  storageConfigs: {
     type: Array,
     default: () => [],
   },
@@ -471,6 +471,17 @@ const props = defineProps({
     default: false,
   },
 });
+
+const storageConfigs = computed(() => props.storageConfigs || []);
+
+const formatStorageOptionLabel = (config) => {
+  if (!config) {
+    return t("file.storage");
+  }
+
+  const meta = config.provider_type || config.storage_type;
+  return meta ? `${config.name} (${meta})` : config.name;
+};
 
 const emit = defineEmits(["upload-success", "upload-error", "refresh-files"]);
 
@@ -549,23 +560,25 @@ const displayFilename = computed(() => {
   }
 });
 
-// 监听s3Configs变化，自动选择默认配置
+// 监听存储配置变化，自动选择默认或首个可用配置
 watch(
-  () => props.s3Configs,
+  storageConfigs,
   (configs) => {
-    if (configs && configs.length > 0) {
-      // 查找默认配置
-      const defaultConfig = configs.find((config) => config.is_default);
-      if (defaultConfig) {
-        // 使用默认配置的ID
-        formData.storage_config_id = defaultConfig.id;
-      } else if (!formData.storage_config_id && configs.length > 0) {
-        // 如果没有默认配置且当前未选择配置，则选择第一个
-        formData.storage_config_id = configs[0].id;
-      }
+    const list = configs || [];
+
+    if (list.length === 0) {
+      formData.storage_config_id = "";
+      return;
     }
+
+    if (formData.storage_config_id && list.some((config) => config.id === formData.storage_config_id)) {
+      return;
+    }
+
+    const defaultConfig = list.find((config) => config.is_default);
+    formData.storage_config_id = (defaultConfig || list[0]).id;
   },
-  { immediate: true } // 页面加载时立即执行
+  { immediate: true }
 );
 
 /**
@@ -851,7 +864,7 @@ const submitUpload = async () => {
 
 /**
  * 预签名直传方式
- * 先从URL获取内容，然后使用预签名URL上传到S3
+ * 先从URL获取内容，然后使用预签名URL上传到目标存储
  */
 const presignedDirectUpload = async () => {
   try {
@@ -895,7 +908,7 @@ const presignedDirectUpload = async () => {
     // 2. 使用预签名URL上传文件
     currentStage.value = "uploading";
 
-    const uploadResult = await api.urlUpload.uploadFromUrlToS3({
+    const uploadResult = await api.urlUpload.uploadUrlContentToStorage({
       url: urlInput.value,
       uploadUrl: presignData.uploadUrl || presignData.upload_url,
       onProgress: (progress, loaded, _total, phase) => {
@@ -977,7 +990,7 @@ const presignedDirectUpload = async () => {
 
 /**
  * 分片上传方式
- * 先从URL获取内容，然后使用分片上传到S3
+ * 先从URL获取内容，然后使用分片上传到目标存储
  */
 /**
  * 取消上传
@@ -1027,10 +1040,10 @@ const resetForm = () => {
 
   activeXhr.value = null;
 
-  // 保留S3配置ID，重置其他表单字段
-  const s3ConfigId = formData.storage_config_id;
+  // 保留存储配置ID，重置其他表单字段
+  const storageConfigId = formData.storage_config_id;
   Object.assign(formData, {
-    storage_config_id: s3ConfigId,
+    storage_config_id: storageConfigId,
     slug: "",
     path: "",
     remark: "",

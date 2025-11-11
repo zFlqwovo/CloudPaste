@@ -212,11 +212,11 @@ export async function commitCrossStorageCopy(fs, mount, files) {
 
   for (const file of files) {
     try {
-      const { targetPath, s3Path } = file || {};
-      if (!targetPath || !s3Path) {
+      const { targetPath, storagePath } = file || {};
+      if (!targetPath || !storagePath) {
         results.failed.push({
           targetPath: targetPath || "未指定",
-          error: "目标路径和S3路径不能为空",
+          error: "目标路径和存储路径不能为空",
         });
         continue;
       }
@@ -230,4 +230,3 @@ export async function commitCrossStorageCopy(fs, mount, files) {
   fs.emitCacheInvalidation({ mount, reason: "batch-copy-commit", db: fs.mountManager.db });
   return results;
 }
-

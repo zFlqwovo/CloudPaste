@@ -43,7 +43,7 @@ const copyItemsResolver = (c) => {
 };
 
 export const registerOpsRoutes = (router, helpers) => {
-  const { getServiceParams, getS3ConfigByUserType } = helpers;
+  const { getServiceParams, getStorageConfigByUserType } = helpers;
 
   router.post("/api/fs/rename", parseJsonBody, usePolicy("fs.rename", { pathResolver: renamePathResolver }), async (c) => {
     const db = c.env.DB;
@@ -178,8 +178,8 @@ export const registerOpsRoutes = (router, helpers) => {
     }
 
     const { getEncryptionSecret } = await import("../../utils/environmentUtils.js");
-    const s3Config = await getS3ConfigByUserType(db, mount.storage_config_id, userIdOrInfo, userType, getEncryptionSecret(c));
-    if (!s3Config) {
+    const storageConfig = await getStorageConfigByUserType(db, mount.storage_config_id, userIdOrInfo, userType, getEncryptionSecret(c));
+    if (!storageConfig) {
       throw new HTTPException(ApiStatus.NOT_FOUND, { message: "存储配置不存在" });
     }
 

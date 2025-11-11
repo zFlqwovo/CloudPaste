@@ -300,7 +300,7 @@ const previewFile = async () => {
           previewUrl = previewUrl.startsWith("/") ? `${baseUrl}${previewUrl}` : `${baseUrl}/${previewUrl}`;
         }
 
-        // 将S3 URL包装到Office在线预览服务中
+        // 将直链URL包装到Office在线预览服务中
         officePreviewUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(previewUrl)}`;
       }
 

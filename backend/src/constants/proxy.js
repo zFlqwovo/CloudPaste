@@ -93,7 +93,7 @@ export function buildSignedProxyUrl(request, path, options = {}) {
     return buildFullProxyUrl(request, path, download);
   }
 
-  // 构建基础路径
+  // 构建基础路径（可能是相对路径）
   const proxyPath = buildProxyPath(path, download);
 
   // 尝试在 request 的上下文中构建绝对URL；失败时回退到相对路径并直接拼接查询串

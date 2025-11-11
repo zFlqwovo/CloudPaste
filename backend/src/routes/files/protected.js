@@ -96,7 +96,7 @@ export const registerFilesProtectedRoutes = (router) => {
     }
 
     const result = { success: 0, failed: [] };
-    const s3ConfigIds = new Set();
+    const storageConfigIds = new Set();
     const encryptionSecret = getEncryptionSecret(c);
     const repositoryFactory = useRepositories(c);
     const fileRepository = repositoryFactory.getFileRepository();
@@ -119,8 +119,8 @@ export const registerFilesProtectedRoutes = (router) => {
         }
       }
 
-      if (file.storage_type === "S3" && file.storage_config_id) {
-        s3ConfigIds.add(file.storage_config_id);
+      if (file.storage_config_id) {
+        storageConfigIds.add(file.storage_config_id);
       }
 
       await (async () => {
@@ -140,13 +140,16 @@ export const registerFilesProtectedRoutes = (router) => {
 
         // storage-first 或无 file_path 时，直接按存储配置删除对象（驱动直调）
         if (deleteMode === "both" && file.storage_path && file.storage_config_id) {
-          const s3ConfigRepo = repositoryFactory.getS3ConfigRepository();
-          const storageConfig = await s3ConfigRepo.findById(file.storage_config_id).catch(() => null);
+          const storageConfigRepo = repositoryFactory.getStorageConfigRepository();
+          const storageConfig = storageConfigRepo?.findByIdWithSecrets
+            ? await storageConfigRepo.findByIdWithSecrets(file.storage_config_id).catch(() => null)
+            : await storageConfigRepo.findById(file.storage_config_id).catch(() => null);
 
           if (storageConfig) {
             try {
               const { StorageFactory } = await import("../../storage/factory/StorageFactory.js");
-              const driver = await StorageFactory.createDriver(storageConfig.storage_type || "S3", storageConfig, encryptionSecret);
+              if (!storageConfig.storage_type) throw new Error("存储配置缺少 storage_type");
+              const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, encryptionSecret);
               await driver.initialize?.();
               if (typeof driver.deleteObjectByStoragePath === "function") {
                 await driver.deleteObjectByStoragePath(file.storage_path, { db });
@@ -176,8 +179,8 @@ export const registerFilesProtectedRoutes = (router) => {
     });
   }
 
-  for (const s3ConfigId of s3ConfigIds) {
-    invalidateFsCache({ s3ConfigId, reason: "files-batch-delete", db });
+  for (const storageConfigId of storageConfigIds) {
+    invalidateFsCache({ storageConfigId, reason: "files-batch-delete", db });
   }
 
   return c.json({

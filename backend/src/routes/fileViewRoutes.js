@@ -74,16 +74,7 @@ app.get("/api/office-preview/:slug", async (c) => {
     throw new HTTPException(ApiStatus.NOT_FOUND, { message: "文件存储信息不完整" });
   }
 
-  if (file.storage_type !== "S3") {
-    throw new HTTPException(501, { message: "暂不支持此存储类型的Office预览" });
-  }
-
-  const repositoryFactory = useRepositories(c);
-  const s3ConfigRepository = repositoryFactory.getS3ConfigRepository();
-  const s3Config = await s3ConfigRepository.findById(file.storage_config_id);
-  if (!s3Config) {
-    throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "无法获取存储配置信息" });
-  }
+  // 统一依赖通用 URL 生成逻辑，无存储类型分支
 
   if (file.max_views && file.max_views > 0 && file.views >= file.max_views) {
     throw new HTTPException(ApiStatus.GONE, { message: "文件已达到最大查看次数" });
@@ -93,13 +84,12 @@ app.get("/api/office-preview/:slug", async (c) => {
     console.error("生成Office预览URL失败:", error);
     throw new HTTPException(ApiStatus.INTERNAL_ERROR, { message: "生成预览URL失败: " + error.message });
   });
-  const presignedUrl = urlsObj?.previewUrl || file.s3_url;
+  const presignedUrl = urlsObj?.previewUrl;
 
   return c.json({
     url: presignedUrl,
     filename: file.filename,
     mimetype: file.mimetype,
-    expires_in: s3Config.signature_expires_in || 3600,
     is_temporary: true,
   });
 });

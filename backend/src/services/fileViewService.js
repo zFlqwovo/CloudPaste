@@ -5,9 +5,10 @@
 
 import { ensureRepositoryFactory } from "../utils/repositories.js";
 import { verifyPassword } from "../utils/crypto.js";
-import { generatePresignedUrl, deleteFileFromS3 } from "../utils/s3Utils.js";
 import { getEffectiveMimeType, getContentTypeAndDisposition } from "../utils/fileUtils.js";
 import { getFileBySlug, isFileAccessible } from "./fileService.js";
+import { StorageFactory } from "../storage/factory/StorageFactory.js";
+import { StorageConfigUtils } from "../storage/utils/StorageConfigUtils.js";
 
 /**
  * 文件查看服务类
@@ -63,14 +64,17 @@ export class FileViewService {
     try {
       console.log(`开始删除过期文件: ${file.id}`);
 
-      // 从S3删除文件
-      if (file.storage_path && file.storage_config_id) {
-        const s3ConfigRepository = this.repositoryFactory.getS3ConfigRepository();
-        const s3Config = await s3ConfigRepository.findById(file.storage_config_id);
-
-        if (s3Config) {
-          await deleteFileFromS3(s3Config, file.storage_path, this.encryptionSecret);
-          console.log(`已从S3删除文件: ${file.storage_path}`);
+      // 通过 Driver 按存储路径删除对象
+      if (file.storage_path && file.storage_config_id && file.storage_type) {
+        try {
+          const config = await StorageConfigUtils.getStorageConfig(this.db, file.storage_type, file.storage_config_id);
+          const driver = await StorageFactory.createDriver(file.storage_type, config, this.encryptionSecret);
+          if (typeof driver.deleteObjectByStoragePath === "function") {
+            await driver.deleteObjectByStoragePath(file.storage_path, { db: this.db });
+            console.log(`已从存储删除文件: ${file.storage_path}`);
+          }
+        } catch (e) {
+          console.warn("删除存储对象失败（已忽略以完成记录删除）:", e?.message || e);
         }
       }
 
@@ -154,24 +158,27 @@ export class FileViewService {
         return new Response("文件存储信息不完整", { status: 404 });
       }
 
-      // 检查存储类型
-      if (result.file.storage_type !== "S3") {
-        return new Response("暂不支持此存储类型的文件下载", { status: 501 });
-      }
-
-      // 获取S3配置
-      const s3ConfigRepository = this.repositoryFactory.getS3ConfigRepository();
-      const s3Config = await s3ConfigRepository.findById(result.file.storage_config_id);
-      if (!s3Config) {
-        return new Response("无法获取存储配置信息", { status: 500 });
-      }
-
       // 获取文件的MIME类型
       const contentType = getEffectiveMimeType(result.file.mimetype, result.file.filename);
 
-      // 生成预签名URL，使用S3配置的默认时效，传递MIME类型以确保正确的Content-Type
-      // 注意：文件分享页面没有用户上下文，禁用缓存避免权限泄露
-      const presignedUrl = await generatePresignedUrl(s3Config, result.file.storage_path, this.encryptionSecret, null, forceDownload, contentType, { enableCache: false });
+      // 通过 Driver 生成直链（按存储路径）
+      let presignedUrl = null;
+      try {
+        const config = await StorageConfigUtils.getStorageConfig(this.db, result.file.storage_type, result.file.storage_config_id);
+        const driver = await StorageFactory.createDriver(result.file.storage_type, config, this.encryptionSecret);
+        if (typeof driver.generateDownloadUrlByStoragePath === "function") {
+          presignedUrl = await driver.generateDownloadUrlByStoragePath(result.file.storage_path, {
+            forceDownload,
+            contentType,
+          });
+        }
+      } catch (e) {
+        console.error("生成存储直链失败:", e);
+      }
+
+      if (!presignedUrl) {
+        return new Response("当前存储不支持直链下载", { status: 501 });
+      }
 
       //处理Range请求
       const rangeHeader = request.headers.get("Range");
