@@ -1056,6 +1056,112 @@ export class StorageAdapter {
   }
 
   /**
+   * 单文件上传 - 使用 XMLHttpRequest 避免 CORS 问题
+   * 用于 PRESIGNED_SINGLE 策略,替代 Uppy 默认的 fetch API
+   * @param {Object} options {signature, body, onComplete, size, onProgress, signal}
+   * @returns {Promise<Object>} {ETag}
+   */
+  async uploadSingleFile({ signature, body, onComplete, size, onProgress, signal }) {
+    try {
+      const { url, headers } = signature;
+
+      if (!url) {
+        throw new Error("Cannot upload to an undefined URL");
+      }
+
+      console.log(`[StorageAdapter] uploadSingleFile 被调用: ${url}`);
+
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url, true);
+
+        // 设置请求头
+        if (headers) {
+          Object.keys(headers).forEach((key) => {
+            xhr.setRequestHeader(key, headers[key]);
+          });
+        }
+
+        xhr.responseType = "text";
+
+        // 处理取消信号
+        function onabort() {
+          xhr.abort();
+        }
+        function cleanup() {
+          if (signal) {
+            signal.removeEventListener("abort", onabort);
+          }
+        }
+        if (signal) {
+          signal.addEventListener("abort", onabort);
+        }
+
+        xhr.onabort = () => {
+          cleanup();
+          const err = new DOMException("The operation was aborted", "AbortError");
+          reject(err);
+        };
+
+        // 进度事件
+        const progressHandler = (evt) => {
+          try {
+            const loaded = evt?.loaded ?? 0;
+            const total = evt?.total ?? size;
+            onProgress?.({ loaded, total, lengthComputable: true });
+          } catch {}
+        };
+        xhr.upload.addEventListener("progress", progressHandler);
+
+        // 上传完成
+        xhr.addEventListener("load", (ev) => {
+          cleanup();
+          const target = ev.target;
+
+          if (target.status < 200 || target.status >= 300) {
+            const error = new Error(`HTTP ${target.status}: ${target.statusText}`);
+            error.source = target;
+            reject(error);
+            return;
+          }
+
+          try {
+            onProgress?.({ loaded: size, total: size, lengthComputable: true });
+          } catch {}
+
+          // 获取 ETag
+          const etag = target.getResponseHeader("ETag");
+          if (etag === null) {
+            // 即使读不到 ETag,也不报错,因为文件已经上传成功
+            // commit 阶段会由后端通过 HeadObject 获取 ETag
+            console.warn("[StorageAdapter] ⚠️ 无法读取 ETag (CORS),将由后端验证");
+            onComplete?.(null);
+            resolve({ ETag: null });
+            return;
+          }
+
+          console.log(`[StorageAdapter] ✅ 单文件上传成功 (ETag: ${etag})`);
+          onComplete?.(etag);
+          resolve({ ETag: etag });
+        });
+
+        // 上传失败
+        xhr.addEventListener("error", (ev) => {
+          cleanup();
+          const error = new Error("Upload failed");
+          error.source = ev.target;
+          reject(error);
+        });
+
+        xhr.send(body);
+      });
+    } catch (error) {
+      console.error("[StorageAdapter] uploadSingleFile 失败:", error);
+      throw error;
+    }
+  }
+
+  /**
    * 提交预签名上传完成 - CloudPaste特有功能
    * @param {Object} file Uppy文件对象
    * @param {Object} response 上传响应

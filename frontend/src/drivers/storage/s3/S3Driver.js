@@ -72,7 +72,10 @@ export class S3Driver {
         awsS3Opts.abortMultipartUpload = adapter.abortMultipartUpload.bind(adapter);
         awsS3Opts.listParts = adapter.listParts.bind(adapter);
       } else {
+        // 单文件上传:提供 getUploadParameters 和 uploadPartBytes
+        // uploadPartBytes 使用 XMLHttpRequest 可以读取 ETag,避免 CORS 错误
         awsS3Opts.getUploadParameters = adapter.getUploadParameters.bind(adapter);
+        awsS3Opts.uploadPartBytes = adapter.uploadSingleFile.bind(adapter);
       }
 
       uppy.use(AwsS3, awsS3Opts);
@@ -129,6 +132,9 @@ export class S3Driver {
     // 避免重复安装
     if (uppy.getPlugin(pluginId)) return;
 
+    // 创建 StorageAdapter 实例用于单文件上传(使用 XMLHttpRequest 避免 CORS)
+    const adapter = new StorageAdapter("/", uppy);
+
     uppy.use(AwsS3, {
       id: pluginId,
       shouldUseMultipart: () => false,
@@ -173,6 +179,8 @@ export class S3Driver {
           headers: data.headers || {},
         };
       },
+      // 使用 XMLHttpRequest 避免 CORS 问题
+      uploadPartBytes: adapter.uploadSingleFile.bind(adapter),
     });
 
     // 在成功后执行 commit
@@ -216,6 +224,9 @@ export class S3Driver {
     const basePayload = this.#withStorageConfig(payload || {});
     const pluginId = "AwsS3UrlShare";
     if (uppy.getPlugin(pluginId)) return;
+
+    // 创建 StorageAdapter 实例用于单文件上传(使用 XMLHttpRequest 避免 CORS)
+    const adapter = new StorageAdapter("/", uppy);
 
     uppy.use(AwsS3, {
       id: pluginId,
@@ -262,6 +273,8 @@ export class S3Driver {
         } catch {}
         return { method: "PUT", url: uploadUrl, headers: presignData.headers || {} };
       },
+      // 使用 XMLHttpRequest 避免 CORS 问题
+      uploadPartBytes: adapter.uploadSingleFile.bind(adapter),
     });
 
     const onSuccess = async (file) => {
@@ -298,7 +311,6 @@ export class S3Driver {
     return api.fs.listMultipartParts(path, uploadId, fileName);
   }
 
-
   // Helpers ---------------------------------------------------------------
   #withStorageConfig(payload) {
     if (payload?.storage_config_id) {
@@ -309,7 +321,6 @@ export class S3Driver {
     }
     return { ...payload, storage_config_id: this.storageConfigId };
   }
-
 }
 
 export const SUPPORTED_STRATEGIES = [

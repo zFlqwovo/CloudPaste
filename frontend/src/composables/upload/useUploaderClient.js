@@ -68,14 +68,7 @@ function inferType(file) {
 }
 
 // 创建驱动会话
-function createDriverSession({
-  payload = {},
-  storageConfigId,
-  installPlugin,
-  events = {},
-  uppyOptions = {},
-  uppy: existingUppy,
-}) {
+function createDriverSession({ payload = {}, storageConfigId, installPlugin, events = {}, uppyOptions = {}, uppy: existingUppy }) {
   const configId = storageConfigId ?? payload?.storage_config_id;
   if (!configId) {
     throw new Error("缺少 storage_config_id，无法初始化上传会话");
