@@ -864,12 +864,27 @@ export class StorageAdapter {
     try {
       console.log(`[StorageAdapter] listParts被调用: ${file.name}, uploadId: ${uploadId}, key: ${key}`);
 
-      // 直接从localStorage返回已上传分片信息
       const cachedParts = this.getUploadedPartsFromStorage(key);
-      console.log(`[StorageAdapter] 从localStorage返回${cachedParts.length}个已上传分片`);
-      console.log(`[StorageAdapter] 缓存的分片信息:`, cachedParts);
+      if (cachedParts.length > 0) {
+        console.log(`[StorageAdapter] 使用缓存的分片信息(${cachedParts.length})`);
+        return cachedParts;
+      }
 
-      return cachedParts;
+      console.log(`[StorageAdapter] 缓存为空，回源查询服务器`);
+      const response = await fsApi.listMultipartParts(key, uploadId, file.name);
+      if (!response?.success) {
+        throw new Error(response?.message || "listMultipartParts 失败");
+      }
+
+      const serverParts = (response.data?.parts || []).map((part) => ({
+        PartNumber: part.partNumber ?? part.PartNumber,
+        ETag: part.etag ?? part.ETag,
+        Size: part.size ?? part.Size ?? 0,
+      }));
+
+      this.saveUploadedPartsToStorage(key, serverParts);
+      console.log(`[StorageAdapter] 服务器返回${serverParts.length}个分片`);
+      return serverParts;
     } catch (error) {
       console.error("[StorageAdapter] listParts失败:", error);
       return [];
@@ -983,7 +998,14 @@ export class StorageAdapter {
           reject(err);
         };
 
-        xhr.upload.addEventListener("progress", onProgress);
+        const progressHandler = (evt) => {
+          try {
+            const loaded = evt?.loaded ?? 0;
+            const total = evt?.total ?? size;
+            onProgress?.({ loaded, total, lengthComputable: true });
+          } catch {}
+        };
+        xhr.upload.addEventListener("progress", progressHandler);
 
         xhr.addEventListener("load", (ev) => {
           cleanup();
@@ -996,7 +1018,7 @@ export class StorageAdapter {
             return;
           }
 
-          onProgress(size);
+          try { onProgress?.({ loaded: size, total: size, lengthComputable: true }); } catch {}
 
           // 获取ETag
           const etag = target.getResponseHeader("ETag");

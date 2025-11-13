@@ -1,6 +1,7 @@
 import { ref, computed } from "vue";
 import { useAdminBase } from "./useAdminBase.js";
 import { useAuthStore } from "@/stores/authStore.js";
+import { useStorageConfigsStore } from "@/stores/storageConfigsStore.js";
 import { useI18n } from "vue-i18n";
 import { api } from "@/api";
 import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
@@ -20,7 +21,9 @@ export function useMountManagement() {
 
   // 挂载点管理特有状态
   const mounts = ref([]);
-  const storageConfigsList = ref([]);
+  const storageConfigsStore = useStorageConfigsStore();
+  const storageConfigs = computed(() => storageConfigsStore.sortedConfigs);
+  const storageConfigsLoading = computed(() => storageConfigsStore.isLoading);
   const apiKeyNames = ref({});
   const showForm = ref(false);
   const currentMount = ref(null);
@@ -87,13 +90,12 @@ export function useMountManagement() {
   /**
    * 加载存储配置列表
    */
-  const loadStorageConfigs = async () => {
+  const loadStorageConfigs = async (options = {}) => {
     try {
-      const response = await api.storage.getStorageConfigs();
-      if (response.code === 200 && response.data) {
-        storageConfigsList.value = response.data;
+      if (options.force) {
+        await storageConfigsStore.refreshConfigs();
       } else {
-        console.error("加载存储配置列表失败:", response.message);
+        await storageConfigsStore.loadConfigs();
       }
     } catch (err) {
       console.error("加载存储配置列表错误:", err);
@@ -104,7 +106,7 @@ export function useMountManagement() {
    * 根据ID获取存储配置
    */
   const getStorageConfigById = (configId) => {
-    return storageConfigsList.value.find((config) => config.id === configId) || null;
+    return storageConfigsStore.getConfigById(configId);
   };
 
   /**
@@ -157,8 +159,8 @@ export function useMountManagement() {
           updateMountPagination();
 
           // 如果存储配置列表为空，尝试重新加载
-          if (storageConfigsList.value.length === 0) {
-            loadStorageConfigs();
+          if (!storageConfigs.value.length) {
+            await loadStorageConfigs();
           }
 
           // 检查是否需要加载API密钥信息
@@ -442,20 +444,19 @@ export function useMountManagement() {
     if (!mount) return "-";
 
     if (mount.storage_config_id) {
-      if (storageConfigsList.value.length === 0) {
+      if (!storageConfigs.value.length && storageConfigsLoading.value) {
         return `${mount.storage_type || "-"} (加载中...)`;
       }
 
       const config = getStorageConfigById(mount.storage_config_id);
       if (config) {
-        const providerLabel = config.provider_type ? ` (${config.provider_type})` : "";
-        return `${config.name}${providerLabel}`;
+        return storageConfigsStore.formatProviderLabel(config);
       }
 
       return `${mount.storage_type || "-"} (ID: ${mount.storage_config_id})`;
     }
 
-    return mount.storage_type || "-";
+    return storageConfigsStore.getStorageTypeLabel(mount.storage_type) || mount.storage_type || "-";
   };
 
   return {
@@ -464,7 +465,8 @@ export function useMountManagement() {
 
     // 挂载点管理特有状态
     mounts,
-    storageConfigsList,
+    storageConfigs,
+    storageConfigsLoading,
     apiKeyNames,
     showForm,
     currentMount,
