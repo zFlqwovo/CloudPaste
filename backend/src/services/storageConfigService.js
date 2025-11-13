@@ -122,9 +122,9 @@ export async function updateStorageConfig(db, id, updateData, adminId, encryptio
   if (updateData.status) topPatch.status = updateData.status;
 
   let cfg = {};
-  try {
-    cfg = exists.config_json ? JSON.parse(exists.config_json) : {};
-  } catch {}
+  if (exists?.__config_json__ && typeof exists.__config_json__ === "object") {
+    cfg = { ...exists.__config_json__ };
+  }
   // 合并驱动 JSON 字段
   const boolKeys = new Set(["path_style"]);
   for (const [k, v] of Object.entries(updateData)) {
@@ -189,12 +189,20 @@ export async function testStorageConnection(db, id, adminId, encryptionSecret, r
   }
   const tester = StorageFactory.getTester(type);
   if (typeof tester === "function") {
-    const res = await tester(cfg, encryptionSecret, requestOrigin);
-    // 标记最后使用时间
     try {
-      await repo.updateLastUsed(id);
-    } catch {}
-    return res;
+      const res = await tester(cfg, encryptionSecret, requestOrigin);
+      // 标记最后使用时间
+      try {
+        await repo.updateLastUsed(id);
+      } catch {}
+      return res;
+    } catch (error) {
+      if (error instanceof HTTPException) {
+        throw error;
+      }
+      const message = error?.message || "存储连通性测试失败";
+      throw new HTTPException(ApiStatus.INTERNAL_SERVER_ERROR, { message });
+    }
   }
   throw new HTTPException(ApiStatus.NOT_FOUND, { message: `未找到存储类型的测试实现: ${type}` });
 }

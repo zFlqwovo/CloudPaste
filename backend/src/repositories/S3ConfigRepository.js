@@ -29,6 +29,13 @@ export class S3ConfigRepository extends BaseRepository {
           merged.access_key_id = cfg?.access_key_id;
           merged.secret_access_key = cfg?.secret_access_key;
         }
+        // 保留原始 config_json 对象（非枚举属性，避免对外暴露）
+        Object.defineProperty(merged, "__config_json__", {
+          value: cfg,
+          enumerable: false,
+          configurable: false,
+          writable: false,
+        });
         delete merged.config_json;
         return merged;
       }
@@ -89,7 +96,7 @@ export class S3ConfigRepository extends BaseRepository {
   async findFirstPublic(options = {}) {
     const { withSecrets = false } = options;
     const row = await this.queryFirst(
-      `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE is_public = 1 ORDER BY is_default DESC, updated_at DESC LIMIT 1`
+        `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE is_public = 1 ORDER BY is_default DESC, updated_at DESC LIMIT 1`
     );
     return this._inflate(row, { withSecrets });
   }
@@ -150,16 +157,16 @@ export class S3ConfigRepository extends BaseRepository {
 
   async findByEndpoint(endpointUrl, adminId) {
     const res = await this.query(
-      `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE storage_type='S3' AND json_extract(config_json,'$.endpoint_url') = ? AND admin_id = ? ORDER BY name ASC`,
-      [endpointUrl, adminId]
+        `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE storage_type='S3' AND json_extract(config_json,'$.endpoint_url') = ? AND admin_id = ? ORDER BY name ASC`,
+        [endpointUrl, adminId]
     );
     return this._inflateList(res.results || []);
   }
 
   async findByBucket(bucketName, adminId) {
     const res = await this.query(
-      `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE storage_type='S3' AND json_extract(config_json,'$.bucket_name') = ? AND admin_id = ? ORDER BY name ASC`,
-      [bucketName, adminId]
+        `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE storage_type='S3' AND json_extract(config_json,'$.bucket_name') = ? AND admin_id = ? ORDER BY name ASC`,
+        [bucketName, adminId]
     );
     return this._inflateList(res.results || []);
   }
@@ -184,13 +191,13 @@ export class S3ConfigRepository extends BaseRepository {
 
   async findRecentlyUsed(adminId, limit = 10) {
     const result = await this.query(
-      `
+        `
       SELECT * FROM ${DbTables.STORAGE_CONFIGS}
       WHERE admin_id = ? AND last_used IS NOT NULL
       ORDER BY last_used DESC
       LIMIT ?
       `,
-      [adminId, limit]
+        [adminId, limit]
     );
     return this._inflateList(result.results || []);
   }
@@ -206,8 +213,8 @@ export class S3ConfigRepository extends BaseRepository {
 
   async findByRegion(region, adminId) {
     const res = await this.query(
-      `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE storage_type='S3' AND json_extract(config_json,'$.region') = ? AND admin_id = ? ORDER BY name ASC`,
-      [region, adminId]
+        `SELECT * FROM ${DbTables.STORAGE_CONFIGS} WHERE storage_type='S3' AND json_extract(config_json,'$.region') = ? AND admin_id = ? ORDER BY name ASC`,
+        [region, adminId]
     );
     return this._inflateList(res.results || []);
   }
@@ -241,7 +248,7 @@ export class S3ConfigRepository extends BaseRepository {
 
   async findAllWithUsage() {
     const queryResult = await this.query(
-      `SELECT id, name, storage_type, admin_id, is_public, is_default, created_at, updated_at, last_used,
+        `SELECT id, name, storage_type, admin_id, is_public, is_default, created_at, updated_at, last_used,
               json_extract(config_json,'$.provider_type') AS provider_type,
               json_extract(config_json,'$.endpoint_url') AS endpoint_url,
               json_extract(config_json,'$.bucket_name') AS bucket_name,
@@ -258,10 +265,10 @@ export class S3ConfigRepository extends BaseRepository {
     const result = [];
     for (const config of configs) {
       const usage = await this.queryFirst(
-        `SELECT COUNT(*) as file_count, SUM(size) as total_size 
+          `SELECT COUNT(*) as file_count, SUM(size) as total_size 
          FROM ${DbTables.FILES} 
          WHERE storage_config_id = ?`,
-        [config.id]
+          [config.id]
       );
       result.push({
         ...config,
