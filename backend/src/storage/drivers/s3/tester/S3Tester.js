@@ -101,7 +101,7 @@ export async function s3TestConnection(config, encryptionSecret, requestOrigin =
   // 1) 读权限（ListObjectsV2）
   try {
     const list = await client.send(
-        new ListObjectsV2Command({ Bucket: config.bucket_name, MaxKeys: 10, Prefix: prefix || undefined })
+      new ListObjectsV2Command({ Bucket: config.bucket_name, MaxKeys: 10, Prefix: prefix || undefined })
     );
     result.read.success = true;
     result.read.objectCount = list.Contents?.length || 0;
@@ -153,9 +153,9 @@ export async function s3TestConnection(config, encryptionSecret, requestOrigin =
   try {
     const probeKey = `${prefix}__cors_probe_${Date.now()}.txt`;
     const presigned = await getSignedUrl(
-        client,
-        new PutObjectCommand({ Bucket: config.bucket_name, Key: probeKey, ContentType: "text/plain" }),
-        { expiresIn }
+      client,
+      new PutObjectCommand({ Bucket: config.bucket_name, Key: probeKey, ContentType: "text/plain" }),
+      { expiresIn }
     );
     const corsHeaders = getCorsHeaders(provider, requestOrigin);
     const resp = await fetch(presigned, { method: "OPTIONS", headers: corsHeaders }).catch(() => null);
@@ -171,9 +171,9 @@ export async function s3TestConnection(config, encryptionSecret, requestOrigin =
       result.cors.maxAge = maxAge || "";
       result.cors.statusCode = resp.status;
       const allowedMethodsList = (allowMethods || "")
-          .split(",")
-          .map((m) => m.trim().toUpperCase())
-          .filter(Boolean);
+        .split(",")
+        .map((m) => m.trim().toUpperCase())
+        .filter(Boolean);
       const supportsPut = allowedMethodsList.includes("PUT") || allowedMethodsList.includes("*");
       const supportsOrigin = !requestOrigin || allowOrigin === "*" || allowOrigin === requestOrigin;
       result.cors.uploadSupported = !!(supportsPut && supportsOrigin);
@@ -222,8 +222,8 @@ export async function s3TestConnection(config, encryptionSecret, requestOrigin =
       step.step2.etag = (uploadResp.headers.get("ETag") || "").replace(/"/g, "") || null;
       step.step2.bytesUploaded = body.byteLength;
       const exposeHeaders =
-          uploadResp.headers.get("Access-Control-Expose-Headers") ||
-          uploadResp.headers.get("access-control-expose-headers");
+        uploadResp.headers.get("Access-Control-Expose-Headers") ||
+        uploadResp.headers.get("access-control-expose-headers");
       if (exposeHeaders) {
         result.cors.exposeHeaders = exposeHeaders;
       }
@@ -239,7 +239,7 @@ export async function s3TestConnection(config, encryptionSecret, requestOrigin =
       step.step2.duration = Math.round(t2e - t2s);
       step.step2.statusCode = uploadResp.status;
       step.step2.statusText = uploadResp.statusText;
-      throw new Error(`HTTP ${uploadResp.status}: ${uploadResp.statusText}`);
+      throw new DriverError(`HTTP ${uploadResp.status}: ${uploadResp.statusText}`);
     }
 
     // step3
@@ -304,3 +304,4 @@ export async function s3TestConnection(config, encryptionSecret, requestOrigin =
 
   return { success: overallSuccess, message, result };
 }
+import { DriverError } from "../../../../http/errors.js";

@@ -63,11 +63,11 @@ export function useMountManagement() {
 
     const query = searchQuery.value.toLowerCase();
     return mounts.value.filter(
-      (mount) =>
-        mount.name.toLowerCase().includes(query) ||
-        mount.mount_path.toLowerCase().includes(query) ||
-        mount.storage_type.toLowerCase().includes(query) ||
-        (mount.remark && mount.remark.toLowerCase().includes(query))
+        (mount) =>
+            mount.name.toLowerCase().includes(query) ||
+            mount.mount_path.toLowerCase().includes(query) ||
+            mount.storage_type.toLowerCase().includes(query) ||
+            (mount.remark && mount.remark.toLowerCase().includes(query))
     );
   });
 
@@ -118,7 +118,7 @@ export function useMountManagement() {
       if (isAdmin.value) {
         // 管理员用户 - 加载所有API密钥
         const response = await api.admin.getAllApiKeys();
-        if (response.code === 200 && response.data) {
+        if (response?.success && response.data) {
           // 构建API密钥ID到名称的映射
           const keyMap = {};
           response.data.forEach((key) => {
@@ -149,7 +149,7 @@ export function useMountManagement() {
       try {
         // 使用统一的挂载点列表API
         const response = await api.mount.getMountsList();
-        if (response.code === 200 && response.data) {
+        if (response?.success && response.data) {
           mounts.value = response.data;
           if (mounts.value.length > 0) {
             // 更新最后刷新时间
@@ -165,7 +165,7 @@ export function useMountManagement() {
 
           // 检查是否需要加载API密钥信息
           const needsApiKeys = mounts.value.some(
-            (mount) => mount.created_by && (mount.created_by.startsWith("apikey:") || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mount.created_by))
+              (mount) => mount.created_by && (mount.created_by.startsWith("apikey:") || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mount.created_by))
           );
 
           if (needsApiKeys) {
@@ -246,7 +246,7 @@ export function useMountManagement() {
       try {
         // 根据用户类型调用相应的API函数
         const response = await apiDeleteMount(id);
-        if (response.code === 200) {
+        if (response?.success) {
           base.showSuccess(t("admin.mount.success.deleted"));
           // 重新加载挂载点列表
           loadMounts();
@@ -283,7 +283,7 @@ export function useMountManagement() {
         const response = await apiUpdateMount(mount.id, updateData);
 
         // 处理响应
-        if (response.code === 200) {
+        if (response?.success) {
           base.showSuccess(mount.is_active ? t("admin.mount.success.disabled") : t("admin.mount.success.enabled"));
           // 重新加载挂载点列表
           loadMounts();

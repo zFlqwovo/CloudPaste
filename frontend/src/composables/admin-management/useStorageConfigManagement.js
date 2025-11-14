@@ -96,17 +96,15 @@ export function useStorageConfigManagement() {
         limit: base.pagination.limit,
       });
 
-      if (response.data) {
-        storageConfigs.value = response.data;
-        // 使用标准的updatePagination方法
-        base.updatePagination(
-          {
-            total: response.total || response.data.length,
-          },
-          "page"
-        );
+      if (response && response.data) {
+        const dataBlock = response.data;
+        const items = Array.isArray(dataBlock) ? dataBlock : dataBlock.items || [];
+        const total = response.total ?? (typeof dataBlock.total === "number" ? dataBlock.total : items.length);
+
+        storageConfigs.value = items;
+        base.updatePagination({ total }, "page");
         base.updateLastRefreshTime();
-        console.log(`存储配置列表加载完成，共 ${storageConfigs.value.length} 条`);
+        console.log(`存储配置列表加载完成，共 ${items.length} 条`);
       } else {
         base.showError(response.message || "加载数据失败");
         storageConfigs.value = [];

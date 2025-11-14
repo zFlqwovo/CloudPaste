@@ -3,14 +3,13 @@
  * 负责文件上传相关操作：直接上传、分片上传（前端分片）、预签名上传等
  */
 
-import { HTTPException } from "hono/http-exception";
 import { ApiStatus } from "../../../../constants/index.js";
+import { AppError, ValidationError, S3DriverError } from "../../../../http/errors.js";
 import { generatePresignedPutUrl, buildS3Url } from "../utils/s3Utils.js";
 import { S3Client, PutObjectCommand, ListMultipartUploadsCommand, ListPartsCommand, UploadPartCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
-
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
 import { getEnvironmentOptimizedUploadConfig, convertStreamForAWSCompatibility } from "../../../../utils/environmentUtils.js";
@@ -297,9 +296,7 @@ export class S3UploadOperations {
       } catch (headError) {
         // 如果 HeadObject 失败,说明文件不存在,上传实际失败
         console.error(`❌ 后端验证失败 - 文件[${s3SubPath}]不存在:`, headError);
-        throw new HTTPException(ApiStatus.BAD_REQUEST, {
-          message: "文件上传失败:文件不存在于存储桶中",
-        });
+        throw new ValidationError("文件上传失败:文件不存在于存储桶中");
       }
 
       // 更新父目录的修改时间
@@ -327,14 +324,12 @@ export class S3UploadOperations {
     } catch (error) {
       console.error("处理上传完成失败:", error);
 
-      // 如果已经是 HTTPException,直接抛出
-      if (error instanceof HTTPException) {
+      // 如果已经是 AppError，直接抛出
+      if (error instanceof AppError) {
         throw error;
       }
 
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, {
-        message: `处理上传完成失败: ${error.message}`,
-      });
+      throw new S3DriverError("处理上传完成失败", { details: { cause: error?.message } });
     }
   }
 
@@ -367,9 +362,7 @@ export class S3UploadOperations {
       };
     } catch (error) {
       console.error("取消上传失败:", error);
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, {
-        message: `取消上传失败: ${error.message}`,
-      });
+      throw new S3DriverError("取消上传失败", { details: { cause: error?.message } });
     }
   }
 
@@ -493,7 +486,7 @@ export class S3UploadOperations {
         // 验证parts格式
         const validatedParts = parts.map((part) => {
           if (!part.PartNumber || !part.ETag) {
-            throw new Error(`分片数据不完整: PartNumber=${part.PartNumber}, ETag=${part.ETag}`);
+            throw new ValidationError(`分片数据不完整: PartNumber=${part.PartNumber}, ETag=${part.ETag}`);
           }
 
           return {
@@ -722,9 +715,7 @@ export class S3UploadOperations {
       }
 
       // 其他错误继续抛出
-      throw new HTTPException(ApiStatus.INTERNAL_ERROR, {
-        message: error.message || "列出已上传的分片失败",
-      });
+      throw new S3DriverError("列出已上传的分片失败", { details: { cause: error?.message } });
     }
   }
 
