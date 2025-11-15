@@ -6,9 +6,9 @@
 import { computed, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
-import { useFileBasketStore } from "../../stores/fileBasketStore.js";
+import { useFileBasketStore } from "@/stores/fileBasketStore.js";
 import { useAuthStore } from "@/stores/authStore.js";
-import { useTaskManager } from "../../utils/taskManager.js";
+import { useTaskManager } from "@/utils/taskManager.js";
 import { api } from "@/api";
 
 export function useFileBasket() {

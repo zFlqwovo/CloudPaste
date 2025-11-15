@@ -141,13 +141,7 @@ const addEditorActions = (editor, monaco) => {
       const chars = content.length;
       const words = content.trim() ? content.trim().split(/\s+/).length : 0;
 
-      // 使用更友好的提示方式
-      const message = `行数: ${lines}\n字符数: ${chars}\n单词数: ${words}`;
-      if (window.confirm) {
-        alert(message);
-      } else {
-        console.log("文本统计:", { lines, chars, words });
-      }
+      console.log("文本统计:", { lines, chars, words });
     },
   });
 

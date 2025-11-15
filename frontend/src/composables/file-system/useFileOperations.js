@@ -5,12 +5,12 @@
 
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { api } from "@/api";
-import { downloadFileWithAuth } from "@/utils/fileUtils.js";
 import { copyToClipboard } from "@/utils/clipboard.js";
+import { useFsService } from "@/modules/fs";
 
 export function useFileOperations() {
   const { t } = useI18n();
+  const fsService = useFsService();
 
   // 操作状态
   const loading = ref(false);
@@ -56,13 +56,12 @@ export function useFileOperations() {
         return { success: true, message: t("mount.messages.downloadStarted", { name: item.name }) };
       }
 
-      // 如果没有download_url，尝试通过API获取下载链接
-      const getFileInfo = api.fs.getFileInfo;
-      const response = await getFileInfo(item.path);
+      // 如果没有download_url，尝试通过FS service获取下载链接
+      const info = await fsService.getFileInfo(item.path);
 
-      if (response.success && response.data?.download_url) {
+      if (info?.download_url) {
         const link = document.createElement("a");
-        link.href = response.data.download_url;
+        link.href = info.download_url;
         link.download = item.name;
         link.style.display = "none";
         document.body.appendChild(link);
@@ -95,14 +94,8 @@ export function useFileOperations() {
       loading.value = true;
       error.value = null;
 
-      const renameItemApi = api.fs.renameItem;
-      const response = await renameItemApi(oldPath, newPath);
-
-      if (response.success) {
-        return { success: true, message: t("mount.messages.renameSuccess") };
-      } else {
-        throw new Error(response.message || t("mount.messages.renameFailed"));
-      }
+      await fsService.renameItem(oldPath, newPath);
+      return { success: true, message: t("mount.messages.renameSuccess") };
     } catch (err) {
       console.error("重命名失败:", err);
       error.value = err.message;
@@ -126,14 +119,8 @@ export function useFileOperations() {
       // 构造完整路径，确保目录路径以 / 结尾
       const fullPath = parentPath.endsWith("/") ? `${parentPath}${folderName}/` : `${parentPath}/${folderName}/`;
 
-      const createFolderApi = api.fs.createDirectory;
-      const response = await createFolderApi(fullPath);
-
-      if (response.success) {
-        return { success: true, message: t("mount.messages.createFolderSuccess") };
-      } else {
-        throw new Error(response.message || t("mount.messages.createFolderFailed"));
-      }
+      await fsService.createDirectory(fullPath);
+      return { success: true, message: t("mount.messages.createFolderSuccess") };
     } catch (err) {
       console.error("创建文件夹失败:", err);
       error.value = err.message;
@@ -174,12 +161,7 @@ export function useFileOperations() {
       const paths = items.map((item) => item.path);
 
       // 使用统一的批量删除接口
-      const result = await api.fs.batchDeleteItems(paths);
-
-      // 简化的结果处理
-      if (result.failed && result.failed.length > 0) {
-        throw new Error(result.failed[0].error);
-      }
+      await fsService.batchDeleteItems(paths);
 
       return {
         success: true,
@@ -216,33 +198,26 @@ export function useFileOperations() {
       loading.value = true;
       error.value = null;
 
-      // 使用统一API函数
-      const getFileLinkApi = api.fs.getFileLink;
+      // 调用FS service获取直链
+      const presignedUrl = await fsService.getFileLink(item.path, expiresIn, forceDownload);
 
-      // 调用API获取直链
-      const response = await getFileLinkApi(item.path, expiresIn, forceDownload);
+      // 复制链接到剪贴板
+      const copySuccess = await copyToClipboard(presignedUrl);
 
-      if (response.success && response.data?.presignedUrl) {
-        // 复制链接到剪贴板
-        const copySuccess = await copyToClipboard(response.data.presignedUrl);
+      if (copySuccess) {
+        // 显示成功通知
+        showLinkCopiedNotification.value = true;
+        setTimeout(() => {
+          showLinkCopiedNotification.value = false;
+        }, 3000);
 
-        if (copySuccess) {
-          // 显示成功通知
-          showLinkCopiedNotification.value = true;
-          setTimeout(() => {
-            showLinkCopiedNotification.value = false;
-          }, 3000);
-
-          return {
-            success: true,
-            message: t("mount.messages.linkCopiedSuccess"),
-            url: response.data.presignedUrl,
-          };
-        } else {
-          throw new Error(t("mount.messages.copyFailed"));
-        }
+        return {
+          success: true,
+          message: t("mount.messages.linkCopiedSuccess"),
+          url: presignedUrl,
+        };
       } else {
-        throw new Error(response.message || t("mount.messages.getFileLinkFailed"));
+        throw new Error(t("mount.messages.copyFailed"));
       }
     } catch (err) {
       console.error("获取文件直链错误:", err);
