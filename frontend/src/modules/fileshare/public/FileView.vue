@@ -279,24 +279,22 @@ const closeEditModal = () => {
  */
 const saveFileChanges = async (updatedFile) => {
   try {
-    let response;
+    if (!updatedFile?.id) {
+      showError(t("fileView.errors.updateFailed"), t("fileView.errors.missingId"));
+      return;
+    }
 
     // 使用 fileshareService 统一更新文件元数据
-    response = await fileshareService.updateFileMetadata(updatedFile.id, updatedFile);
+    // 约定：成功时正常返回（true 或领域数据），失败时抛出 Error
+    await fileshareService.updateFileMetadata(updatedFile.id, updatedFile);
 
-    if (response.success) {
-      // 更新成功，重新加载文件信息
-      await loadFileInfo();
-      // 关闭编辑模态框
-      closeEditModal();
-    } else {
-      // 处理错误情况
-      console.error("更新文件信息失败:", response.message);
-      showError(t("fileView.errors.updateFailed"), `${t("fileView.errors.updateFailed")}: ${response.message}`);
-    }
+    // 更新成功，重新加载文件信息并关闭弹窗
+    await loadFileInfo();
+    closeEditModal();
   } catch (err) {
     console.error("更新文件错误:", err);
-    showError(t("fileView.errors.updateFailed"), t("fileView.errors.unknown"));
+    const msg = err?.message || t("fileView.errors.unknown");
+    showError(t("fileView.errors.updateFailed"), msg);
   }
 };
 

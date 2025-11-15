@@ -20,7 +20,8 @@ export function buildAuthHeaders(baseHeaders = {}) {
   const headers = { ...baseHeaders };
   const authState = getAuthSnapshot();
 
-  if (authState && authState.isAuthenticated) {
+  // 只要 bridge 中存在有效的认证凭据，就注入到请求头中
+  if (authState) {
     if (authState.authType === "admin" && authState.adminToken) {
       headers.Authorization = `Bearer ${authState.adminToken}`;
     } else if (authState.authType === "apikey" && authState.apiKey) {
@@ -30,4 +31,3 @@ export function buildAuthHeaders(baseHeaders = {}) {
 
   return headers;
 }
-

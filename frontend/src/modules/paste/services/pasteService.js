@@ -40,51 +40,22 @@ export function usePasteService() {
       options.search = search.trim();
     }
 
-    // 目前管理员与 API Key 文本用户走同一 endpoint
+    // 目前管理员与 API Key 文本用户走统一 /api/pastes endpoint
     const resp = await api.paste.getPastes(null, limit, offset, options);
-    if (!resp) {
-      throw new Error("加载文本列表失败");
-    }
-
-    // 统一处理 { success, data, pagination, message } 与直接数组等多种形式
-    let success = true;
-    let data = resp;
-    let pagination = resp.pagination;
-    let message = resp.message;
-
-    if (typeof resp === "object" && "success" in resp) {
-      success = !!resp.success;
-      data = resp.data;
-      pagination = resp.pagination;
-      message = resp.message;
-    }
-
-    if (!success) {
+    if (!resp || typeof resp !== "object" || resp.success !== true) {
+      const message = resp && typeof resp === "object" && "message" in resp ? resp.message : null;
       throw new Error(message || "加载文本列表失败");
     }
 
-    const items =
-      Array.isArray(data) ?
-        data :
-        Array.isArray(data?.results) ?
-          data.results :
-          Array.isArray(data?.items) ?
-            data.items :
-            [];
+    const payload = resp.data || {};
+    const items = Array.isArray(payload.results) ? payload.results : [];
+    const pagination = payload.pagination || {};
 
     const finalPagination = {
-      total:
-        typeof pagination?.total === "number"
-          ? pagination.total
-          : typeof resp.total === "number"
-            ? resp.total
-            : items.length,
-      limit: typeof pagination?.limit === "number" ? pagination.limit : limit,
-      offset: typeof pagination?.offset === "number" ? pagination.offset : offset,
-      hasMore:
-        typeof pagination?.hasMore === "boolean"
-          ? pagination.hasMore
-          : undefined,
+      total: typeof pagination.total === "number" ? pagination.total : items.length,
+      limit: typeof pagination.limit === "number" ? pagination.limit : limit,
+      offset: typeof pagination.offset === "number" ? pagination.offset : offset,
+      hasMore: typeof pagination.hasMore === "boolean" ? pagination.hasMore : undefined,
     };
 
     return { items, pagination: finalPagination };

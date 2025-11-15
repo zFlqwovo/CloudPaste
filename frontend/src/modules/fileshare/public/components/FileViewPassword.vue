@@ -113,18 +113,14 @@ const verifyPassword = async () => {
 
   try {
     // 通过 fileshareService 验证文件密码
-    const response = await fileshareService.verifyFilePassword(props.fileId, password.value);
+    // 约定：成功时返回领域数据对象，失败时抛出 Error
+    const data = await fileshareService.verifyFilePassword(props.fileId, password.value);
 
-    if (response.success) {
-      // 密码验证成功，将用户输入的密码与API返回的URL一起传递给父组件
-      emit("verified", {
-        ...response.data, // 传递API返回的所有数据
-        currentPassword: password.value, // 传递当前输入的密码，用于后续操作
-      });
-    } else {
-      // 密码验证失败
-      error.value = response.message || t("fileView.password.error");
-    }
+    // 密码验证成功，将用户输入的密码与API返回的数据一起传递给父组件
+    emit("verified", {
+      ...(data || {}),
+      currentPassword: password.value, // 传递当前输入的密码，用于后续操作
+    });
   } catch (err) {
     console.error("验证密码时出错:", err);
     // 优先使用HTTP状态码判断错误类型，更可靠
@@ -138,15 +134,16 @@ const verifyPassword = async () => {
       // 404 Not Found - 资源不存在
       error.value = "此文件不存在或已被删除";
     } else {
-      // 后备判断：基于错误消息内容判断错误类型（保持兼容性）
-      if (err.message && (err.message.includes("密码错误") || err.message.includes("密码不正确") || err.message.includes("401"))) {
+      // 根据错误消息内容精确映射到文案
+      const msg = err.message || "";
+      if (msg.includes("密码不正确") || msg.includes("密码错误")) {
         error.value = t("fileView.password.error");
-      } else if (err.message && (err.message.includes("已过期") || err.message.includes("410"))) {
-        error.value = t("fileView.errors.forbidden");
-      } else if (err.message && (err.message.includes("找不到") || err.message.includes("不存在") || err.message.includes("404"))) {
-        error.value = t("fileView.errors.notFound");
+      } else if (msg.includes("已过期") || msg.includes("达到最大查看次数") || msg.includes("410")) {
+        error.value = "此文件已过期或不可访问";
+      } else if (msg.includes("不存在") || msg.includes("已被删除") || msg.includes("404")) {
+        error.value = "此文件不存在或已被删除";
       } else {
-        error.value = err.message || t("fileView.errors.unknown");
+        error.value = msg || t("fileView.errors.unknown");
       }
     }
   } finally {
