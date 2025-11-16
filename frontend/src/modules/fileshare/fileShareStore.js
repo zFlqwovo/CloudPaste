@@ -5,7 +5,6 @@ import { useFileshareService } from "@/modules/fileshare/fileshareService.js";
 /**
  * Fileshare 领域 Store
  *
- * 职责：
  * - 统一管理文件分享列表及分页状态
  * - 提供按 id / slug 的详情获取与简单缓存
  * - 为 admin/public 视图提供共享的数据来源

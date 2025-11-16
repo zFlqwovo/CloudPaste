@@ -112,16 +112,6 @@
       <span>{{ t("fileView.fileInfo.linkCopied") }}</span>
     </div>
 
-    <!-- 错误提示组件 -->
-    <ErrorToast
-      :visible="showErrorToast"
-      :title="errorTitle"
-      :message="errorMessage"
-      :action-text="errorActionText"
-      :action-handler="errorActionHandler"
-      @close="closeErrorToast"
-    />
-
     <!-- 分享模态框 -->
     <ShareModal :visible="showShareModal" :file-info="fileInfo" :dark-mode="darkMode" @close="closeShareModal" />
   </div>
@@ -131,13 +121,13 @@
 import { ref, defineProps, defineEmits, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import ErrorToast from "@/components/common/ErrorToast.vue";
 import ShareModal from "./ShareModal.vue";
 import { useAuthStore } from "@/stores/authStore.js";
 import { FileType } from "@/utils/fileTypes.js";
 import { useDeleteSettingsStore } from "@/stores/deleteSettingsStore.js";
 import { getFileErrorKey } from "@/api/services/fileGateway.js";
 import { useFileshareService } from "@/modules/fileshare/fileshareService.js";
+import { useGlobalMessage } from "@/composables/core/useGlobalMessage.js";
 
 const { t } = useI18n();
 
@@ -162,6 +152,7 @@ const props = defineProps({
 const emit = defineEmits(["edit", "delete", "refresh-file-info"]);
 
 const fileshareService = useFileshareService();
+const { showSuccess, showError } = useGlobalMessage();
 
 // 使用认证Store
 const authStore = useAuthStore();
@@ -180,31 +171,6 @@ const showCopyToast = ref(false);
 
 // 分享模态框状态
 const showShareModal = ref(false);
-
-// 错误提示状态
-const showErrorToast = ref(false);
-const errorTitle = ref("");
-const errorMessage = ref("");
-const errorActionText = ref("");
-const errorActionHandler = ref(null);
-
-// 显示错误提示
-const showError = (title, message, actionText = "", actionHandler = null) => {
-  errorTitle.value = title;
-  errorMessage.value = message;
-  errorActionText.value = actionText;
-  errorActionHandler.value = actionHandler;
-  showErrorToast.value = true;
-};
-
-// 关闭错误提示
-const closeErrorToast = () => {
-  showErrorToast.value = false;
-  errorTitle.value = "";
-  errorMessage.value = "";
-  errorActionText.value = "";
-  errorActionHandler.value = null;
-};
 
 // 计算属性：判断当前用户是否为文件创建者
 const isCreator = computed(() => {
@@ -247,7 +213,7 @@ const previewFile = async () => {
       message = t(errorKey);
     }
 
-    showError(t("fileView.actions.previewFailed"), message, t("fileView.actions.retry"), () => emit("refresh-file-info"));
+    showError(`${t("fileView.actions.previewFailed")}: ${message}`);
   }
 };
 
@@ -282,7 +248,7 @@ const downloadFile = () => {
     if (fallbackUrl) {
       window.open(fallbackUrl, "_blank");
     }
-    showError(t("fileView.actions.downloadFailed"), error.message || t("fileView.errors.unknown"));
+    showError(`${t("fileView.actions.downloadFailed")}: ${error.message || t("fileView.errors.unknown")}`);
   }
 };
 
@@ -335,7 +301,7 @@ const deleteFile = async () => {
     }
   } catch (err) {
     console.error("删除文件错误:", err);
-    showError(t("fileView.actions.deleteFailed"), err.message || t("fileView.errors.unknown"));
+      showError(`${t("fileView.actions.deleteFailed")}: ${err.message || t("fileView.errors.unknown")}`);
   } finally {
     deleting.value = false;
   }

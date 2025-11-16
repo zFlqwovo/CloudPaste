@@ -1,7 +1,7 @@
 import { ref, reactive, computed } from "vue";
 import { copyToClipboard } from "@/utils/clipboard.js";
 import { useDeleteSettingsStore } from "@/stores/deleteSettingsStore.js";
-import { useAdminBase } from "@/composables/admin-management/useAdminBase.js";
+import { useAdminBase } from "@/modules/admin";
 import { generateQRCode as createQRCodeImage } from "@/utils/qrcodeUtils.js";
 import { useFileshareService } from "@/modules/fileshare/fileshareService.js";
 import { useFileShareStore } from "@/modules/fileshare/fileShareStore.js";

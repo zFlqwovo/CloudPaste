@@ -72,7 +72,7 @@
         :is-open="isUploadModalOpen"
         :current-path="currentPath"
         :dark-mode="darkMode"
-        :is-admin="authStore.isAdmin"
+        :is-admin="isAdmin"
         @close="handleCloseUploadModal"
         @upload-success="handleUploadSuccess"
         @upload-error="handleUploadError"
@@ -84,8 +84,8 @@
         :dark-mode="darkMode"
         :selected-items="getSelectedItems()"
         :source-path="currentPath"
-        :is-admin="authStore.isAdmin"
-        :api-key-info="authStore.apiKeyInfo"
+        :is-admin="isAdmin"
+        :api-key-info="apiKeyInfo"
         @close="handleCloseCopyModal"
         @copy-started="handleCopyStarted"
         @copy-complete="handleCopyComplete"
@@ -159,7 +159,7 @@
 
       <!-- 面包屑导航 -->
       <div class="mb-4">
-        <BreadcrumbNav
+          <BreadcrumbNav
           :current-path="currentPath"
           :dark-mode="darkMode"
           :preview-file="isPreviewMode ? previewFile : null"
@@ -170,8 +170,8 @@
           @batch-delete="batchDelete"
           @batch-copy="handleBatchCopy"
           @batch-add-to-basket="handleBatchAddToBasket"
-          :basic-path="authStore.apiKeyInfo?.basic_path || '/'"
-          :user-type="authStore.isAdmin ? 'admin' : 'user'"
+          :basic-path="apiKeyInfo?.basic_path || '/'"
+          :user-type="isAdmin ? 'admin' : 'user'"
         />
       </div>
 
@@ -222,7 +222,7 @@
           <div v-if="isPreviewLoading" class="p-8 text-center">
             <div class="flex flex-col items-center space-y-4">
               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <div class="text-gray-600 dark:text-gray-400">{{ $t("common.loading") }}{{ route.query.preview ? ` ${route.query.preview}` : "" }}...</div>
+              <div class="text-gray-600 dark:text-gray-400">{{ $t("common.loading") }}</div>
             </div>
           </div>
 
@@ -267,9 +267,9 @@
               :file="previewInfo || previewFile"
               :dark-mode="darkMode"
               :is-loading="isPreviewLoading"
-              :is-admin="authStore.isAdmin"
-              :api-key-info="authStore.apiKeyInfo"
-              :has-file-permission="authStore.hasFilePermission"
+              :is-admin="isAdmin"
+              :api-key-info="apiKeyInfo"
+              :has-file-permission="hasFilePermission"
               :directory-items="directoryItems"
               @download="handleDownload"
               @loaded="handlePreviewLoaded"
@@ -295,16 +295,15 @@
 
 <script setup>
 import { ref, computed, provide, onMounted, onBeforeUnmount, watch } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 
 // 组合式函数 - 使用统一聚合导出
-import { useSelection, useFilePreview, useFileOperations, useUIState, useFileBasket } from "@/composables/index.js";
+import { useSelection, useFileOperations, useUIState, useFileBasket } from "@/composables/index.js";
 
-// Store
-import { useAuthStore } from "@/stores/authStore.js";
-import { useFileSystemStore } from "@/stores/fileSystemStore.js";
+// 视图控制器
+import { useMountExplorerController } from "./useMountExplorerController.js";
 
 // 子组件
 import BreadcrumbNav from "@/modules/fs/components/shared/BreadcrumbNav.vue";
@@ -324,90 +323,45 @@ const { t } = useI18n();
 
 // Vue Router
 const router = useRouter();
-const route = useRoute();
 
-// 使用Store和组合式函数
-const authStore = useAuthStore();
-const fileSystemStore = useFileSystemStore();
+// 使用组合式函数
 const selection = useSelection();
-const filePreview = useFilePreview();
 const fileOperations = useFileOperations();
-
-// 组合式函数
 const uiState = useUIState();
 const fileBasket = useFileBasket();
 
 // 文件篮状态
 const { isBasketOpen } = storeToRefs(fileBasket);
 
-// 使用storeToRefs解构响应式状态
-const { currentPath, loading, error, hasPermissionForCurrentPath, directoryItems, isVirtualDirectory } = storeToRefs(fileSystemStore);
-
-// 解构方法（方法不需要storeToRefs）
-const { refreshDirectory, loadDirectory } = fileSystemStore;
-
-// ===== FS 路由与路径控制 =====
-
-const getPathFromRoute = () => {
-  const pathMatch = route.params.pathMatch;
-  if (pathMatch) {
-    const pathArray = Array.isArray(pathMatch) ? pathMatch : [pathMatch];
-    const urlPath = "/" + pathArray.join("/");
-    return urlPath.endsWith("/") ? urlPath : `${urlPath}/`;
-  }
-  return "/";
-};
-
-const getRouteIntent = () => {
-  if (route.query.preview) {
-    return {
-      type: "file_preview",
-      directoryPath: getPathFromRoute(),
-      fileName: route.query.preview,
-    };
-  }
-
-  return {
-    type: "directory_browse",
-    directoryPath: getPathFromRoute(),
-  };
-};
-
-const updateUrl = (path, previewFile = null) => {
-  const normalizedPath = path || "/";
-  const query = {};
-
-  if (previewFile) {
-    query.preview = previewFile;
-  }
-
-  let routePath = "/mount-explorer";
-  if (normalizedPath !== "/") {
-    const pathSegments = normalizedPath.split("/").filter(Boolean);
-    if (pathSegments.length > 0) {
-      routePath = `/mount-explorer/${pathSegments.join("/")}`;
-    }
-  }
-
-  router.push({
-    path: routePath,
-    query,
-  });
-};
-
-const navigateTo = async (path) => {
-  const normalizedPath = path || "/";
-
-  // 无论当前是否处于预览模式，导航到新的目录并清除预览参数
-  updateUrl(normalizedPath);
-};
+// 控制器：封装路由 / 权限 / 目录加载与预览初始化
+const {
+  currentPath,
+  loading,
+  error,
+  hasPermissionForCurrentPath,
+  directoryItems,
+  isVirtualDirectory,
+  isAdmin,
+  hasApiKey,
+  hasFilePermission,
+  hasMountPermission,
+  hasPermission,
+  apiKeyInfo,
+  currentMountId,
+  previewFile,
+  previewInfo,
+  isPreviewMode,
+  isPreviewLoading,
+  previewError,
+  hasPreviewIntent,
+  updateUrl,
+  navigateTo,
+  updatePreviewUrl,
+  stopPreview,
+  refreshDirectory,
+} = useMountExplorerController();
 
 const { isCheckboxMode, selectedItems, selectedCount, setAvailableItems, toggleCheckboxMode, toggleSelectAll, getSelectedItems, selectItem } = selection;
-
-const { previewFile, previewInfo, isPreviewMode, isLoading: isPreviewLoading, error: previewError, updatePreviewUrl, stopPreview, initPreviewFromRoute } = filePreview;
-
-// 计算属性：基于路由参数判断是否有预览意图
-const hasPreviewIntent = computed(() => !!route.query.preview);
 
 // 组合式函数状态和方法
 const {
@@ -447,39 +401,6 @@ const props = defineProps({
   },
 });
 
-const currentMountId = computed(() => {
-  // 从fileSystemStore的directoryData中获取挂载点信息
-  const directoryData = fileSystemStore.directoryData;
-
-  // 如果是实际挂载点目录，directoryData会包含mount_id
-  if (directoryData && directoryData.mount_id) {
-    console.log("从directoryData获取挂载点ID:", directoryData.mount_id);
-    return directoryData.mount_id;
-  }
-
-  // 如果是虚拟目录，检查items中是否有挂载点
-  if (directoryData && directoryData.items) {
-    const mountItem = directoryData.items.find((item) => item.isMount && item.mount_id);
-    if (mountItem) {
-      console.log("从虚拟目录items获取挂载点ID:", mountItem.mount_id);
-      return mountItem.mount_id;
-    }
-  }
-
-  // 如果都没有，尝试从路径中提取（作为备用方案）
-  const pathSegments = currentPath.value.split("/").filter(Boolean);
-  const extractedId = pathSegments.length > 0 ? pathSegments[0] : "";
-  console.log("从路径提取挂载点ID:", extractedId);
-  return extractedId;
-});
-
-// 从Store获取权限状态的计算属性
-const isAdmin = computed(() => authStore.isAdmin);
-const hasApiKey = computed(() => authStore.authType === "apikey" && !!authStore.apiKey);
-const hasFilePermission = computed(() => authStore.hasFilePermission);
-const hasMountPermission = computed(() => authStore.hasMountPermission);
-const hasPermission = computed(() => authStore.hasMountPermission);
-
 // 权限变化处理
 const handlePermissionChange = (hasPermission) => {
   console.log("MountExplorer: 权限状态变化", hasPermission);
@@ -487,8 +408,6 @@ const handlePermissionChange = (hasPermission) => {
 };
 
 // API密钥信息
-const apiKeyInfo = computed(() => authStore.apiKeyInfo);
-
 // 导航到管理页面
 const navigateToAdmin = () => {
   import("@/router").then(({ routerUtils }) => {
@@ -941,210 +860,8 @@ watch(
   { immediate: true }
 );
 
-// 创建异步处理器防止竞态条件
-const createAsyncProcessor = () => {
-  let currentPromise = null;
-
-  return async (asyncFn) => {
-    // 如果有正在执行的异步操作，等待它完成
-    if (currentPromise) {
-      try {
-        await currentPromise;
-      } catch (error) {
-        // 忽略之前操作的错误
-      }
-    }
-
-    // 执行新的异步操作
-    currentPromise = asyncFn();
-
-    try {
-      await currentPromise;
-    } finally {
-      currentPromise = null;
-    }
-  };
-};
-
-// 创建状态比较器
-const createAuthStateComparator = () => {
-  let previousAuthState = null;
-
-  return (currentAuth) => {
-    const currentState = {
-      isAdmin: currentAuth.isAdmin,
-      // 只比较关键的apiKeyInfo属性，避免深度序列化
-      apiKeyId: currentAuth.apiKeyInfo?.id || null,
-      basicPath: currentAuth.apiKeyInfo?.basic_path || null,
-      permissions: currentAuth.apiKeyInfo?.permissions
-        ? {
-            text: !!currentAuth.apiKeyInfo.permissions.text,
-            file: !!currentAuth.apiKeyInfo.permissions.file,
-            mount: !!currentAuth.apiKeyInfo.permissions.mount,
-          }
-        : null,
-    };
-
-    // 首次调用
-    if (!previousAuthState) {
-      previousAuthState = { ...currentState };
-      return { changed: true, isFirstCall: true, changes: ["initial"] };
-    }
-
-    // 精确比较关键属性
-    const changes = [];
-    if (currentState.isAdmin !== previousAuthState.isAdmin) {
-      changes.push("isAdmin");
-    }
-    if (currentState.apiKeyId !== previousAuthState.apiKeyId) {
-      changes.push("apiKeyId");
-    }
-    if (currentState.basicPath !== previousAuthState.basicPath) {
-      changes.push("basicPath");
-    }
-
-    // 比较权限对象
-    const oldPerms = previousAuthState.permissions;
-    const newPerms = currentState.permissions;
-    if (JSON.stringify(oldPerms) !== JSON.stringify(newPerms)) {
-      changes.push("permissions");
-    }
-
-    const hasChanges = changes.length > 0;
-    if (hasChanges) {
-      previousAuthState = { ...currentState };
-    }
-
-    return { changed: hasChanges, isFirstCall: false, changes };
-  };
-};
-
-const asyncProcessor = createAsyncProcessor();
-const authComparator = createAuthStateComparator();
-
-// 根据路由和权限初始化当前路径并加载目录
-const initializeFromRoute = async () => {
-  // 等待认证状态就绪
-  if (!authStore.isAuthenticated) {
-    console.log("等待认证状态就绪...");
-    return;
-  }
-
-  const urlPath = getPathFromRoute();
-  let finalPath = urlPath;
-
-  // 基于 API Key 基本路径进行路径修正
-  if (!authStore.isAdmin && authStore.apiKeyInfo) {
-    const basicPath = authStore.apiKeyInfo.basic_path || "/";
-    const normalizedBasicPath = basicPath === "/" ? "/" : basicPath.replace(/\/+$/, "");
-    const normalizedUrlPath = urlPath.replace(/\/+$/, "") || "/";
-
-    if (normalizedBasicPath !== "/" && normalizedUrlPath !== normalizedBasicPath && !normalizedUrlPath.startsWith(`${normalizedBasicPath}/`)) {
-      console.log("URL路径超出权限范围，重定向到基本路径:", basicPath);
-      finalPath = basicPath;
-      currentPath.value = basicPath;
-      updateUrl(basicPath);
-    } else {
-      currentPath.value = urlPath;
-    }
-  } else {
-    currentPath.value = urlPath;
-  }
-
-  const intent = getRouteIntent();
-
-  if (intent.type === "directory_browse") {
-    await loadDirectory(finalPath);
-  } else if (intent.type === "file_preview") {
-    if (!fileSystemStore.directoryData || currentPath.value !== intent.directoryPath) {
-      await loadDirectory(intent.directoryPath);
-    }
-  }
-};
-
-// 处理目录变化的统一方法
-const handleDirectoryChange = async () => {
-  try {
-    await initializeFromRoute();
-  } catch (error) {
-    console.error("目录变化处理失败:", error);
-    showMessage("error", t("mount.messages.directoryLoadFailed"));
-  }
-};
-
-// 处理预览变化的统一方法
-const handlePreviewChange = async () => {
-  try {
-    await initPreviewFromRoute(currentPath.value, directoryItems.value);
-  } catch (error) {
-    console.error("预览变化处理失败:", error);
-    showMessage("error", t("mount.messages.previewLoadFailed"));
-  }
-};
-
-// 权限状态监听器
-watch(
-  () => ({ isAdmin: authStore.isAdmin, apiKeyInfo: authStore.apiKeyInfo }),
-  (newAuth) => {
-    const comparison = authComparator(newAuth);
-
-    if (comparison.changed) {
-      console.log("权限状态变化检测:", {
-        isFirstCall: comparison.isFirstCall,
-        changes: comparison.changes,
-        newAuth: {
-          isAdmin: newAuth.isAdmin,
-          apiKeyId: newAuth.apiKeyInfo?.id,
-          basicPath: newAuth.apiKeyInfo?.basic_path,
-        },
-      });
-
-      // 确保权限信息已经加载
-      if (typeof newAuth.isAdmin !== "boolean") {
-        console.log("等待权限信息加载...");
-        return;
-      }
-
-      // 使用异步处理器防止竞态条件
-      asyncProcessor(async () => {
-        await handleDirectoryChange();
-      });
-    }
-  },
-  { immediate: true }
-);
-
-// 路由路径监听器
-watch(
-  () => route.params.pathMatch,
-  (newPath, oldPath) => {
-    if (newPath !== oldPath) {
-      asyncProcessor(async () => {
-        await handleDirectoryChange();
-      });
-    }
-  }
-);
-
-// 预览文件监听器
-watch(
-  () => route.query.preview,
-  () => {
-    asyncProcessor(async () => {
-      await handlePreviewChange();
-    });
-  },
-  { immediate: true }
-);
-
 // 组件挂载时执行
 onMounted(async () => {
-  // 如果需要重新验证，则进行验证
-  if (authStore.needsRevalidation) {
-    console.log("MountExplorer: 需要重新验证认证状态");
-    await authStore.validateAuth();
-  }
-
   // 监听认证状态变化事件
   window.addEventListener("auth-state-changed", handleAuthStateChange);
 

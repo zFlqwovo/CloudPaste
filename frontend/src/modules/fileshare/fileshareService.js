@@ -15,7 +15,6 @@ import {
 /**
  * Fileshare 领域服务
  *
- * 职责：
  * - 对 fileGateway 提供的低层 API 进行领域级封装
  * - 统一列表 / 搜索 / 单条获取 / 永久链接 / Office 预览等逻辑
  *

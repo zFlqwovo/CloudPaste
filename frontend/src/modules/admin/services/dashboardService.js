@@ -3,7 +3,6 @@ import { api } from "@/api";
 /**
  * Admin 仪表盘 Service
  *
- * 职责：
  * - 封装 dashboard 统计相关 API 调用
  *
  * 不负责：

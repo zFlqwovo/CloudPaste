@@ -4,7 +4,6 @@ import { buildAuthHeaders } from "@/api/authHeaders.js";
 /**
  * Security 模块入口
  *
- * 职责：
  * - 提供统一的认证快照访问（基于 authBridge）
  * - 暴露构造 Authorization 头的工具，供 driver / API client 使用
  */

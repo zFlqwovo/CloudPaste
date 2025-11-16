@@ -2,7 +2,7 @@ import { ref, reactive, computed } from "vue";
 import { usePasteService } from "@/modules/paste";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useAuthStore } from "@/stores/authStore.js";
-import { useAdminBase } from "@/composables/admin-management/useAdminBase.js";
+import { useAdminBase } from "@/modules/admin";
 import { generateQRCode as createQRCodeImage } from "@/utils/qrcodeUtils.js";
 
 /**

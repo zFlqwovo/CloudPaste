@@ -3,7 +3,6 @@ import { api } from "@/api";
 /**
  * Admin 存储配置 Service
  *
- * 职责：
  * - 封装存储配置的读取 / 新建 / 更新 / 测试
  *
  * 约定：

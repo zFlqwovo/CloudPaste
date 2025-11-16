@@ -4,7 +4,6 @@ import { useAuthStore } from "@/stores/authStore.js";
 /**
  * Paste 领域 service
  *
- * 职责：
  * - 统一封装与文本分享相关的 API 调用
  * - 根据当前认证状态（管理员 / API Key 用户）选择合适的后端入口
  *

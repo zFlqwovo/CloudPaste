@@ -3,7 +3,6 @@ import { api } from "@/api";
 /**
  * Upload 领域 Service
  *
- * 职责：
  * - 提供与上传页相关的辅助数据访问（例如最近上传文件）
  *
  * 不负责：

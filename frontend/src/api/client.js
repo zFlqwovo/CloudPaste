@@ -218,7 +218,9 @@ export async function fetchApi(endpoint, options = {}) {
           // 确保返回后端提供的具体错误信息
           const errorMessage = responseData && responseData.message ? responseData.message : "密码错误";
 
-          throw new Error(errorMessage);
+          const error = new Error(errorMessage);
+          error.__logged = true;
+          throw error;
         }
 
         // 如果是修改密码请求，可能是当前密码验证失败
@@ -226,7 +228,9 @@ export async function fetchApi(endpoint, options = {}) {
           // 返回具体的错误信息，通常是"当前密码错误"
           const errorMessage = responseData && responseData.message ? responseData.message : "验证失败";
 
-          throw new Error(errorMessage);
+          const error = new Error(errorMessage);
+          error.__logged = true;
+          throw error;
         }
 
         // 判断使用的是哪种认证方式
@@ -236,7 +240,9 @@ export async function fetchApi(endpoint, options = {}) {
         if (authHeader.startsWith("Bearer ")) {
           console.log("管理员令牌验证失败，执行登出");
           await logoutViaBridge();
-          throw new Error("管理员会话已过期，请重新登录");
+          const error = new Error("管理员会话已过期，请重新登录");
+          error.__logged = true;
+          throw error;
         }
 
         // API密钥处理
@@ -252,15 +258,21 @@ export async function fetchApi(endpoint, options = {}) {
 
           if (isPermissionIssue) {
             console.log("API密钥权限不足，不执行登出");
-            throw new Error(responseData.message || "访问被拒绝，您可能无权执行此操作");
+            const error = new Error(responseData.message || "访问被拒绝，您可能无权执行此操作");
+            error.__logged = true;
+            throw error;
           }
 
           console.log("API密钥验证失败，执行登出");
           await logoutViaBridge();
-          throw new Error("API密钥无效或已过期");
+          const apiKeyError = new Error("API密钥无效或已过期");
+          apiKeyError.__logged = true;
+          throw apiKeyError;
         }
 
-        throw new Error("未授权访问，请登录后重试");
+        const unauthorizedError = new Error("未授权访问，请登录后重试");
+        unauthorizedError.__logged = true;
+        throw unauthorizedError;
       }
 
       // 对409状态码做特殊处理（链接后缀冲突或其他冲突）
@@ -268,31 +280,43 @@ export async function fetchApi(endpoint, options = {}) {
         console.error(`❌ 资源冲突错误(${url}):`, responseData);
         // 使用后端返回的具体错误信息，无论是字符串形式还是对象形式
         if (typeof responseData === "string") {
-          throw new Error(responseData);
+          const error = new Error(responseData);
+          error.__logged = true;
+          throw error;
         } else if (responseData && typeof responseData === "object" && responseData.message) {
-          throw new Error(responseData.message);
+          const error = new Error(responseData.message);
+          error.__logged = true;
+          throw error;
         } else {
-          throw new Error("链接后缀已被占用，请尝试其他后缀");
+          const error = new Error("链接后缀已被占用，请尝试其他后缀");
+          error.__logged = true;
+          throw error;
         }
       }
 
       // 处理新的后端错误格式 (code, message)
       if (responseData && typeof responseData === "object") {
         console.error(`❌ API错误(${url}):`, responseData);
-        throw new Error(responseData.message || `HTTP错误 ${response.status}: ${response.statusText}`);
+        const error = new Error(responseData.message || `HTTP错误 ${response.status}: ${response.statusText}`);
+        error.__logged = true;
+        throw error;
       }
 
       console.error(`❌ HTTP错误(${url}): ${response.status}`, responseData);
-      throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+      const error = new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+      error.__logged = true;
+      throw error;
     }
 
     // 处理新的后端统一响应格式 (code, message, data)
     if (responseData && typeof responseData === "object") {
-      //success 布尔判断
+      // success 布尔判断
       if ("success" in responseData) {
         if (responseData.success !== true) {
           console.error(`❌ API业务错误(${url}):`, responseData);
-          throw new Error(responseData.message || "请求失败");
+          const error = new Error(responseData.message || "请求失败");
+          error.__logged = true;
+          throw error;
         }
         return responseData;
       }
@@ -318,7 +342,10 @@ export async function fetchApi(endpoint, options = {}) {
       console.error(`🌐 网络错误(${url}):`, error.message);
       throw new Error("网络连接失败，请检查网络设置");
     } else {
-      console.error(`❌ API请求失败(${url}):`, error);
+      // 避免对已经在上层记录过的业务错误重复打印日志
+      if (!error.__logged) {
+        console.error(`❌ API请求失败(${url}):`, error);
+      }
       throw error;
     }
   }

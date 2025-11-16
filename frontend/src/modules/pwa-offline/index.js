@@ -3,7 +3,6 @@ import { getAuthSnapshot } from "@/modules/security/index.js";
 /**
  * PWA Offline 模块入口
  *
- * 职责：
  * - 统一封装离线操作队列的写入逻辑
  * - 对外提供轻量 API，供 api/client 等模块调用
  */

@@ -21,6 +21,5 @@ const props = defineProps({
 
 <template>
   <!-- 将接收到的属性传递给主组件 -->
-  <!-- 这种结构使得可以在不修改外部引用的情况下，轻松重构内部实现 -->
   <PasteViewMain :dark-mode="darkMode" :slug="slug" />
 </template>

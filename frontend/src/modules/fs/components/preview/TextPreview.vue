@@ -116,9 +116,7 @@ const handleContentChange = (newContent) => {
 };
 
 const handleSave = (content) => {
-  console.log("保存文件内容:", content);
-  // TODO: 实现文件保存功能
-  // 这里可以调用API保存文件内容
+  console.log("TextPreview 触发保存事件，交由父级组件处理实际保存逻辑");
   emit("save", {
     content,
     filename: currentFileData.value?.name,

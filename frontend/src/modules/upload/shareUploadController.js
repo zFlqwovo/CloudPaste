@@ -7,7 +7,6 @@ import { useUploaderClient } from "@/modules/storage-core/index.js";
  * 统一管理基于 Uppy 的分享上传会话（Share / URL），
  * 将对 useUploaderClient / driver 的直接依赖集中在 modules 层。
  *
- * 职责：
  * - 创建 / 记录当前活跃的上传会话
  * - 提供统一的销毁 / 取消入口
  *

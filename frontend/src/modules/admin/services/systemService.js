@@ -3,7 +3,6 @@ import { api } from "@/api";
 /**
  * Admin 系统相关 Service
  *
- * 职责：
  * - 统一封装所有 api.system 相关调用
  * - 为 settings / dashboard 等视图提供数据访问接口
  *
