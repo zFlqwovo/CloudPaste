@@ -158,7 +158,7 @@ const saveEdit = () => {
   }
 
   // 传递更新数据给父组件
-  emit("save", { data: updateData });
+  emit("save", updateData);
 };
 </script>
 

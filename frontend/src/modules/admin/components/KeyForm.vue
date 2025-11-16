@@ -338,11 +338,13 @@ const customKey = ref("");
 const useCustomKey = ref(false);
 const expiration = ref("1d");
 const customExpiration = ref("");
-// 权限状态 - 支持所有 9 种权限
+// 权限状态 - 支持所有权限位
 const permissions = ref({
   // 基础权限
   text: false,
+  text_manage: false,
   file_share: false,
+  file_manage: false,
 
   // 挂载页权限
   mount_view: false,
@@ -422,7 +424,9 @@ const resetForm = () => {
   // 重置所有权限
   permissions.value = {
     text: false,
+    text_manage: false,
     file_share: false,
+    file_manage: false,
     mount_view: false,
     mount_upload: false,
     mount_copy: false,
@@ -859,8 +863,8 @@ defineExpose({
             <h4 class="text-sm font-medium mb-2" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
               {{ $t("admin.keyManagement.permissions.basic", "基础权限") }}
             </h4>
-            <div class="grid grid-cols-1 gap-3">
-              <!-- 文本权限 -->
+            <div class="grid grid-cols-2 gap-3">
+              <!-- 文本创建权限 -->
               <div class="flex items-center space-x-2">
                 <input
                   :id="isEditMode ? 'edit-text-permission' : 'text-permission'"
@@ -874,7 +878,21 @@ defineExpose({
                 </label>
               </div>
 
-              <!-- 文件权限 -->
+              <!-- 文本管理权限 -->
+              <div class="flex items-center space-x-2">
+                <input
+                  :id="isEditMode ? 'edit-text-manage-permission' : 'text-manage-permission'"
+                  v-model="permissions.text_manage"
+                  type="checkbox"
+                  class="h-4 w-4 rounded"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-primary-600' : 'bg-white border-gray-300 text-primary-500'"
+                />
+                <label :for="isEditMode ? 'edit-text-manage-permission' : 'text-manage-permission'" class="text-sm font-medium" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+                  {{ $t("admin.keyManagement.permissions.text_manage", "文本管理") }}
+                </label>
+              </div>
+
+              <!-- 文件创建权限 -->
               <div class="flex items-center space-x-2">
                 <input
                   :id="isEditMode ? 'edit-file-permission' : 'file-permission'"
@@ -885,6 +903,20 @@ defineExpose({
                 />
                 <label :for="isEditMode ? 'edit-file-permission' : 'file-permission'" class="text-sm font-medium" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
                   {{ $t("admin.keyManagement.permissions.file_share", "文件分享") }}
+                </label>
+              </div>
+
+              <!-- 文件管理权限 -->
+              <div class="flex items-center space-x-2">
+                <input
+                  :id="isEditMode ? 'edit-file-manage-permission' : 'file-manage-permission'"
+                  v-model="permissions.file_manage"
+                  type="checkbox"
+                  class="h-4 w-4 rounded"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-primary-600' : 'bg-white border-gray-300 text-primary-500'"
+                />
+                <label :for="isEditMode ? 'edit-file-manage-permission' : 'file-manage-permission'" class="text-sm font-medium" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+                  {{ $t("admin.keyManagement.permissions.file_manage", "文件管理") }}
                 </label>
               </div>
             </div>

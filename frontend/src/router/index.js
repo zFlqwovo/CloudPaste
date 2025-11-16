@@ -289,9 +289,9 @@ const hasRoutePermission = (route, authStore) => {
     return route.meta.requiredPermissions.some((permission) => {
       switch (permission) {
         case "text":
-          return authStore.hasTextPermission;
+          return authStore.hasTextManagePermission;
         case "file":
-          return authStore.hasFilePermission;
+          return authStore.hasFileManagePermission;
         case "mount":
           return authStore.hasMountPermission;
         default:
@@ -313,11 +313,11 @@ const getDefaultRouteForUser = (authStore) => {
   // API密钥用户：根据权限确定默认页面
   if (authStore.authType === "apikey") {
     // 按优先级检查权限
-    if (authStore.hasTextPermission) {
+    if (authStore.hasTextManagePermission) {
       return "AdminTextManagement";
     }
 
-    if (authStore.hasFilePermission) {
+    if (authStore.hasFileManagePermission) {
       return "AdminFileManagement";
     }
 

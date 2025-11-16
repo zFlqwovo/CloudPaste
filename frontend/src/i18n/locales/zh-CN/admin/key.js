@@ -24,13 +24,16 @@ export default {
     permissions: {
       basic: "基础权限",
       text: "文本分享",
+      text_manage: "文本管理",
       file_share: "文件分享",
+      file_manage: "文件管理",
       mount: "挂载页权限",
       mount_view: "查看",
       mount_upload: "上传",
       mount_copy: "复制",
       mount_rename: "重命名",
       mount_delete: "删除",
+      // WebDAV 权限
       webdav: "WebDAV权限",
       webdav_read: "WebDAV读取",
       webdav_manage: "WebDAV管理",

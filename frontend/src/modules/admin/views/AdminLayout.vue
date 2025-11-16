@@ -52,8 +52,8 @@ const router = useRouter();
 // 计算用户权限
 const userPermissions = computed(() => ({
   isAdmin: authStore.isAdmin,
-  text: authStore.hasTextPermission,
-  file: authStore.hasFilePermission,
+  text: authStore.hasTextManagePermission,
+  file: authStore.hasFileManagePermission,
   mount: authStore.hasMountPermission,
 }));
 

@@ -25,7 +25,7 @@ const getPrincipalContext = (c) => {
 };
 
 export const registerPastesProtectedRoutes = (router) => {
-  router.post("/api/paste", usePolicy("pastes.manage"), async (c) => {
+  router.post("/api/paste", usePolicy("pastes.create"), async (c) => {
     const db = c.env.DB;
     const body = await c.req.json();
     const { userType, userId } = getPrincipalContext(c);

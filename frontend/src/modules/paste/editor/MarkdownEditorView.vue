@@ -128,8 +128,8 @@ const isPlainTextMode = ref(false);
 const editorContent = ref("");
 const currentEditor = ref(null);
 
-// 从Store获取权限状态的计算属性
-const hasPermission = computed(() => authStore.hasTextPermission);
+// 从Store获取权限状态的计算属性（文本分享创建权限）
+const hasPermission = computed(() => authStore.hasTextSharePermission);
 
 // 二维码弹窗状态
 const showQRCodeModal = ref(false);

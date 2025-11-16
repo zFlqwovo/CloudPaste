@@ -34,7 +34,7 @@ export function usePasteManagement() {
   const authStore = useAuthStore();
 
   const isAdmin = computed(() => authStore.isAdmin);
-  const isApiKeyUser = computed(() => authStore.authType === "apikey" && authStore.hasTextPermission);
+  const isApiKeyUser = computed(() => authStore.authType === "apikey" && authStore.hasTextManagePermission);
   const isAuthorized = computed(() => isAdmin.value || isApiKeyUser.value);
 
   /**
@@ -392,4 +392,3 @@ export function usePasteManagement() {
     closeAllModals,
   };
 }
-

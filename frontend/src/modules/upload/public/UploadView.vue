@@ -26,7 +26,7 @@
       </div>
 
       <!-- 最近上传记录 -->
-      <div v-if="recentFiles.length > 0" class="card p-4 sm:p-6">
+      <div v-if="canLoadRecentFiles && recentFiles.length > 0" class="card p-4 sm:p-6">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-medium">{{ t("file.recentUploads") }}</h3>
           <span class="text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("file.showingRecent") }}</span>
@@ -55,7 +55,7 @@ const { showSuccess, showError, showWarning } = useGlobalMessage();
 
 // 使用认证Store
 const authStore = useAuthStore();
-const { isAdmin, hasFilePermission } = storeToRefs(authStore);
+const { isAdmin, hasFilePermission, hasFileManagePermission } = storeToRefs(authStore);
 
 const props = defineProps({
   darkMode: {
@@ -71,6 +71,7 @@ const loadingFiles = ref(false);
 
 // 从Store获取权限状态的计算属性
 const hasPermission = computed(() => hasFilePermission.value);
+const canLoadRecentFiles = computed(() => hasFileManagePermission.value);
 
 // 计算最近3条记录
 const recentFiles = computed(() => {
@@ -90,7 +91,13 @@ const handlePermissionChange = async (hasPermissionValue) => {
 
   if (hasPermissionValue) {
     console.log("用户获得权限，开始加载配置和文件列表");
-    await Promise.all([loadStorageConfigs({ force: true }), loadFiles()]);
+    const tasks = [loadStorageConfigs({ force: true })];
+    if (canLoadRecentFiles.value) {
+      tasks.push(loadFiles());
+    } else {
+      files.value = [];
+    }
+    await Promise.all(tasks);
   } else {
     console.log("用户失去权限，清空数据");
     files.value = [];
@@ -114,7 +121,10 @@ const loadStorageConfigs = async (options = {}) => {
 
 // 加载已上传文件列表
 const loadFiles = async () => {
-  if (!hasPermission.value) return;
+  if (!hasPermission.value || !canLoadRecentFiles.value) {
+    files.value = [];
+    return;
+  }
 
   loadingFiles.value = true;
   try {
@@ -131,7 +141,9 @@ const loadFiles = async () => {
 // 处理上传成功事件
 const handleUploadSuccess = (fileData) => {
   // 刷新文件列表
-  loadFiles();
+  if (canLoadRecentFiles.value) {
+    loadFiles();
+  }
 
   showSuccess(t("file.uploadSuccessful"));
 };

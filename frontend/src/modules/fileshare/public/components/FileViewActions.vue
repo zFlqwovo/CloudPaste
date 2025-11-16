@@ -160,7 +160,8 @@ const authStore = useAuthStore();
 // 从Store获取权限状态的计算属性
 const isAdmin = computed(() => authStore.isAdmin);
 const hasApiKey = computed(() => authStore.authType === "apikey" && !!authStore.apiKey);
-const hasFilePermission = computed(() => authStore.hasFilePermission);
+// 这里的文件权限用于管理（编辑/删除），对应后端 FILE_MANAGE 位
+const hasFilePermission = computed(() => authStore.hasFileManagePermission);
 
 // 删除确认状态
 const showDeleteConfirm = ref(false);

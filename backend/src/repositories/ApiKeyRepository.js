@@ -119,9 +119,9 @@ export class ApiKeyRepository extends BaseRepository {
    */
   async deleteExpired(currentTime = new Date()) {
     const result = await this.execute(
-      `DELETE FROM ${DbTables.API_KEYS} 
+        `DELETE FROM ${DbTables.API_KEYS} 
        WHERE expires_at IS NOT NULL AND expires_at < ?`,
-      [currentTime.toISOString()]
+        [currentTime.toISOString()]
     );
 
     return {
@@ -137,9 +137,9 @@ export class ApiKeyRepository extends BaseRepository {
    */
   async findExpired(currentTime = new Date()) {
     const result = await this.query(
-      `SELECT * FROM ${DbTables.API_KEYS} 
+        `SELECT * FROM ${DbTables.API_KEYS} 
        WHERE expires_at IS NOT NULL AND expires_at < ?`,
-      [currentTime.toISOString()]
+        [currentTime.toISOString()]
     );
 
     return result.results || [];
@@ -155,9 +155,9 @@ export class ApiKeyRepository extends BaseRepository {
     // 获取有效密钥数量（未过期）
     const now = new Date().toISOString();
     const valid = await this.queryFirst(
-      `SELECT COUNT(*) as count FROM ${DbTables.API_KEYS} 
+        `SELECT COUNT(*) as count FROM ${DbTables.API_KEYS} 
        WHERE expires_at IS NULL OR expires_at > ?`,
-      [now]
+        [now]
     );
 
     // 获取所有密钥数据，在应用层统计权限
@@ -183,11 +183,11 @@ export class ApiKeyRepository extends BaseRepository {
     allKeys.forEach((key) => {
       const permissions = key.permissions || 0;
 
-      // 基础权限统计
-      if (PermissionChecker.hasPermission(permissions, Permission.TEXT)) {
+      // 基础权限统计（任一相关位即可视为具备该能力族）
+      if (PermissionChecker.hasAnyPermission(permissions, [Permission.TEXT_SHARE, Permission.TEXT_MANAGE])) {
         permissionStats.text++;
       }
-      if (PermissionChecker.hasPermission(permissions, Permission.FILE_SHARE)) {
+      if (PermissionChecker.hasAnyPermission(permissions, [Permission.FILE_SHARE, Permission.FILE_MANAGE])) {
         permissionStats.file_share++;
       }
 

@@ -36,8 +36,10 @@ export const useAuthStore = defineStore("auth", () => {
   // 使用位标志权限系统
   const apiKeyPermissions = ref(0); // 位标志权限值
   const apiKeyPermissionDetails = ref({
-    text: false,
-    file: false,
+    text_share: false,
+    text_manage: false,
+    file_share: false,
+    file_manage: false,
     mount_view: false,
     mount_upload: false,
     mount_copy: false,
@@ -59,15 +61,26 @@ export const useAuthStore = defineStore("auth", () => {
   // 是否为管理员（从 authType 推导，消除冗余状态）
   const isAdmin = computed(() => authType.value === "admin");
 
-  // 是否有文本权限
-  const hasTextPermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.TEXT);
+  // 文本/文件分享权限（创建 vs 管理）
+  const hasTextSharePermission = computed(() => {
+    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.TEXT_SHARE);
   });
 
-  // 是否有文件权限
-  const hasFilePermission = computed(() => {
+  const hasTextManagePermission = computed(() => {
+    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.TEXT_MANAGE);
+  });
+
+  const hasFileSharePermission = computed(() => {
     return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.FILE_SHARE);
   });
+
+  const hasFileManagePermission = computed(() => {
+    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.FILE_MANAGE);
+  });
+
+  // 兼容旧命名：hasTextPermission / hasFilePermission 代表“具备对应分享能力（通常用于创建）”
+  const hasTextPermission = hasTextSharePermission;
+  const hasFilePermission = hasFileSharePermission;
 
   // 是否有挂载权限（任一挂载权限）
   const hasMountPermission = computed(() => {
@@ -126,8 +139,16 @@ export const useAuthStore = defineStore("auth", () => {
 
     if (permissions && typeof permissions === "object") {
       let bitFlag = 0;
-      if (permissions.text) bitFlag |= Permission.TEXT;
-      if (permissions.file) bitFlag |= Permission.FILE_SHARE;
+      // 兼容新旧字段命名（text/text_share, file/file_share 等）
+      const textShare = permissions.text_share ?? permissions.text ?? false;
+      const textManage = permissions.text_manage ?? false;
+      const fileShare = permissions.file_share ?? permissions.file ?? false;
+      const fileManage = permissions.file_manage ?? false;
+
+      if (textShare) bitFlag |= Permission.TEXT_SHARE;
+      if (textManage) bitFlag |= Permission.TEXT_MANAGE;
+      if (fileShare) bitFlag |= Permission.FILE_SHARE;
+      if (fileManage) bitFlag |= Permission.FILE_MANAGE;
       if (permissions.mount_view) bitFlag |= Permission.MOUNT_VIEW;
       if (permissions.mount_upload) bitFlag |= Permission.MOUNT_UPLOAD;
       if (permissions.mount_copy) bitFlag |= Permission.MOUNT_COPY;
@@ -587,7 +608,11 @@ export const useAuthStore = defineStore("auth", () => {
 
     // 计算属性
     hasTextPermission,
+    hasTextSharePermission,
+    hasTextManagePermission,
     hasFilePermission,
+    hasFileSharePermission,
+    hasFileManagePermission,
     hasMountPermission,
     hasMountViewPermission,
     hasMountUploadPermission,

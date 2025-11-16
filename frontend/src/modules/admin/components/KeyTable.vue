@@ -9,11 +9,13 @@ import { useAdminApiKeyService } from "@/modules/admin/services/apiKeyService.js
 const getPermissionTags = (permissions) => {
   const tags = [];
 
-  if (PermissionChecker.hasPermission(permissions, Permission.TEXT)) {
+  // 文本分享（任一相关位）
+  if (PermissionChecker.hasAnyPermission(permissions, [Permission.TEXT_SHARE, Permission.TEXT_MANAGE])) {
     tags.push({ key: "text", label: "admin.keyManagement.permissions.text", color: "blue" });
   }
 
-  if (PermissionChecker.hasPermission(permissions, Permission.FILE_SHARE)) {
+  // 文件分享（任一相关位）
+  if (PermissionChecker.hasAnyPermission(permissions, [Permission.FILE_SHARE, Permission.FILE_MANAGE])) {
     tags.push({ key: "file_share", label: "admin.keyManagement.permissions.file_share", color: "green" });
   }
 

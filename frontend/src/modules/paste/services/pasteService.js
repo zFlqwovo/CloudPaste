@@ -20,11 +20,18 @@ export function usePasteService() {
   const authStore = useAuthStore();
 
   const isAdmin = () => authStore.isAdmin;
-  const isApiKeyUser = () => authStore.authType === "apikey" && authStore.hasTextPermission;
+  const isApiKeyManager = () => authStore.authType === "apikey" && authStore.hasTextManagePermission;
+  const isApiKeyCreator = () => authStore.authType === "apikey" && authStore.hasTextSharePermission;
 
   const ensureCanManage = () => {
-    if (!isAdmin() && !isApiKeyUser()) {
+    if (!isAdmin() && !isApiKeyManager()) {
       throw new Error("当前账号无权管理文本数据");
+    }
+  };
+
+  const ensureCanCreate = () => {
+    if (!isAdmin() && !isApiKeyCreator()) {
+      throw new Error("当前账号无权创建文本分享");
     }
   };
 
@@ -201,7 +208,7 @@ export function usePasteService() {
    * @returns {Promise<string>} 新创建的 slug
    */
   const createPaste = async (data) => {
-    ensureCanManage();
+    ensureCanCreate();
     const resp = await api.paste.createPaste(data);
     if (!resp) {
       throw new Error("创建文本失败");
@@ -277,4 +284,3 @@ export function usePasteService() {
     getMarkdownSettings,
   };
 }
-

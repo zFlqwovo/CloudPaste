@@ -21,50 +21,52 @@ apiKeyRoutes.get("/api/test/api-key", requireAuth, async (c) => {
   // 如果是管理员，返回管理员信息
   if (isAdmin) {
     return jsonOk(c, {
+      name: "管理员",
+      basic_path: "/",
+      permissions: {
+        text: true,
+        file: true,
+        mount_view: true,
+        mount_upload: true,
+        mount_copy: true,
+        mount_rename: true,
+        mount_delete: true,
+        webdav_read: true,
+        webdav_manage: true,
+      },
+      key_info: {
+        id: apiKeyId,
         name: "管理员",
         basic_path: "/",
-        permissions: {
-          text: true,
-          file: true,
-          mount_view: true,
-          mount_upload: true,
-          mount_copy: true,
-          mount_rename: true,
-          mount_delete: true,
-          webdav_read: true,
-          webdav_manage: true,
-        },
-        key_info: {
-          id: apiKeyId,
-          name: "管理员",
-          basic_path: "/",
-        },
-        is_admin: true,
-      }, "管理员令牌验证成功");
+      },
+      is_admin: true,
+    }, "管理员令牌验证成功");
   }
 
   // API密钥用户，返回具体的权限信息
   const permissions = apiKeyInfo?.permissions || 0;
   return jsonOk(c, {
+    name: apiKeyInfo?.name || "未知",
+    basic_path: apiKeyInfo?.basicPath || "/",
+    permissions: {
+      text_share: PermissionChecker.hasPermission(permissions, Permission.TEXT_SHARE),
+      text_manage: PermissionChecker.hasPermission(permissions, Permission.TEXT_MANAGE),
+      file_share: PermissionChecker.hasPermission(permissions, Permission.FILE_SHARE),
+      file_manage: PermissionChecker.hasPermission(permissions, Permission.FILE_MANAGE),
+      mount_view: PermissionChecker.hasPermission(permissions, Permission.MOUNT_VIEW),
+      mount_upload: PermissionChecker.hasPermission(permissions, Permission.MOUNT_UPLOAD),
+      mount_copy: PermissionChecker.hasPermission(permissions, Permission.MOUNT_COPY),
+      mount_rename: PermissionChecker.hasPermission(permissions, Permission.MOUNT_RENAME),
+      mount_delete: PermissionChecker.hasPermission(permissions, Permission.MOUNT_DELETE),
+      webdav_read: PermissionChecker.hasPermission(permissions, Permission.WEBDAV_READ),
+      webdav_manage: PermissionChecker.hasPermission(permissions, Permission.WEBDAV_MANAGE),
+    },
+    key_info: {
+      id: apiKeyId || apiKeyInfo?.id,
       name: apiKeyInfo?.name || "未知",
       basic_path: apiKeyInfo?.basicPath || "/",
-      permissions: {
-        text: PermissionChecker.hasPermission(permissions, Permission.TEXT),
-        file: PermissionChecker.hasPermission(permissions, Permission.FILE_SHARE),
-        mount_view: PermissionChecker.hasPermission(permissions, Permission.MOUNT_VIEW),
-        mount_upload: PermissionChecker.hasPermission(permissions, Permission.MOUNT_UPLOAD),
-        mount_copy: PermissionChecker.hasPermission(permissions, Permission.MOUNT_COPY),
-        mount_rename: PermissionChecker.hasPermission(permissions, Permission.MOUNT_RENAME),
-        mount_delete: PermissionChecker.hasPermission(permissions, Permission.MOUNT_DELETE),
-        webdav_read: PermissionChecker.hasPermission(permissions, Permission.WEBDAV_READ),
-        webdav_manage: PermissionChecker.hasPermission(permissions, Permission.WEBDAV_MANAGE),
-      },
-      key_info: {
-        id: apiKeyId || apiKeyInfo?.id,
-        name: apiKeyInfo?.name || "未知",
-        basic_path: apiKeyInfo?.basicPath || "/",
-      },
-    }, "API密钥验证成功");
+    },
+  }, "API密钥验证成功");
 });
 
 // 获取所有API密钥列表
