@@ -2,22 +2,22 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { useFileshareService } from "@/modules/fileshare/fileshareService.js";
 
+/** @typedef {import("@/types/fileshare").FileshareItem} FileshareItem */
+/** @typedef {import("@/types/api").PaginationInfo} PaginationInfo */
+
 /**
  * Fileshare 领域 Store
  *
- * - 统一管理文件分享列表及分页状态
- * - 提供按 id / slug 的详情获取与简单缓存
- * - 为 admin/public 视图提供共享的数据来源
- *
- * 不负责：
- * - UI 文案与交互（提示、模态框等）
- * - 具体删除/更新 API 调用（交给上层 service 或 composable）
+ * - 统一管理文件分享列表与分页状态
+ * - 提供基于 id / slug 的简单缓存
+ * - 为 admin/public 视图提供共享数据源
  */
 export const useFileShareStore = defineStore("fileShare", () => {
   const service = useFileshareService();
 
-  // 列表及分页
+  /** @type {import("vue").Ref<FileshareItem[]>} */
   const items = ref([]);
+  /** @type {import("vue").Ref<PaginationInfo>} */
   const pagination = ref({
     total: 0,
     limit: 20,
@@ -26,24 +26,22 @@ export const useFileShareStore = defineStore("fileShare", () => {
 
   const searchTerm = ref("");
 
-  // 状态
   const loading = ref(false);
-  const error = ref(null);
-  const lastLoadedAt = ref(null);
+  const error = ref(/** @type {string | null} */ (null));
+  const lastLoadedAt = ref(/** @type {number | null} */ (null));
 
-  // 简单缓存：按 id / slug
+  /** @type {import("vue").Ref<Map<number | string, FileshareItem>>} */
   const cacheById = ref(new Map());
+  /** @type {import("vue").Ref<Map<string, FileshareItem>>} */
   const cacheBySlug = ref(new Map());
 
   const isSearchMode = computed(() => !!searchTerm.value && searchTerm.value.trim().length > 0);
 
   /**
-   * 从服务端加载文件列表
+   * 从服务端加载文件分享列表
    *
-   * @param {Object} options
-   * @param {number} [options.limit]
-   * @param {number} [options.offset]
-   * @param {string} [options.search]
+   * @param {{limit?:number,offset?:number,search?:string}} [options]
+   * @returns {Promise<{files: FileshareItem[], pagination: PaginationInfo}>}
    */
   const loadList = async ({ limit, offset, search } = {}) => {
     const finalLimit = typeof limit === "number" ? limit : pagination.value.limit;
@@ -65,11 +63,11 @@ export const useFileShareStore = defineStore("fileShare", () => {
       const mergedPagination =
         serverPagination && typeof serverPagination === "object"
           ? serverPagination
-          : {
+          : /** @type {PaginationInfo} */ ({
               total: files.length,
               limit: finalLimit,
               offset: finalOffset,
-            };
+            });
 
       pagination.value = mergedPagination;
       lastLoadedAt.value = Date.now();
@@ -88,7 +86,7 @@ export const useFileShareStore = defineStore("fileShare", () => {
       return { files, pagination: mergedPagination };
     } catch (e) {
       console.error("加载文件分享列表失败:", e);
-      error.value = e.message || "加载文件列表失败";
+      error.value = /** @type {any} */ (e)?.message || "加载文件分享列表失败";
       items.value = [];
       throw e;
     } finally {
@@ -101,7 +99,10 @@ export const useFileShareStore = defineStore("fileShare", () => {
   };
 
   /**
-   * 按 ID 获取文件详情（带简单缓存）
+   * 根据 ID 获取文件（带缓存）
+   * @param {number|string} id
+   * @param {{useCache?:boolean}} [options]
+   * @returns {Promise<FileshareItem | null>}
    */
   const fetchById = async (id, { useCache = true } = {}) => {
     if (!id) {
@@ -109,7 +110,7 @@ export const useFileShareStore = defineStore("fileShare", () => {
     }
 
     if (useCache && cacheById.value.has(id)) {
-      return cacheById.value.get(id);
+      return cacheById.value.get(id) || null;
     }
 
     const file = await service.fetchById(id);
@@ -121,11 +122,14 @@ export const useFileShareStore = defineStore("fileShare", () => {
         cacheBySlug.value.set(file.slug, file);
       }
     }
-    return file;
+    return file || null;
   };
 
   /**
-   * 按 slug 获取文件详情（带简单缓存）
+   * 根据 slug 获取文件（带缓存）
+   * @param {string} slug
+   * @param {{useCache?:boolean}} [options]
+   * @returns {Promise<FileshareItem | null>}
    */
   const fetchBySlug = async (slug, { useCache = true } = {}) => {
     if (!slug) {
@@ -133,7 +137,7 @@ export const useFileShareStore = defineStore("fileShare", () => {
     }
 
     if (useCache && cacheBySlug.value.has(slug)) {
-      return cacheBySlug.value.get(slug);
+      return cacheBySlug.value.get(slug) || null;
     }
 
     const file = await service.fetchBySlug(slug);
@@ -145,11 +149,12 @@ export const useFileShareStore = defineStore("fileShare", () => {
         cacheBySlug.value.set(file.slug, file);
       }
     }
-    return file;
+    return file || null;
   };
 
   /**
-   * 使用部分更新合并缓存和当前列表中的文件
+   * 使用部分更新合并到当前列表和缓存中
+   * @param {Partial<FileshareItem>} partial
    */
   const updateCachedFile = (partial) => {
     if (!partial) return;
@@ -168,12 +173,13 @@ export const useFileShareStore = defineStore("fileShare", () => {
     }
 
     if (id != null) {
-      items.value = items.value.map((file) => (file && file.id === id ? merged : file));
+      items.value = items.value.map((file) => (file && file.id === id ? /** @type {FileshareItem} */ (merged) : file));
     }
   };
 
   /**
-   * 从列表和缓存中移除指定 ID 的文件
+   * 从列表及缓存中移除指定 ID 的文件
+   * @param {number|string} id
    */
   const removeFromStore = (id) => {
     if (!id) return;
@@ -194,7 +200,7 @@ export const useFileShareStore = defineStore("fileShare", () => {
   };
 
   /**
-   * 重置全部状态（退出管理页或切换用户时使用）
+   * 重置全部状态
    */
   const resetState = () => {
     items.value = [];
@@ -221,7 +227,7 @@ export const useFileShareStore = defineStore("fileShare", () => {
     lastLoadedAt,
     isSearchMode,
 
-    // 派生
+    // 衍生
     hasItems: computed(() => items.value.length > 0),
 
     // 行为

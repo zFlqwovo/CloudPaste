@@ -12,56 +12,59 @@ import {
   verifyFilePassword as apiVerifyFilePassword,
 } from "@/api/services/fileService.js";
 
+/** @typedef {import("@/types/fileshare").FileshareItem} FileshareItem */
+/** @typedef {import("@/types/api").PaginationInfo} PaginationInfo */
+
 /**
- * Fileshare 领域服务
+ * Fileshare 服务
  *
- * - 对 fileGateway 提供的低层 API 进行领域级封装
- * - 统一列表 / 搜索 / 单条获取 / 永久链接 / Office 预览等逻辑
- *
- * 不负责：
- * - UI 文案和 DOM 操作（复制剪贴板、window.open 等）
+ * - 基于 fileGateway / fileService 提供的 API 做统一封装
+ * - 统一列表、详情、URL 构建、删除、密码验证等能力
  */
 export function useFileshareService() {
   /**
-   * 获取分享文件列表（支持搜索）
+   * 获取文件分享列表
    *
-   * @param {Object} options
-   * @param {number} options.limit
-   * @param {number} options.offset
-   * @param {string} [options.search]
+   * @param {{limit?:number,offset?:number,search?:string}} [options]
+   * @returns {Promise<{files: FileshareItem[], pagination: PaginationInfo}>}
    */
   const fetchList = async ({ limit, offset, search } = {}) => {
     const listOptions = {};
     if (search && search.trim().length > 0) {
       listOptions.search = search.trim();
     }
-    // listSharedFiles 已经在 fileGateway 中做了 success 检查并抛错，
-    // 这里统一封装为 { files, pagination } 结构
-    return await listSharedFiles(limit, offset, listOptions);
+    const result = await listSharedFiles(limit, offset, listOptions);
+    return /** @type {{files: FileshareItem[], pagination: PaginationInfo}} */ (result);
   };
 
   /**
-   * 根据 id 获取单个分享文件详情
+   * 根据 id 获取文件分享详情
+   * @param {number|string} id
+   * @returns {Promise<FileshareItem>}
    */
   const fetchById = async (id) => {
     if (!id) {
       throw new Error("缺少文件 ID");
     }
-    return await getSharedFileById(id);
+    return /** @type {FileshareItem} */ (await getSharedFileById(id));
   };
 
   /**
-   * 根据 slug 获取公开分享文件详情
+   * 根据 slug 获取文件分享详情
+   * @param {string} slug
+   * @returns {Promise<FileshareItem>}
    */
   const fetchBySlug = async (slug) => {
     if (!slug) {
       throw new Error("缺少文件 slug");
     }
-    return await getSharedFileBySlug(slug);
+    return /** @type {FileshareItem} */ (await getSharedFileBySlug(slug));
   };
 
   /**
-   * 获取永久下载链接
+   * 获取永久下载 URL
+   * @param {FileshareItem} file
+   * @returns {string}
    */
   const getPermanentDownloadUrl = (file) => {
     if (!file || !file.slug) return "";
@@ -69,7 +72,9 @@ export function useFileshareService() {
   };
 
   /**
-   * 获取永久预览链接
+   * 获取永久预览 URL
+   * @param {FileshareItem} file
+   * @returns {string}
    */
   const getPermanentPreviewUrl = (file) => {
     if (!file || !file.slug) return "";
@@ -77,21 +82,25 @@ export function useFileshareService() {
   };
 
   /**
-   * 获取 Office 预览 URL（使用默认 provider）
+   * 获取 Office 预览 URL
+   * @param {FileshareItem} file
+   * @param {{provider?: "microsoft"|"google", returnAll?: boolean}} [options]
+   * @returns {Promise<any>}
    */
   const getOfficePreviewUrl = async (file, options = {}) => {
     if (!file?.slug) return null;
-    return await gatewayGetOfficePreviewUrl(file, {
+    return gatewayGetOfficePreviewUrl(file, {
       provider: options.provider || "microsoft",
       returnAll: options.returnAll || false,
     });
   };
 
   /**
-   * 构造前端使用的分享页 URL（/file/:slug）
+   * 构建前端访问的分享页 URL（/file/:slug）
    *
-   * @param {Object} file - 包含 slug 的文件对象
-   * @param {string} [origin] - 可选的 origin（例如 window.location.origin），默认使用当前环境
+   * @param {FileshareItem} file
+   * @param {string} [origin]
+   * @returns {string}
    */
   const buildShareUrl = (file, origin) => {
     if (!file || !file.slug) return "";
@@ -107,7 +116,10 @@ export function useFileshareService() {
   };
 
   /**
-   * 更新文件元数据（用于修改 slug、备注、过期时间等）
+   * 更新文件元数据（备注、最大访问次数、过期时间等）
+   * @param {number|string} fileId
+   * @param {Partial<FileshareItem>} metadata
+   * @returns {Promise<true|FileshareItem>}
    */
   const updateFileMetadata = async (fileId, metadata) => {
     if (!fileId) {
@@ -124,7 +136,10 @@ export function useFileshareService() {
   };
 
   /**
-   * 批量删除文件（供 admin/public 视图复用）
+   * 批量删除文件（admin/public 共用）
+   * @param {Array<number|string>} ids
+   * @param {string} deleteMode
+   * @returns {Promise<any>}
    */
   const deleteFiles = async (ids, deleteMode) => {
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -143,7 +158,10 @@ export function useFileshareService() {
   };
 
   /**
-   * 验证受保护分享文件的访问密码
+   * 验证受密码保护的文件分享
+   * @param {string} slug
+   * @param {string} password
+   * @returns {Promise<boolean|any>}
    */
   const verifyFilePassword = async (slug, password) => {
     if (!slug || !password) {
@@ -175,3 +193,4 @@ export function useFileshareService() {
     verifyFilePassword,
   };
 }
+

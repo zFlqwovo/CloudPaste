@@ -2,14 +2,6 @@
   <div class="paste-view-editor-wrapper">
     <!-- 主要编辑器内容 -->
     <div class="paste-view-editor">
-      <!-- 成功通知提示 -->
-      <div v-if="notification" class="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg bg-green-500 text-white shadow-lg notification-toast flex items-center">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-        {{ notification }}
-      </div>
-
       <!-- 添加隐藏的文件输入控件用于导入Markdown文件 -->
       <input type="file" ref="markdownImporter" accept=".md,.markdown,.mdown,.mkd" style="display: none" @change="importMarkdownFile" />
 
@@ -188,8 +180,9 @@
 
 <script setup>
 import { ref, watch, onBeforeUnmount } from "vue";
-  import { getInputClasses } from "./PasteViewUtils";
-  import VditorUnified from "@/components/common/VditorUnified.vue";
+import { useGlobalMessage } from "@/composables/core/useGlobalMessage.js";
+import { getInputClasses } from "./PasteViewUtils";
+import VditorUnified from "@/components/common/VditorUnified.vue";
 import PasteCopyFormatMenu from "./PasteCopyFormatMenu.vue";
 
 // Props 定义
@@ -207,10 +200,12 @@ const props = defineProps({
 // Emits 定义
 const emit = defineEmits(["save", "cancel", "update:error", "update:isPlainTextMode"]);
 
+// 全局消息
+const { showSuccess, showError, showWarning, showInfo } = useGlobalMessage();
+
 // 响应式数据
 const editorRef = ref(null);
 const editorContent = ref(props.content);
-const notification = ref("");
 const showPassword = ref(false);
 const markdownImporter = ref(null);
 
@@ -255,14 +250,6 @@ const editForm = ref({
   password: "",
   clearPassword: false, // 新增是否清除密码的标志
 });
-
-// 工具函数
-const showNotification = (message, duration = 2000) => {
-  notification.value = message;
-  setTimeout(() => {
-    notification.value = "";
-  }, duration);
-};
 
 // 切换编辑器模式
 const toggleEditorMode = () => {
@@ -328,7 +315,7 @@ const clearEditorContent = () => {
         editorRef.value.setValue("");
       }
     }
-    showNotification("内容已清空");
+    handleStatusMessage({ type: "success", message: "内容已清空" });
   }
 };
 
@@ -355,11 +342,35 @@ const closeCopyFormatMenu = () => {
 };
 
 // 处理状态消息
-const handleStatusMessage = ({ message, type }) => {
+const handleStatusMessage = (payload) => {
+  /** @type {string | undefined} */
+  let message;
+  /** @type {string} */
+  let type = "info";
+
+  if (typeof payload === "string") {
+    message = payload;
+  } else if (payload && typeof payload === "object") {
+    message = payload.message;
+    type = payload.type || "info";
+  }
+
+  if (!message) {
+    return;
+  }
+
   if (type === "error") {
     emit("update:error", message);
+    showError(message);
+    return;
+  }
+
+  if (type === "success") {
+    showSuccess(message);
+  } else if (type === "warning") {
+    showWarning(message);
   } else {
-    showNotification(message);
+    showInfo(message);
   }
 };
 
@@ -486,7 +497,7 @@ const importMarkdownFile = (event) => {
         }
       }
 
-      showNotification("文件导入成功");
+      handleStatusMessage({ type: "success", message: "文件导入成功" });
 
       // 清空文件输入，允许重复导入同一文件
       if (markdownImporter.value) {
@@ -515,7 +526,6 @@ watch(
 
 // 清理
 onBeforeUnmount(() => {
-  notification.value = "";
   copyFormatMenuVisible.value = false;
 });
 </script>
@@ -530,18 +540,4 @@ onBeforeUnmount(() => {
   margin-bottom: 1rem;
 }
 
-.notification-toast {
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
 </style>

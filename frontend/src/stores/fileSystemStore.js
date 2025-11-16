@@ -1,7 +1,6 @@
 /**
  * 文件系统 Pinia Store
- * 负责管理 FS 领域的目录数据与加载状态
- * 不再直接耦合 vue-router 或 DOM 副作用
+ * 负责挂载浏览器中 FS 目录浏览的核心状态
  */
 
 import { defineStore } from "pinia";
@@ -9,30 +8,35 @@ import { ref, computed } from "vue";
 import { useAuthStore } from "./authStore.js";
 import { useFsService } from "@/modules/fs";
 
+/** @typedef {import("@/types/fs").FsDirectoryResponse} FsDirectoryResponse */
+/** @typedef {import("@/types/fs").FsDirectoryItem} FsDirectoryItem */
+
 export const useFileSystemStore = defineStore("fileSystem", () => {
   const fsService = useFsService();
   const authStore = useAuthStore();
 
-  // ===== 状态管理 =====
+  // ===== 状态 =====
   const currentPath = ref("/");
-  const directoryData = ref(null);
+  /** @type {import("vue").Ref<FsDirectoryResponse | null>} */
+  const directoryData = ref(/** @type {FsDirectoryResponse | null} */ (null));
   const loading = ref(false);
-  const error = ref(null);
+  const error = ref(/** @type {string | null} */ (null));
 
-  // 请求去重状态
-  const currentLoadingPath = ref(null);
+  // 当前正在加载的路径（避免重复请求）
+  const currentLoadingPath = ref(/** @type {string | null} */ (null));
 
-  // ===== 计算属性 =====
+  // ===== 派生状态 =====
 
   /**
-   * 检查当前路径是否有权限访问
+   * 检查当前路径是否有访问权限
    */
   const hasPermissionForCurrentPath = computed(() => authStore.hasPathPermission(currentPath.value));
 
   /**
-   * 目录项目列表
+   * 目录条目列表
+   * @type {import("vue").ComputedRef<FsDirectoryItem[]>}
    */
-  const directoryItems = computed(() => directoryData.value?.items || []);
+  const directoryItems = computed(() => (directoryData.value?.items || []));
 
   /**
    * 是否为虚拟目录
@@ -44,12 +48,12 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
   /**
    * 加载目录内容
    * @param {string} path - 目录路径
-   * @param {boolean} force - 是否强制刷新
+   * @param {boolean} [force=false] - 是否强制刷新
    */
   const loadDirectory = async (path, force = false) => {
     const normalizedPath = path || "/";
 
-    // 防止重复请求
+    // 避免重复请求
     if (!force && currentLoadingPath.value === normalizedPath) {
       console.log(`目录 ${normalizedPath} 正在加载中，跳过重复请求`);
       return;
@@ -57,7 +61,7 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
 
     // 权限检查
     if (!authStore.hasPathPermission(normalizedPath)) {
-      error.value = `没有权限访问路径: ${normalizedPath}`;
+      error.value = `无权访问路径: ${normalizedPath}`;
       return;
     }
 
@@ -66,13 +70,12 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
       currentLoadingPath.value = normalizedPath;
       error.value = null;
 
-      // 调用FS service获取目录内容，传递refresh选项
       const data = await fsService.getDirectoryList(normalizedPath, { refresh: force });
       directoryData.value = data;
       currentPath.value = normalizedPath;
     } catch (err) {
       console.error("加载目录失败:", err);
-      error.value = err.message || "加载目录失败";
+      error.value = /** @type {any} */ (err)?.message || "加载目录失败";
       directoryData.value = null;
     } finally {
       loading.value = false;
@@ -90,7 +93,7 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
   };
 
   /**
-   * 重置状态
+   * 重置状态（退出登录 / 切换用户时使用）
    */
   const resetState = () => {
     currentPath.value = "/";
@@ -107,7 +110,7 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
     loading,
     error,
 
-    // 计算属性
+    // 派生状态
     hasPermissionForCurrentPath,
     directoryItems,
     isVirtualDirectory,
@@ -118,3 +121,4 @@ export const useFileSystemStore = defineStore("fileSystem", () => {
     resetState,
   };
 });
+
