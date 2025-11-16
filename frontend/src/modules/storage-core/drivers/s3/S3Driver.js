@@ -120,7 +120,7 @@ export class S3Driver {
    * @param {object} uppy Uppy 实例
    * @param {object} options { payload }
    */
-  applyShareUploader(uppy, { payload } = {}) {
+  applyShareUploader(uppy, { payload, onShareRecord } = {}) {
     if (!uppy) throw new Error("applyShareUploader 需要提供 Uppy 实例");
 
     const basePayload = this.#withStorageConfig(payload || {});
@@ -167,6 +167,9 @@ export class S3Driver {
             filename: data.filename || meta.filename || file.name,
             path: merged.path,
             slug: merged.slug,
+            password: basePayload.password || meta.password || null,
+            expires_in: basePayload.expires_in,
+            max_views: basePayload.max_views,
           });
         } catch {}
 
@@ -200,8 +203,21 @@ export class S3Driver {
           path: meta.path,
         });
         // 暴露 fileId 以便上层需要时可读取
-        if (commitRes?.data?.id) {
-          try { uppy.setFileMeta(file.id, { fileId: commitRes.data.id }); } catch {}
+        if (commitRes?.data) {
+          const shareRecord = commitRes.data;
+          console.debug("[ShareUploader] commit result", shareRecord);
+          try {
+            uppy.setFileMeta(file.id, {
+              fileId: shareRecord.id,
+              shareRecord,
+            });
+          } catch {}
+          try {
+            uppy.emit("share-record", { file, shareRecord });
+          } catch {}
+          try {
+            onShareRecord?.({ file, shareRecord });
+          } catch {}
         }
       } catch (e) {
         // 发出错误事件以便 UI 感知
@@ -216,7 +232,7 @@ export class S3Driver {
   /**
    * URL 分享：使用 urlUpload presign + AwsS3 单请求 + 在 'upload-success' 提交 commitUrlUpload
    */
-  applyUrlUploader(uppy, { payload } = {}) {
+  applyUrlUploader(uppy, { payload, onShareRecord } = {}) {
     if (!uppy) throw new Error("applyUrlUploader 需要提供 Uppy 实例");
     const basePayload = this.#withStorageConfig(payload || {});
     const pluginId = "AwsS3UrlShare";
@@ -277,7 +293,7 @@ export class S3Driver {
     const onSuccess = async (file) => {
       const meta = file?.meta || {};
       try {
-        await api.urlUpload.commitUrlUpload({
+        const commitRes = await api.urlUpload.commitUrlUpload({
           key: meta.key,
           storage_config_id: meta.storage_config_id,
           filename: meta.filename || file.name,
@@ -290,6 +306,22 @@ export class S3Driver {
           expires_in: meta.expires_in ?? basePayload.expires_in,
           max_views: meta.max_views ?? basePayload.max_views,
         });
+        if (commitRes?.data) {
+          const shareRecord = commitRes.data;
+          console.debug("[UrlShareUploader] commit result", shareRecord);
+          try {
+            uppy.setFileMeta(file.id, {
+              fileId: shareRecord.id,
+              shareRecord,
+            });
+          } catch {}
+          try {
+            uppy.emit("share-record", { file, shareRecord });
+          } catch {}
+          try {
+            onShareRecord?.({ file, shareRecord });
+          } catch {}
+        }
       } catch (e) {
         try { uppy.emit('upload-error', file, e); } catch {}
       }

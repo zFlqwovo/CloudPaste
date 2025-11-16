@@ -171,6 +171,11 @@ export function usePasteManagement() {
    * @param {Partial<Paste>} updated
    */
   const submitEdit = async (updated) => {
+    if (updated && updated.error) {
+      base.showError(updated.error);
+      return;
+    }
+
     if (!editingPaste.value || !editingPaste.value.slug) {
       base.showError("提交失败：缺少文本标识");
       return;
@@ -184,6 +189,16 @@ export function usePasteManagement() {
           max_views: updated.max_views ?? editingPaste.value.max_views,
           expires_at: updated.expires_at ?? editingPaste.value.expires_at,
         };
+
+        if (Object.prototype.hasOwnProperty.call(updated, "newSlug")) {
+          payload.newSlug = updated.newSlug;
+        }
+
+        if (updated.password) {
+          payload.password = updated.password;
+        } else if (updated.clearPassword) {
+          payload.clearPassword = true;
+        }
 
         await pasteService.updatePaste(editingPaste.value.slug, payload);
         base.showSuccess("更新成功");
@@ -200,22 +215,33 @@ export function usePasteManagement() {
    * 复制访问链接
    * @param {Paste} paste
    */
-  const copyLink = async (paste) => {
-    if (!paste || !paste.slug) {
+  const resolvePasteContext = (payload) => {
+    if (!payload) return { slug: "", id: null };
+    if (typeof payload === "string") {
+      const found = pastes.value.find((item) => item.slug === payload);
+      return { slug: payload, id: found?.id ?? null };
+    }
+    return { slug: payload.slug || "", id: payload.id ?? null };
+  };
+
+  const copyLink = async (payload) => {
+    const { slug, id } = resolvePasteContext(payload);
+    if (!slug) {
       base.showError("复制失败：缺少文本标识");
       return;
     }
 
     const baseUrl = window.location.origin;
-    const link = `${baseUrl}/paste/${paste.slug}`;
+    const link = `${baseUrl}/paste/${slug}`;
 
     try {
       const ok = await copyToClipboard(link);
       if (ok) {
-        copiedTexts[paste.slug] = true;
+        const key = id ?? slug;
+        copiedTexts[key] = true;
         base.showSuccess("访问链接已复制");
         setTimeout(() => {
-          copiedTexts[paste.slug] = false;
+          copiedTexts[key] = false;
         }, 2000);
       } else {
         base.showError("复制访问链接失败");

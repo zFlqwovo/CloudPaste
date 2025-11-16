@@ -66,7 +66,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, defineProps, onUnmounted } from "vue";
+import { ref, computed, onMounted, defineProps, onUnmounted, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useAuthStore } from "@/stores/authStore.js";
 import { useFileshareService } from "@/modules/fileshare/fileshareService.js";
@@ -94,6 +95,9 @@ const props = defineProps({
     default: false,
   },
 });
+
+const router = useRouter();
+const route = useRoute();
 
 // 状态变量
 const slug = ref(props.slug);
@@ -266,11 +270,28 @@ const saveFileChanges = async (updatedFile) => {
     }
 
     // 使用 fileshareService 统一更新文件元数据
-    // 约定：成功时正常返回（true 或领域数据），失败时抛出 Error
-    await fileshareService.updateFileMetadata(updatedFile.id, updatedFile);
+    const result = await fileshareService.updateFileMetadata(updatedFile.id, updatedFile);
+    const updatedSlug = result && typeof result === "object" && result.slug ? result.slug : fileInfo.value.slug;
+    const slugChanged = updatedSlug && updatedSlug !== fileInfo.value.slug;
+
+    if (slugChanged) {
+      slug.value = updatedSlug;
+    }
 
     // 更新成功，重新加载文件信息并关闭弹窗（强制刷新，避免使用旧缓存）
     await loadFileInfo(true);
+    if (slugChanged) {
+      try {
+        await router.replace({
+          name: "FileView",
+          params: { slug: updatedSlug },
+          query: route.query,
+          hash: route.hash,
+        });
+      } catch (replaceError) {
+        console.warn("跳转新链接失败", replaceError);
+      }
+    }
     closeEditModal();
     showSuccess(t("fileView.actions.updateSuccess"));
   } catch (err) {
@@ -321,4 +342,14 @@ onUnmounted(() => {
     countdownTimer = null;
   }
 });
+
+watch(
+  () => props.slug,
+  (newSlug) => {
+    if (newSlug && newSlug !== slug.value) {
+      slug.value = newSlug;
+      loadFileInfo(true);
+    }
+  }
+);
 </script>

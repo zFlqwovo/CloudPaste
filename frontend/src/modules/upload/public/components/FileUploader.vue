@@ -486,8 +486,10 @@
         @upload-success="$emit('upload-success', $event)"
         @upload-error="$emit('upload-error', $event)"
         @refresh-files="$emit('refresh-files')"
+        @share-results="$emit('share-results', $event)"
       />
     </div>
+
   </div>
 </template>
 
@@ -501,6 +503,7 @@ import { useStorageConfigsStore } from "@/stores/storageConfigsStore.js";
 import { useShareSettingsForm } from "@/composables/upload/useShareSettingsForm.js";
 import { useUploadQueue } from "@/composables/upload/useUploadQueue.js";
 import { useShareUploadController, useShareUploadDomain, useUploadService } from "@/modules/upload";
+import { useFileshareService } from "@/modules/fileshare";
 
 const props = defineProps({
   darkMode: { type: Boolean, default: false },
@@ -509,10 +512,11 @@ const props = defineProps({
   storageConfigs: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(["upload-success", "upload-error", "refresh-files"]);
+const emit = defineEmits(["upload-success", "upload-error", "refresh-files", "share-results"]);
 const { t } = useI18n();
 const deleteSettingsStore = useDeleteSettingsStore();
 const storageConfigsStore = useStorageConfigsStore();
+const fileshareService = useFileshareService();
 const {
   fileInput,
   selectedFiles,
@@ -556,6 +560,8 @@ const totalProgress = ref(0);
 const message = ref(null);
 const lastLoaded = ref(0);
 const lastTime = ref(0);
+const shareRecordMap = new Map();
+const pendingShareItems = ref([]);
 
 const uppyIdByIndex = new Map();
 const pendingErrorDescriptors = [];
@@ -565,6 +571,10 @@ const findFileIndexById = (fileId) => {
     if (id === fileId) return index;
   }
   return -1;
+};
+
+const emitShareResults = (results) => {
+  emit("share-results", Array.isArray(results) ? results : []);
 };
 
 watch(
@@ -619,6 +629,94 @@ const setErrorMessage = (text, type = "error") => {
     emit("upload-error", new Error(text));
   }
 };
+
+const getCurrentOrigin = () => (typeof window !== "undefined" && window.location ? window.location.origin : "");
+
+const buildShareResultEntry = (item) => {
+  const meta = item?.meta || {};
+  const cachedRecord = shareRecordMap.get(item?.id);
+  if (!meta.shareRecord && cachedRecord) {
+    console.debug("[FileUploader] using cached shareRecord", item?.id, cachedRecord);
+  }
+  const record = meta.shareRecord || cachedRecord;
+  if (!record) return null;
+  const slug = record.slug || meta.slug || item?.slug || null;
+  if (!slug && !record.url) return null;
+
+  const origin = getCurrentOrigin();
+  let shareUrl = "";
+  if (slug) {
+    shareUrl = fileshareService.buildShareUrl({ slug }, origin);
+  } else if (record.url) {
+    shareUrl = record.url.startsWith("http") || !origin ? record.url : `${origin.replace(/\/$/,"")}${record.url}`;
+  }
+  const previewUrl = record.previewUrl || record.proxy_preview_url || record.proxyPreviewUrl || shareUrl;
+  const downloadUrl =
+    record.proxy_download_url ||
+    record.proxyDownloadUrl ||
+    record.downloadUrl ||
+    (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
+
+  return {
+    id: record.id || meta.fileId || item?.id || slug,
+    filename: record.filename || meta.filename || item?.name || slug || "file",
+    slug,
+    shareUrl,
+    previewUrl,
+    downloadUrl,
+    password: meta.password || null,
+    expiresAt: record.expires_at || record.expiresAt || null,
+  };
+};
+
+const extractShareResults = (uploadResults = []) => {
+  console.debug("[FileUploader] upload successful items", uploadResults);
+  const normalized = uploadResults.map((item) => {
+    const entry = buildShareResultEntry(item);
+    if (!entry) {
+      console.debug("[FileUploader] missing shareRecord for item", item);
+    }
+    return entry;
+  });
+  return normalized.filter((entry) => entry && entry.shareUrl);
+};
+
+const flushPendingShareResults = () => {
+  if (!pendingShareItems.value.length) return;
+  const ready = [];
+  const waiting = [];
+
+  pendingShareItems.value.forEach((item) => {
+    const entry = buildShareResultEntry(item);
+    if (entry) {
+      ready.push(entry);
+      if (item?.id) {
+        shareRecordMap.delete(item.id);
+      }
+    } else {
+      waiting.push(item);
+    }
+  });
+
+  if (!ready.length) {
+    console.debug("[FileUploader] pending share records not ready", waiting.map((item) => item.id));
+    pendingShareItems.value = waiting;
+    return;
+  }
+
+  emitShareResults(ready);
+  pendingShareItems.value = waiting;
+  if (!waiting.length) {
+    shareRecordMap.clear();
+  }
+};
+
+const resetShareCaches = () => {
+  shareRecordMap.clear();
+  pendingShareItems.value = [];
+};
+
+
 
 const handleFilesAddition = (fileList) => {
   const files = Array.from(fileList || []);
@@ -781,6 +879,8 @@ const submitUpload = async () => {
   if (!ensurePreconditions()) return;
 
   disposeShareSession();
+  emitShareResults([]);
+  resetShareCaches();
 
   let ids = [];
   const basePayload = buildPayloadForFile(formData);
@@ -810,11 +910,22 @@ const submitUpload = async () => {
         onComplete: (result) => {
           const failedDescriptors = (result?.failed || []).map((item) => buildErrorDescriptor(item?.error || new Error(t("file.messages.uploadFailed"))));
           const uploadResults = result?.successful || [];
+          pendingShareItems.value = uploadResults;
+          const normalizedShareResults = extractShareResults(uploadResults);
           const summary = summarizeUploadResults({
             errors: failedDescriptors,
             uploadResults,
             totalFiles: selectedFiles.value.length,
           });
+
+          if (normalizedShareResults.length) {
+            emitShareResults(normalizedShareResults);
+            resetShareCaches();
+          } else if (pendingShareItems.value.length) {
+            console.debug("[FileUploader] waiting for share-record events", pendingShareItems.value.map((item) => item.id));
+          }
+
+          flushPendingShareResults();
 
           isUploading.value = false;
           uploadSpeed.value = "";
@@ -837,6 +948,13 @@ const submitUpload = async () => {
 
           removeSuccessfulItems();
           disposeShareSession();
+        },
+        onShareRecord: ({ file, shareRecord }) => {
+          console.debug("[FileUploader] share-record event", file?.id, shareRecord);
+          if (file?.id && shareRecord) {
+            shareRecordMap.set(file.id, shareRecord);
+          }
+          flushPendingShareResults();
         },
       },
     }));
@@ -885,8 +1003,22 @@ const retryUpload = async (index) => {
           updateFileItem(index, { status: FILE_STATUS.ERROR, message: descriptor.message });
         },
         onComplete: (result) => {
-          isUploading.value = false;
+          const uploadResults = result?.successful || [];
+          pendingShareItems.value = uploadResults;
           const failedDescriptors = (result?.failed || []).map((item) => buildErrorDescriptor(item?.error || new Error(t("file.messages.uploadFailed"))));
+          const normalizedShareResults = extractShareResults(uploadResults);
+
+          if (normalizedShareResults.length) {
+            emitShareResults(normalizedShareResults);
+            resetShareCaches();
+          } else if (pendingShareItems.value.length) {
+            console.debug("[FileUploader] waiting for share-record events", pendingShareItems.value.map((item) => item.id));
+          }
+
+          flushPendingShareResults();
+
+          isUploading.value = false;
+
           if (failedDescriptors.length === 0) {
             message.value = { type: "success", content: t("file.retrySuccessful") };
             emit("refresh-files");
@@ -895,6 +1027,13 @@ const retryUpload = async (index) => {
             setErrorMessage(failedDescriptors[0].message || t("file.messages.uploadFailed"));
           }
           session?.destroy?.();
+        },
+        onShareRecord: ({ file, shareRecord }) => {
+          console.debug("[FileUploader] share-record event (retry)", file?.id, shareRecord);
+          if (file?.id && shareRecord) {
+            shareRecordMap.set(file.id, shareRecord);
+          }
+          flushPendingShareResults();
         },
       },
     });
@@ -1013,4 +1152,5 @@ const cancelSingleUpload = (index) => {
 .animate-progress-stripes {
   animation: progressStripes 1s linear infinite;
 }
+
 </style>

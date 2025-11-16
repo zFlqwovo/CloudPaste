@@ -33,22 +33,16 @@
                 </div>
                 <!-- 文件名 -->
                 <div class="font-medium" :class="darkMode ? 'text-white' : 'text-gray-900'" :title="file.filename">{{ truncateFilename(file.filename) }}</div>
-                <span v-if="file.has_password" class="ml-2" :title="'密码保护'">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-4 w-4"
-                    :class="darkMode ? 'text-yellow-400' : 'text-yellow-600'"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
+                <span
+                  v-if="file.has_password"
+                  :class="['ml-2', passwordBadgeBaseClass]"
+                  title="密码保护"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-3.5 w-3.5" :class="passwordIconClass">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4" />
+                    <rect stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x="6" y="11" width="12" height="9" rx="2" />
                   </svg>
+                  <span class="leading-none">加密</span>
                 </span>
               </div>
               <div class="text-xs mt-1 truncate" :class="darkMode ? 'text-gray-400' : 'text-gray-500'" :title="file.slug ? `/${file.slug}` : '无短链接'">
@@ -272,15 +266,7 @@ const fileColumns = computed(() => [
             },
             truncateFilename(file.filename)
           ),
-          file.has_password &&
-            h(
-              "span",
-              {
-                class: `ml-2 h-4 w-4 ${props.darkMode ? "text-yellow-400" : "text-yellow-600"}`,
-                title: "密码保护",
-              },
-              "🔒"
-            ),
+          file.has_password && renderPasswordBadge("ml-2"),
         ]),
         h(
           "span",
@@ -715,6 +701,61 @@ const getMimeTypeClass = (file) => {
       return props.darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700";
   }
 };
+
+const passwordBadgeBaseClass = computed(
+  () =>
+    `inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+      props.darkMode ? "bg-amber-500/15 text-amber-100 border-amber-400/30" : "bg-amber-50 text-amber-700 border-amber-200"
+    }`
+);
+
+const passwordIconClass = computed(() => (props.darkMode ? "text-amber-200" : "text-amber-600"));
+
+const renderPasswordBadge = (extraClass = "") =>
+  h(
+    "span",
+    {
+      class: `${passwordBadgeBaseClass.value} ${extraClass}`,
+      title: "密码保护",
+    },
+    [
+      h(
+        "svg",
+        {
+          xmlns: "http://www.w3.org/2000/svg",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          class: `h-3.5 w-3.5 ${passwordIconClass.value}`,
+        },
+        [
+          h("path", {
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            "stroke-width": "2",
+            d: "M7 11V7a5 5 0 0110 0v4",
+          }),
+          h("rect", {
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            "stroke-width": "2",
+            x: "6",
+            y: "11",
+            width: "12",
+            height: "9",
+            rx: "2",
+          }),
+        ]
+      ),
+      h(
+        "span",
+        {
+          class: "leading-none",
+        },
+        "加密"
+      ),
+    ]
+  );
 
 const getFileIconClassLocal = (file) => {
   const fileItem = {

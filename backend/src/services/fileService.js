@@ -8,7 +8,7 @@ import { FileRepository } from "../repositories/index.js";
 import { StorageConfigUtils } from "../storage/utils/StorageConfigUtils.js";
 import { StorageFactory } from "../storage/factory/StorageFactory.js";
 import { GetFileType, getFileTypeName } from "../utils/fileTypeDetector.js";
-import { validateSlugFormat } from "../utils/common.js";
+import { generateUniqueFileSlug, validateSlugFormat } from "../utils/common.js";
 import { hashPassword } from "../utils/crypto.js";
 import { ApiStatus, DbTables, UserType } from "../constants/index.js";
 import { ValidationError, NotFoundError, AuthorizationError, ConflictError } from "../http/errors.js";
@@ -315,8 +315,12 @@ export class FileService {
 
     // 处理 slug 更新（包含格式校验和冲突检查）
     if (updateData.slug !== undefined) {
-      await this._validateAndProcessSlug(updateData.slug, fileId, userType);
-      finalUpdateData.slug = updateData.slug;
+      if (!updateData.slug) {
+        finalUpdateData.slug = await generateUniqueFileSlug(this.db, null, false, null);
+      } else {
+        await this._validateAndProcessSlug(updateData.slug, fileId, userType);
+        finalUpdateData.slug = updateData.slug;
+      }
     }
 
     // 处理过期时间
@@ -354,6 +358,7 @@ export class FileService {
     return {
       success: true,
       message: "文件元数据更新成功",
+      slug: finalUpdateData.slug ?? existingFile.slug,
     };
   }
 
@@ -532,29 +537,29 @@ export class FileService {
 
     // 为每个文件添加字段（包括文件类型检测）
     const processedFiles = await Promise.all(
-      files.map(async (file) => {
-        // 添加文件类型信息
-        const fileType = await GetFileType(file.filename, this.db);
-        const fileTypeName = await getFileTypeName(file.filename, this.db);
+        files.map(async (file) => {
+          // 添加文件类型信息
+          const fileType = await GetFileType(file.filename, this.db);
+          const fileTypeName = await getFileTypeName(file.filename, this.db);
 
-        const result = {
-          ...file,
-          has_password: file.password ? true : false,
-          type: fileType, // 整数类型常量 (0-6)
-          typeName: fileTypeName, // 类型名称（用于调试）
-        };
+          const result = {
+            ...file,
+            has_password: file.password ? true : false,
+            type: fileType, // 整数类型常量 (0-6)
+            typeName: fileTypeName, // 类型名称（用于调试）
+          };
 
-        // 添加API密钥名称
-        if (file.created_by && file.created_by.startsWith("apikey:")) {
-          const keyId = file.created_by.substring(7);
-          const keyName = keyNamesMap.get(keyId);
-          if (keyName) {
-            result.key_name = keyName;
+          // 添加API密钥名称
+          if (file.created_by && file.created_by.startsWith("apikey:")) {
+            const keyId = file.created_by.substring(7);
+            const keyName = keyNamesMap.get(keyId);
+            if (keyName) {
+              result.key_name = keyName;
+            }
           }
-        }
 
-        return result;
-      })
+          return result;
+        })
     );
 
     return processedFiles;

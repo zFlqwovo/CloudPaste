@@ -54,18 +54,21 @@
       <!-- 元数据编辑表单 - 允许编辑备注、过期时间等 -->
       <div class="mt-6 border-t pt-4" :class="darkMode ? 'border-gray-700' : 'border-gray-200'">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <!-- 链接后缀 - 不可修改 -->
+          <!-- 链接后缀 -->
           <div class="form-group">
             <label class="form-label block mb-1 text-sm font-medium" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">链接后缀</label>
-            <input
-              type="text"
-              class="form-input w-full rounded-md shadow-sm cursor-not-allowed opacity-75"
-              :class="getInputClasses(darkMode)"
-              placeholder="不可修改"
-              v-model="editForm.customLink"
-              disabled
-            />
-            <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-500' : 'text-gray-400'">后缀不可修改，仅支持字母、数字、-和_</p>
+            <div class="flex items-center">
+              <input
+                type="text"
+                class="form-input w-full rounded-md shadow-sm"
+                :class="[getInputClasses(darkMode), slugError ? (darkMode ? 'border-red-500' : 'border-red-600') : '']"
+                placeholder="留空则自动生成"
+                v-model="editForm.customLink"
+                @input="handleSlugInput"
+              />
+            </div>
+            <p v-if="slugError" class="mt-1 text-xs" :class="darkMode ? 'text-red-400' : 'text-red-600'">{{ slugError }}</p>
+            <p v-else class="mt-1 text-xs" :class="darkMode ? 'text-gray-500' : 'text-gray-400'">仅限字母、数字、-、_、.，留空自动生成</p>
           </div>
 
           <!-- 备注信息 -->
@@ -251,6 +254,8 @@ const editForm = ref({
   clearPassword: false, // 新增是否清除密码的标志
 });
 
+const slugError = ref("");
+
 // 切换编辑器模式
 const toggleEditorMode = () => {
   isPlainTextMode.value = !isPlainTextMode.value;
@@ -281,10 +286,35 @@ const validateMaxViews = () => {
   if (value < 0) {
     editForm.value.maxViews = 0;
   }
-  // 确保是整数
   if (!Number.isInteger(value)) {
     editForm.value.maxViews = Math.floor(value);
   }
+};
+
+const validateCustomLink = () => {
+  slugError.value = "";
+  const raw = editForm.value.customLink ? editForm.value.customLink.trim() : "";
+  if (!raw) {
+    return true;
+  }
+
+  const slugRegex = /^[a-zA-Z0-9._-]+$/;
+  if (!slugRegex.test(raw)) {
+    slugError.value = "链接后缀只能包含字母、数字、-、_、.";
+    return false;
+  }
+
+  if (raw.length > 50) {
+    slugError.value = "链接后缀不能超过50个字符";
+    return false;
+  }
+
+  editForm.value.customLink = raw;
+  return true;
+};
+
+const handleSlugInput = () => {
+  validateCustomLink();
 };
 
 // 编辑器事件处理
@@ -390,6 +420,7 @@ watch(
       editForm.value.customLink = newPaste.slug || "";
       editForm.value.maxViews = newPaste.max_views || 0;
       editForm.value.password = "";
+      slugError.value = "";
 
       // 处理过期时间
       editForm.value.expiryTime = getInitialExpiryTime(newPaste.expires_at);
@@ -419,6 +450,11 @@ const saveEdit = async () => {
     return;
   }
 
+  if (!validateCustomLink()) {
+    emit("update:error", slugError.value || "链接后缀格式无效");
+    return;
+  }
+
   // 准备更新数据对象，包含内容和元数据
   const updateData = {
     content: newContent,
@@ -426,7 +462,11 @@ const saveEdit = async () => {
     max_views: editForm.value.maxViews === 0 ? null : parseInt(editForm.value.maxViews),
   };
 
-  // 处理自定义链接 - 注意：链接后缀不可修改，所以不包含在更新数据中
+  const normalizedSlug = editForm.value.customLink ? editForm.value.customLink.trim() : "";
+  const currentSlug = props.paste?.slug || "";
+  if (normalizedSlug !== currentSlug) {
+    updateData.newSlug = normalizedSlug || null;
+  }
 
   // 处理过期时间
   if (editForm.value.expiryTime !== "0") {

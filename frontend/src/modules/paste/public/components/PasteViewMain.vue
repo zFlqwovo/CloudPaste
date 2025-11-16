@@ -2,6 +2,7 @@
 // PasteViewMain组件 - 主组件，整合各个功能模块
 // 负责协调预览、大纲和编辑功能，管理全局状态和数据流
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 
 import PasteViewPreview from "./PasteViewPreview.vue";
 import PasteViewOutline from "./PasteViewOutline.vue";
@@ -33,6 +34,9 @@ const props = defineProps({
     required: true,
   },
 });
+
+const router = useRouter();
+const route = useRoute();
 
 // 领域 service 实例（公开视图使用仅访问公开接口）
 const pasteService = usePasteService();
@@ -358,7 +362,9 @@ const saveEdit = async (updateData) => {
     const passwordChanged = updateData.password || updateData.clearPassword;
 
     // 使用统一API更新内容（自动根据认证信息处理权限）
-    await pasteService.updatePaste(slug, updateData);
+    const updateResult = await pasteService.updatePaste(slug, updateData);
+    const updatedSlug = updateResult && typeof updateResult === "object" && updateResult.slug ? updateResult.slug : paste.value.slug;
+    const slugChanged = updatedSlug && updatedSlug !== paste.value.slug;
 
     // 更新本地内容状态
     paste.value.content = updateData.content;
@@ -367,6 +373,9 @@ const saveEdit = async (updateData) => {
     paste.value.remark = updateData.remark;
     paste.value.max_views = updateData.max_views;
     paste.value.expires_at = updateData.expires_at;
+    if (slugChanged) {
+      paste.value.slug = updatedSlug;
+    }
 
     // 切换回预览模式
     switchViewMode("preview");
@@ -376,6 +385,21 @@ const saveEdit = async (updateData) => {
     setTimeout(() => {
       error.value = "";
     }, 3000);
+
+    if (slugChanged) {
+      try {
+        const currentQuery = { ...route.query };
+        const currentHash = route.hash;
+        await router.replace({
+          name: "PasteView",
+          params: { slug: updatedSlug },
+          query: currentQuery,
+          hash: currentHash,
+        });
+      } catch (replaceError) {
+        console.warn("重定向到新链接失败", replaceError);
+      }
+    }
 
     // 如果修改了密码，需要重新加载内容以获取新的验证状态
     if (passwordChanged) {

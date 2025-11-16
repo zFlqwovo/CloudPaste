@@ -42,6 +42,12 @@ function attachLifecycle(uppy, callbacks = {}) {
     uppy.on("complete", handler);
     handlers.push(["complete", handler]);
   }
+  if (callbacks.onShareRecord) {
+    console.debug("[UploaderClient] register share-record listener");
+    const handler = (payload) => callbacks.onShareRecord?.(payload);
+    uppy.on("share-record", handler);
+    handlers.push(["share-record", handler]);
+  }
 
   return () => {
     handlers.forEach(([event, handler]) => {
@@ -80,7 +86,7 @@ function createDriverSession({ payload = {}, storageConfigId, installPlugin, eve
   const detachLifecycle = attachLifecycle(uppy, events);
 
   if (typeof installPlugin === "function") {
-    installPlugin(driver, uppy, payload);
+    installPlugin(driver, uppy, payload, events || {});
   }
 
   const addFile = (file, meta = {}) => {
@@ -133,8 +139,11 @@ export function useUploaderClient() {
       storageConfigId: payload?.storage_config_id,
       events,
       uppyOptions,
-      installPlugin: (driver, uppy, payloadRef) => {
-        driver.share.applyShareUploader(uppy, { payload: payloadRef });
+      installPlugin: (driver, uppy, payloadRef, lifecycleEvents = {}) => {
+        driver.share.applyShareUploader(uppy, {
+          payload: payloadRef,
+          onShareRecord: lifecycleEvents.onShareRecord,
+        });
       },
     });
   };
@@ -145,8 +154,11 @@ export function useUploaderClient() {
       storageConfigId: payload?.storage_config_id,
       events,
       uppyOptions,
-      installPlugin: (driver, uppy, payloadRef) => {
-        driver.share.applyUrlUploader(uppy, { payload: payloadRef });
+      installPlugin: (driver, uppy, payloadRef, lifecycleEvents = {}) => {
+        driver.share.applyUrlUploader(uppy, {
+          payload: payloadRef,
+          onShareRecord: lifecycleEvents.onShareRecord,
+        });
       },
     });
   };

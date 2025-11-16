@@ -1,17 +1,22 @@
 <template>
   <div v-if="shareLink" class="mt-3 p-3 rounded-md share-link-box" :class="darkMode ? 'bg-gray-800/50' : 'bg-gray-50'">
     <div class="flex items-center">
-      <span class="text-sm mr-2" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ $t("markdown.shareLink") }}</span>
-      <a :href="shareLink" target="_blank" class="link-text text-sm flex-grow" :class="darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'">
+      <span class="text-sm mr-2" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ label }}</span>
+      <a
+        :href="shareLink"
+        target="_blank"
+        rel="noopener"
+        class="link-text text-sm flex-grow"
+        :class="darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'"
+      >
         {{ shareLink }}
       </a>
 
-      <!-- 复制图标 -->
       <button
-        @click="copyShareLink"
+        @click="copyPrimaryLink"
         class="ml-2 p-1 rounded-md transition-colors"
         :class="darkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200' : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'"
-        :title="$t('markdown.copyLink')"
+        :title="copyTooltip"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -23,12 +28,12 @@
         </svg>
       </button>
 
-      <!-- 二维码图标 -->
       <button
-        @click="showQRCode"
+        v-if="showQrButton"
+        @click="emit('show-qr-code', shareLink)"
         class="ml-2 p-1 rounded-md transition-colors"
         :class="darkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200' : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'"
-        :title="$t('markdown.showQRCode')"
+        :title="qrTooltip"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -40,12 +45,12 @@
         </svg>
       </button>
 
-      <!-- 复制原始文本直链按钮 -->
       <button
-        @click="copyRawTextLink"
+        v-if="secondaryLink"
+        @click="copySecondaryLink"
         class="ml-2 p-1 rounded-md transition-colors"
         :class="darkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200' : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'"
-        :title="$t('markdown.copyRawLink')"
+        :title="secondaryTooltip"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
@@ -53,115 +58,112 @@
         </svg>
       </button>
 
-      <span class="ml-2 text-xs" :class="darkMode ? 'text-gray-500' : 'text-gray-400'">{{ $t("markdown.linkExpireIn", { seconds: countdown }) }}</span>
+      <span v-if="showCountdown && countdownSeconds > 0" class="ml-2 text-xs" :class="darkMode ? 'text-gray-500' : 'text-gray-400'">
+        {{ countdownText }}
+      </span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
-import { copyToClipboard as clipboardCopy } from "@/utils/clipboard";
-import { api } from "@/api";
+import { ref, onUnmounted, watch, computed } from "vue";
+import { copyToClipboard } from "@/utils/clipboard";
 
-const { t } = useI18n();
-
-// Props
 const props = defineProps({
-  darkMode: {
-    type: Boolean,
-    default: false,
-  },
-  shareLink: {
-    type: String,
-    default: "",
-  },
-  sharePassword: {
-    type: String,
-    default: "",
-  },
+  darkMode: { type: Boolean, default: false },
+  label: { type: String, default: "" },
+  shareLink: { type: String, default: "" },
+  copyTooltip: { type: String, default: "" },
+  copySuccessText: { type: String, default: "" },
+  copyFailureText: { type: String, default: "" },
+  showQrButton: { type: Boolean, default: false },
+  qrTooltip: { type: String, default: "" },
+  secondaryLink: { type: String, default: "" },
+  secondaryTooltip: { type: String, default: "" },
+  secondarySuccessText: { type: String, default: "" },
+  secondaryFailureText: { type: String, default: "" },
+  showCountdown: { type: Boolean, default: false },
+  countdownSeconds: { type: Number, default: 15 },
+  countdownFormatter: { type: Function, default: null },
 });
 
-// Emits
-const emit = defineEmits(["show-qr-code", "status-message"]);
+const emit = defineEmits(["show-qr-code", "status-message", "countdown-end"]);
 
-// 倒计时
-const countdown = ref(15);
+const countdown = ref(props.countdownSeconds);
 let countdownTimer = null;
 
-// 开始倒计时
-const startCountdown = () => {
+const stopCountdown = () => {
   if (countdownTimer) {
     clearInterval(countdownTimer);
+    countdownTimer = null;
   }
+};
 
-  countdown.value = 15;
-
+const startCountdown = () => {
+  if (!props.showCountdown) return;
+  stopCountdown();
+  countdown.value = props.countdownSeconds;
   countdownTimer = setInterval(() => {
     countdown.value--;
-
     if (countdown.value <= 0) {
-      clearInterval(countdownTimer);
+      stopCountdown();
       emit("countdown-end");
     }
   }, 1000);
 };
 
-// 复制分享链接
-const copyShareLink = async () => {
-  if (!props.shareLink) return;
-
-  try {
-    const success = await clipboardCopy(props.shareLink);
-
-    if (success) {
-      emit("status-message", t("markdown.linkCopied"));
+watch(
+  () => props.shareLink,
+  (link) => {
+    if (link && props.showCountdown) {
+      startCountdown();
     } else {
-      throw new Error(t("markdown.copyFailed"));
+      stopCountdown();
     }
-  } catch (err) {
-    console.error("复制失败:", err);
-    emit("status-message", t("markdown.copyFailed"));
   }
-};
+);
 
-// 复制原始文本直链
-const copyRawTextLink = async () => {
-  if (!props.shareLink) return;
-
-  const slug = props.shareLink.split("/").pop();
-  const rawLink = pasteService.getRawPasteUrl(slug, props.sharePassword || null);
-
-  try {
-    const success = await clipboardCopy(rawLink);
-
-    if (success) {
-      emit("status-message", t("markdown.rawLinkCopied"));
-    } else {
-      throw new Error(t("markdown.copyFailed"));
-    }
-  } catch (err) {
-    console.error("复制失败:", err);
-    emit("status-message", t("markdown.copyFailed"));
-  }
-};
-
-// 显示二维码
-const showQRCode = () => {
-  emit("show-qr-code", props.shareLink);
-};
-
-// 组件卸载时清理定时器
 onUnmounted(() => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer);
-    countdownTimer = null;
-  }
+  stopCountdown();
 });
 
-// 暴露方法
+const emitStatus = (type, message) => {
+  if (message) {
+    emit("status-message", { type, message });
+  }
+};
+
+const copyPrimaryLink = async () => {
+  if (!props.shareLink) return;
+  try {
+    const success = await copyToClipboard(props.shareLink);
+    emitStatus(success ? "success" : "error", success ? props.copySuccessText : props.copyFailureText);
+  } catch {
+    emitStatus("error", props.copyFailureText);
+  }
+};
+
+const copySecondaryLink = async () => {
+  if (!props.secondaryLink) return;
+  try {
+    const success = await copyToClipboard(props.secondaryLink);
+    emitStatus(success ? "success" : "error", success ? props.secondarySuccessText : props.secondaryFailureText);
+  } catch {
+    emitStatus("error", props.secondaryFailureText);
+  }
+};
+
+const countdownText = computed(() => {
+  if (!props.showCountdown) return "";
+  if (typeof props.countdownFormatter === "function") {
+    return props.countdownFormatter(countdown.value);
+  }
+  return `${countdown.value}s`;
+});
+
 defineExpose({
   startCountdown,
+  stopCountdown,
 });
 </script>
 
@@ -192,7 +194,6 @@ defineExpose({
   }
 }
 
-/* 移动端优化 */
 @media (max-width: 640px) {
   .share-link-box {
     max-width: 100%;

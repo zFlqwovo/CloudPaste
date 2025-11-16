@@ -451,6 +451,7 @@ import { formatFileSize as formatFileSizeUtil } from "@/utils/fileTypes.js";
 import { useShareSettingsForm } from "@/composables/upload/useShareSettingsForm.js";
 import { useStorageConfigsStore } from "@/stores/storageConfigsStore.js";
 import { useShareUploadController } from "@/modules/upload";
+import { useFileshareService } from "@/modules/fileshare";
 
 const props = defineProps({
   darkMode: { type: Boolean, default: false },
@@ -459,7 +460,7 @@ const props = defineProps({
   isAdmin: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["upload-success", "upload-error", "refresh-files"]);
+const emit = defineEmits(["upload-success", "upload-error", "refresh-files", "share-results"]);
 const { t } = useI18n();
 const storageConfigsStore = useStorageConfigsStore();
 const { activeUrlSession, createUrlSession, disposeUrlSession } = useShareUploadController();
@@ -472,6 +473,67 @@ const {
   selectDefaultStorageConfig,
   resetShareSettings,
 } = useShareSettingsForm();
+const fileshareService = useFileshareService();
+
+const shareRecordMap = new Map();
+const pendingShareItem = ref(null);
+
+const emitShareResults = (results = []) => {
+  emit("share-results", Array.isArray(results) ? results : []);
+};
+
+const getCurrentOrigin = () => (typeof window !== "undefined" && window.location ? window.location.origin : "");
+
+const buildShareResultEntry = (record, meta = {}) => {
+  if (!record) return null;
+  const slug = record.slug || meta.slug || null;
+  const origin = getCurrentOrigin();
+  let shareUrl = "";
+  if (slug) {
+    shareUrl = fileshareService.buildShareUrl({ slug }, origin);
+  } else if (record.url) {
+    shareUrl = record.url.startsWith("http") || !origin ? record.url : `${origin.replace(/\/$/, "")}${record.url}`;
+  }
+  if (!shareUrl) return null;
+
+  const previewUrl = record.previewUrl || record.proxy_preview_url || record.proxyPreviewUrl || shareUrl;
+  const downloadUrl =
+    record.proxy_download_url ||
+    record.proxyDownloadUrl ||
+    record.downloadUrl ||
+    (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
+
+  return {
+    id: record.id || meta.fileId || slug || record.storage_path || record.filename,
+    filename: record.filename || meta.filename || slug || "file",
+    slug,
+    shareUrl,
+    previewUrl,
+    downloadUrl,
+    password: meta.password || null,
+    expiresAt: record.expires_at || record.expiresAt || null,
+  };
+};
+
+const flushPendingShareResult = () => {
+  const pending = pendingShareItem.value;
+  if (!pending) return;
+  const record = pending.id ? shareRecordMap.get(pending.id) : null;
+  if (!record) return;
+  const entry = buildShareResultEntry(record, pending.meta);
+  if (!entry) return;
+  emitShareResults([entry]);
+  if (pending.id) {
+    shareRecordMap.delete(pending.id);
+  }
+  pendingShareItem.value = null;
+  resetShareState();
+};
+
+const resetShareState = () => {
+  shareRecordMap.clear();
+  pendingShareItem.value = null;
+};
 
 const storageConfigs = computed(() => {
   if (props.storageConfigs && props.storageConfigs.length) {
@@ -697,6 +759,7 @@ const handleStageChange = (stage) => {
 const submitUpload = async () => {
   if (!ensurePreconditions() || isUploading.value) return;
 
+  resetShareState();
   isUploading.value = true;
   isCancelled.value = false;
   uploadProgress.value = 0;
@@ -740,19 +803,37 @@ const submitUpload = async () => {
           currentStage.value = "completed";
           uploadProgress.value = 100;
           uploadSpeed.value = "";
+          flushPendingShareResult();
           emit("upload-success", { message: t("file.urlUploadSuccess"), url: urlInput.value, fileInfo: fileInfo.value });
           emit("refresh-files");
-          resetForm();
+          resetForm({ preserveShareState: true });
+        },
+        onShareRecord: ({ file, shareRecord }) => {
+          if (file?.id && shareRecord) {
+            shareRecordMap.set(file.id, shareRecord);
+          }
+          flushPendingShareResult();
         },
       },
     });
-    session.addFiles([
+    const ids = session.addFiles([
       {
         data: blob,
         name: filename,
         type: meta.contentType || blob.type || "application/octet-stream",
       },
     ], () => ({ filename, sourceUrl: urlInput.value }));
+    const fileId = Array.isArray(ids) ? ids[0] : ids;
+    if (fileId) {
+      pendingShareItem.value = {
+        id: fileId,
+        meta: {
+          filename,
+          slug: formData.slug || "",
+          password: formData.password || "",
+        },
+      };
+    }
     activeUrlSession.value = session;
     await session.start();
   } catch (error) {
@@ -778,10 +859,11 @@ const cancelUpload = () => {
   activeXhr.value?.abort?.();
   try { activeUrlSession.value?.cancel?.(); } catch {}
   disposeUrlSession();
+  resetShareState();
   emit("upload-error", new Error(t("file.messages.uploadCancelled")));
 };
 
-const resetForm = () => {
+const resetForm = (options = {}) => {
   urlInput.value = "";
   urlError.value = "";
   fileInfo.value = null;
@@ -794,6 +876,9 @@ const resetForm = () => {
   isCancelled.value = false;
   resetShareSettings({ keepStorage: true });
   disposeUrlSession();
+  if (!options.preserveShareState) {
+    resetShareState();
+  }
 };
 
 onMounted(() => {
