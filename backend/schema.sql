@@ -60,7 +60,7 @@ CREATE TABLE api_keys (
   permissions INTEGER DEFAULT 0,        -- 位标志权限（替代布尔字段）
   role TEXT DEFAULT 'GENERAL',          -- 用户角色：GUEST/GENERAL/ADMIN
   basic_path TEXT DEFAULT '/',
-  is_guest BOOLEAN DEFAULT 0,           -- 是否为访客（免密访问）
+  is_enable BOOLEAN DEFAULT 0,         -- 启用状态：0=禁用，1=启用（所有密钥默认禁用，需手动开启）
   last_used DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL

@@ -100,7 +100,7 @@ async function createAdminTables(db) {
         permissions INTEGER DEFAULT 0,
         role TEXT DEFAULT 'GENERAL',
         basic_path TEXT DEFAULT '/',
-        is_guest BOOLEAN DEFAULT 0,
+        is_enable BOOLEAN DEFAULT 0,
         last_used DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         expires_at DATETIME NOT NULL
@@ -406,6 +406,37 @@ async function createDefaultAdmin(db) {
   }
 }
 
+/**
+ * 创建默认游客 API 密钥（GUEST 角色），默认禁用且无权限
+ * @param {D1Database} db - D1数据库实例
+ */
+async function createDefaultGuestApiKey(db) {
+  console.log("检查默认游客 API 密钥...");
+
+  const guestCount = await db
+    .prepare(`SELECT COUNT(*) as count FROM ${DbTables.API_KEYS} WHERE role = 'GUEST'`)
+    .first();
+
+  if (guestCount && guestCount.count > 0) {
+    console.log("已存在游客 API 密钥，跳过创建");
+    return;
+  }
+
+  const id = crypto.randomUUID();
+  const key = "guest";
+  const expiresAt = new Date("9999-12-31T23:59:59Z").toISOString();
+
+  await db
+    .prepare(
+      `INSERT INTO ${DbTables.API_KEYS} (id, name, key, permissions, role, basic_path, is_enable, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(id, "guest", key, 0, "GUEST", "/", 0, expiresAt)
+    .run();
+
+  console.log("已创建默认游客 API 密钥");
+}
+
 // ==================== 主初始化函数 ====================
 
 /**
@@ -434,6 +465,7 @@ export async function initDatabase(db) {
   await addDefaultProxySetting(db); // 默认代理设置 (1个)
 
   await createDefaultAdmin(db);
+  await createDefaultGuestApiKey(db);
 
   console.log("数据库初始化完成");
 }
@@ -682,6 +714,17 @@ async function executeMigrationForVersion(db, version) {
       console.log("版本19：principal_storage_acl 表检查/创建完成。");
       break;
 
+    case 20:
+      // 版本20：api_keys 表 is_guest -> is_enable 启用位迁移 + 默认游客 Key 补齐
+      console.log("版本20：检查并迁移 api_keys.is_guest -> is_enable...");
+      await migrateApiKeysIsGuestToIsEnable(db);
+      console.log("版本20：api_keys 启用位(is_enable) 迁移完成。");
+
+      console.log("版本20：检查并创建默认游客 API 密钥...");
+      await createDefaultGuestApiKey(db);
+      console.log("版本20：默认游客 API 密钥检查/创建完成。");
+      break;
+
     default:
       console.log(`未知的迁移版本: ${version}`);
       break;
@@ -883,7 +926,12 @@ async function migrateToBitFlagPermissions(db) {
     const columnInfo = await db.prepare(`PRAGMA table_info(${DbTables.API_KEYS})`).all();
     const existingColumns = new Set(columnInfo.results.map((col) => col.name));
 
-    if (!existingColumns.has("permissions") || !existingColumns.has("role") || !existingColumns.has("is_guest")) {
+    // 仅当还没有 permissions/role/is_enable 结构时才做整表重建（老版本布尔权限 -> 位标志）
+    if (
+      !existingColumns.has("permissions") ||
+      !existingColumns.has("role") ||
+      (!existingColumns.has("is_enable") && !existingColumns.has("is_guest"))
+    ) {
       console.log("检测到需要完整的表结构迁移");
 
       // 创建新表结构并迁移数据
@@ -896,7 +944,7 @@ async function migrateToBitFlagPermissions(db) {
           permissions INTEGER DEFAULT 0,
           role TEXT DEFAULT 'GENERAL',
           basic_path TEXT DEFAULT '/',
-          is_guest BOOLEAN DEFAULT 0,
+          is_enable BOOLEAN DEFAULT 0,
           last_used DATETIME,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           expires_at DATETIME NOT NULL
@@ -919,7 +967,7 @@ async function migrateToBitFlagPermissions(db) {
           await db
             .prepare(
               `INSERT INTO ${DbTables.API_KEYS}_new
-             (id, name, key, permissions, role, basic_path, is_guest, last_used, created_at, expires_at)
+             (id, name, key, permissions, role, basic_path, is_enable, last_used, created_at, expires_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             )
             .bind(
@@ -929,7 +977,7 @@ async function migrateToBitFlagPermissions(db) {
               permissions,
               role,
               keyRecord.basic_path || "/",
-              role === "GUEST" ? 1 : 0,
+              0,
               keyRecord.last_used,
               keyRecord.created_at,
               keyRecord.expires_at
@@ -946,6 +994,76 @@ async function migrateToBitFlagPermissions(db) {
     }
   } catch (error) {
     console.error("位标志权限系统迁移失败:", error);
+  }
+}
+
+/**
+ * 将已有的 api_keys.is_guest 列迁移为 is_enable（启用位）
+ * 兼容以下情况：
+ *  - 只有 is_guest：尝试重命名为 is_enable，失败则新增 is_enable 并复制数据；
+ *  - 同时存在 is_guest 和 is_enable：以 is_guest 的值为准覆盖 is_enable，然后尝试删除 is_guest；
+ *  - 只有 is_enable：不做任何操作。
+ * @param {D1Database} db
+ */
+async function migrateApiKeysIsGuestToIsEnable(db) {
+  console.log("开始迁移 api_keys 表的 is_guest -> is_enable...");
+
+  const columnInfo = await db.prepare(`PRAGMA table_info(${DbTables.API_KEYS})`).all();
+  const existingColumns = new Set(columnInfo.results.map((col) => col.name));
+
+  const hasIsGuest = existingColumns.has("is_guest");
+  const hasIsEnable = existingColumns.has("is_enable");
+
+  if (!hasIsGuest && !hasIsEnable) {
+    console.log("api_keys 表不存在 is_guest / is_enable 字段，跳过迁移");
+    return;
+  }
+
+  if (hasIsGuest && !hasIsEnable) {
+    // 优先尝试使用 SQLite 原生重命名列语法
+    try {
+      console.log("检测到仅存在 is_guest，尝试重命名为 is_enable...");
+      await db.prepare(`ALTER TABLE ${DbTables.API_KEYS} RENAME COLUMN is_guest TO is_enable`).run();
+      console.log("成功将 is_guest 列重命名为 is_enable");
+      return;
+    } catch (error) {
+      console.warn("重命名 is_guest -> is_enable 失败，将使用添加列 + 复制数据方案：", error);
+
+      // 添加 is_enable 列（如果不存在）
+      await db.prepare(`ALTER TABLE ${DbTables.API_KEYS} ADD COLUMN is_enable BOOLEAN DEFAULT 0`).run();
+      // 将旧列的数据复制过来
+      await db.prepare(`UPDATE ${DbTables.API_KEYS} SET is_enable = COALESCE(is_guest, 0)`).run();
+
+      // 尝试删除旧列（如果 SQLite 版本支持）
+      try {
+        await removeTableField(db, DbTables.API_KEYS, "is_guest");
+      } catch (dropError) {
+        console.warn("删除 is_guest 列失败，将保留旧列但在代码中忽略：", dropError);
+      }
+      return;
+    }
+  }
+
+  if (hasIsGuest && hasIsEnable) {
+    console.log("检测到同时存在 is_guest 和 is_enable，使用 is_guest 覆盖 is_enable...");
+    await db
+      .prepare(`UPDATE ${DbTables.API_KEYS} SET is_enable = COALESCE(is_guest, is_enable, 0)`)
+      .run()
+      .catch((error) => {
+        console.error("同步 is_guest 到 is_enable 时出错：", error);
+      });
+
+    // 同样尝试删除旧列
+    try {
+      await removeTableField(db, DbTables.API_KEYS, "is_guest");
+    } catch (dropError) {
+      console.warn("删除 is_guest 列失败，将保留旧列但在代码中忽略：", dropError);
+    }
+    return;
+  }
+
+  if (!hasIsGuest && hasIsEnable) {
+    console.log("api_keys 已使用 is_enable 列，不需要迁移 is_guest");
   }
 }
 
@@ -1313,7 +1431,7 @@ export async function checkAndInitDatabase(db) {
     const versionSetting = await db.prepare(`SELECT value FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = 'schema_version'`).first();
 
     const currentVersion = versionSetting ? parseInt(versionSetting.value) : 0;
-    const targetVersion = 19; // 当前最新版本
+    const targetVersion = 20; // 当前最新版本
 
     if (currentVersion < targetVersion) {
       console.log(`需要更新数据库结构，当前版本:${currentVersion}，目标版本:${targetVersion}`);

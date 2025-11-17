@@ -17,7 +17,7 @@ const fsRoutes = new Hono();
 const unifiedFsAuthMiddleware = async (c, next) => {
   const principal = c.get("principal");
 
-  if (!principal || principal.type === "guest") {
+  if (!principal || principal.type === "anonymous") {
     throw new AuthenticationError("需要认证访问");
   }
 

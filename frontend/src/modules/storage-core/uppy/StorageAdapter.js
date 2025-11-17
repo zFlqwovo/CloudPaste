@@ -218,8 +218,8 @@ class AuthProvider {
     if (this.authStore.authType === "admin" && this.authStore.adminToken) {
       headers["Authorization"] = `Bearer ${this.authStore.adminToken}`;
     }
-    // 检查API密钥认证
-    else if (this.authStore.authType === "apikey" && this.authStore.apiKey) {
+    // 检查API密钥/游客认证
+    else if (this.authStore.isKeyUser && this.authStore.apiKey) {
       headers["Authorization"] = `ApiKey ${this.authStore.apiKey}`;
     }
 

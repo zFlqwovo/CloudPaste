@@ -341,6 +341,18 @@ router.beforeEach(async (to, from, next) => {
   try {
     const authStore = useAuthStore();
 
+    // 确保初始化完成，避免刷新时的认证闪烁
+    if (!authStore.initialized) {
+      await authStore.initialize();
+    }
+
+    // 自动游客会话：在未认证且非 /admin 路由时尝试一次基于 Guest API Key 的登录
+    if (!authStore.isAuthenticated && authStore.authType === "none" && !to.path.startsWith("/admin")) {
+      if (typeof authStore.maybeAutoGuestLogin === "function") {
+        await authStore.maybeAutoGuestLogin();
+      }
+    }
+
     // 如果需要认证且认证状态需要重新验证，则进行验证
     if (to.meta.requiresAuth && authStore.needsRevalidation) {
       console.log("路由守卫：需要重新验证认证状态");
@@ -450,6 +462,7 @@ router.beforeEach(async (to, from, next) => {
       console.log("路由守卫：管理权限验证通过", {
         isAdmin: authStore.isAdmin,
         authType: authStore.authType,
+        isGuest: authStore.isGuest,
         hasTextPermission: authStore.hasTextPermission,
         hasFilePermission: authStore.hasFilePermission,
         hasMountPermission: authStore.hasMountPermission,
@@ -468,7 +481,8 @@ router.beforeEach(async (to, from, next) => {
       });
 
       // 只对有挂载权限的API密钥用户进行路径权限检查
-      if (authStore.authType === "apikey" && authStore.hasMountPermission && to.params.pathMatch) {
+      const isKeyLikeUser = authStore.isKeyUser;
+      if (isKeyLikeUser && authStore.hasMountPermission && to.params.pathMatch) {
         const requestedPath = "/" + (Array.isArray(to.params.pathMatch) ? to.params.pathMatch.join("/") : to.params.pathMatch);
         if (!authStore.hasPathPermission(requestedPath)) {
           console.log("路由守卫：用户无此路径权限，重定向到基本路径");

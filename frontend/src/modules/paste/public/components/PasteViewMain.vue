@@ -62,7 +62,7 @@ const authStore = useAuthStore();
 
 // 从Store获取权限状态的计算属性
 const isAdmin = computed(() => authStore.isAdmin);
-const hasApiKey = computed(() => authStore.authType === "apikey" && !!authStore.apiKey);
+const hasApiKey = computed(() => authStore.isKeyUser && !!authStore.apiKey);
 // 这里的“文本权限”用于管理（编辑/删除），对应后端 TEXT_MANAGE 位
 const hasTextPermission = computed(() => authStore.hasTextManagePermission);
 const isCreator = ref(false); // 这个需要根据具体文本分享的创建者信息判断

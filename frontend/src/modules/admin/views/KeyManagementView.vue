@@ -168,7 +168,18 @@ const deleteSelectedKeys = async () => {
     return;
   }
 
-  const selectedCount = selectedKeys.value.length;
+  // 过滤掉 GUEST 密钥（不允许删除）
+  const deletableIds = selectedKeys.value.filter((id) => {
+    const key = apiKeys.value.find((k) => k.id === id);
+    return key && (key.role || "GENERAL") !== "GUEST";
+  });
+
+  if (deletableIds.length === 0) {
+    showError(t("admin.keyManagement.error.cannotDeleteGuest", "游客密钥不允许删除，请通过禁用或修改权限控制访问"));
+    return;
+  }
+
+  const selectedCount = deletableIds.length;
 
   if (!confirm(t("admin.keyManagement.bulkDeleteConfirm", { count: selectedCount }))) {
     return;
@@ -178,7 +189,7 @@ const deleteSelectedKeys = async () => {
 
   try {
     // 逐个删除选中的密钥
-    const promises = selectedKeys.value.map((id) => deleteApiKey(id));
+    const promises = deletableIds.map((id) => deleteApiKey(id));
     await Promise.all(promises);
 
     // 清空选中列表

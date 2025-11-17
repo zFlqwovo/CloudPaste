@@ -324,6 +324,13 @@ const props = defineProps({
   },
 });
 
+// 是否为游客密钥（仅在编辑模式下关注）
+const isGuestKey = computed(() => {
+  if (!props.isEditMode || !props.keyData) return false;
+  const role = props.keyData.role || "GENERAL";
+  return role === "GUEST";
+});
+
 // Emits
 const emit = defineEmits(["close", "updated", "created"]);
 
@@ -641,6 +648,7 @@ watch(
 
 // 处理表单提交
 const handleSubmit = async () => {
+  const isGuestEditing = props.isEditMode && isGuestKey.value;
   // 表单验证
   if (!keyName.value.trim()) {
     error.value = props.isEditMode
@@ -730,7 +738,7 @@ const handleSubmit = async () => {
       // 创建密钥 - 使用新的位标志权限系统
       const customKeyValue = useCustomKey.value ? customKey.value : null;
       const permissionsBitFlag = convertPermissionsToBitFlag(permissions.value);
-      const createdKey = await createApiKey(keyName.value, expiresAt, permissionsBitFlag, "GENERAL", customKeyValue, basicPath.value, false);
+      const createdKey = await createApiKey(keyName.value, expiresAt, permissionsBitFlag, "GENERAL", customKeyValue, basicPath.value);
 
       if (!createdKey || !createdKey.key) {
         throw new Error(t("admin.keyManagement.createModal.errors.createFailed", "创建密钥失败"));
@@ -749,7 +757,6 @@ const handleSubmit = async () => {
           permissions: createdKey.permissions,
           role: createdKey.role,
           basic_path: basicPath.value,
-          is_guest: createdKey.is_guest,
           created_at: createdKey.created_at,
           expires_at: expiresAt,
           last_used: null,
@@ -864,6 +871,7 @@ defineExpose({
             :placeholder="$t(isEditMode ? 'admin.keyManagement.editModal.keyNamePlaceholder' : 'admin.keyManagement.createModal.keyNamePlaceholder')"
             class="w-full p-2 rounded-md border"
             :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'"
+            :disabled="isEditMode && isGuestKey"
           />
           <p class="mt-1 text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
             {{ $t(isEditMode ? "admin.keyManagement.editModal.keyNameHelp" : "admin.keyManagement.createModal.keyNameHelp") }}
@@ -913,7 +921,8 @@ defineExpose({
             v-model="expiration"
             class="w-full p-2 rounded-md border"
             :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'"
-          >
+            :disabled="isEditMode && isGuestKey"
+          > 
             <option v-for="option in expirationOptions" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
@@ -921,7 +930,7 @@ defineExpose({
         </div>
 
         <!-- 自定义过期时间 -->
-        <div v-if="isCustomExpiration">
+        <div v-if="isCustomExpiration && !(isEditMode && isGuestKey)">
           <label :for="isEditMode ? 'edit-custom-expiration' : 'custom-expiration'" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
             {{ $t(isEditMode ? "admin.keyManagement.editModal.customExpiration" : "admin.keyManagement.createModal.customExpiration") }}
           </label>

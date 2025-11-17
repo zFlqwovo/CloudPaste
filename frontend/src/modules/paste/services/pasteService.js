@@ -21,7 +21,7 @@ export function usePasteService() {
 
   const isAdmin = () => authStore.isAdmin;
   const isApiKeyManager = () => authStore.authType === "apikey" && authStore.hasTextManagePermission;
-  const isApiKeyCreator = () => authStore.authType === "apikey" && authStore.hasTextSharePermission;
+  const isApiKeyCreator = () => authStore.isKeyUser && authStore.hasTextSharePermission;
 
   const ensureCanManage = () => {
     if (!isAdmin() && !isApiKeyManager()) {

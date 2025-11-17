@@ -115,4 +115,3 @@ export async function enqueueOfflineOperation(endpoint, options) {
     offlineOperationLock = false;
   }
 }
-

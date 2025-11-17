@@ -11,7 +11,7 @@ import { PermissionGroup } from "../../constants/permissions.js";
 const ADMIN_AUTHORITIES = PermissionGroup.ALL_PERMISSIONS ?? 0xffffffff;
 
 export const createGuestPrincipal = () => ({
-  type: "guest",
+  type: "anonymous",
   id: null,
   authorities: 0,
   attributes: {},
@@ -55,7 +55,7 @@ const mapAuthResultToPrincipal = (authResult) => {
     };
   }
 
-  // 非 admin 且无 apiKey，仅保留三种类型：admin/apiKey/guest
+  // 非 admin 且无 apiKey，仅保留两种已认证类型：admin/apiKey，其余视为匿名
   return createGuestPrincipal();
 };
 

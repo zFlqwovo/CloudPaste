@@ -43,7 +43,7 @@ export function useMountExplorerController() {
 
   // 权限相关派生状态
   const isAdmin = computed(() => authStore.isAdmin);
-  const hasApiKey = computed(() => authStore.authType === "apikey" && !!authStore.apiKey);
+  const hasApiKey = computed(() => authStore.isKeyUser && !!authStore.apiKey);
   const hasFilePermission = computed(() => authStore.hasFilePermission);
   const hasMountPermission = computed(() => authStore.hasMountPermission);
   const hasPermission = computed(() => authStore.hasMountPermission);

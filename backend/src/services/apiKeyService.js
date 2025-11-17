@@ -87,6 +87,16 @@ export async function createApiKey(db, keyData, repositoryFactory) {
   const factory = resolveRepositoryFactory(db, repositoryFactory);
   const apiKeyRepository = factory.getApiKeyRepository();
 
+  // 对于 role='GUEST' 的 Key，保证全局唯一
+  const role = keyData.role || "GENERAL";
+  if (role === "GUEST") {
+    const existingGuests = await apiKeyRepository.findAll({});
+    const hasGuest = Array.isArray(existingGuests) && existingGuests.some((k) => (k.role || "GENERAL") === "GUEST");
+    if (hasGuest) {
+      throw new ConflictError("已存在 GUEST 角色的 API 密钥，系统仅允许一个游客密钥");
+    }
+  }
+
   // 检查名称是否已存在
   const nameExists = await apiKeyRepository.existsByName(keyData.name.trim());
   if (nameExists) {
@@ -96,8 +106,18 @@ export async function createApiKey(db, keyData, repositoryFactory) {
   // 生成唯一ID
   const id = crypto.randomUUID();
 
-  // 生成API密钥，如果有自定义密钥则使用自定义密钥
-  const key = keyData.custom_key ? keyData.custom_key : generateRandomString(12);
+  // 生成API密钥
+  let key;
+  let name = keyData.name.trim();
+
+  if (role === "GUEST") {
+    // 游客密钥固定使用 guest / guest
+    name = "guest";
+    key = "guest";
+  } else {
+    // 非 GUEST：如果有自定义密钥则使用自定义密钥
+    key = keyData.custom_key ? keyData.custom_key : generateRandomString(12);
+  }
 
   // 检查密钥是否已存在
   const keyExists = await apiKeyRepository.existsByKey(key);
@@ -135,12 +155,13 @@ export async function createApiKey(db, keyData, repositoryFactory) {
   // 准备API密钥数据
   const apiKeyData = {
     id,
-    name: keyData.name.trim(),
+    name,
     key,
     permissions, // 位标志权限
-    role: keyData.role || "GENERAL",
+    role,
     basic_path: keyData.basic_path || "/",
-    is_guest: keyData.is_guest || 0,
+    // 启用位：默认禁用，需在管理界面显式开启
+    is_enable: typeof keyData.is_enable === "number" ? keyData.is_enable : 0,
     expires_at: expiresAt.toISOString(),
   };
 
@@ -156,7 +177,7 @@ export async function createApiKey(db, keyData, repositoryFactory) {
     permissions: apiKeyData.permissions, // 位标志权限
     role: apiKeyData.role,
     basic_path: apiKeyData.basic_path,
-    is_guest: apiKeyData.is_guest,
+    is_enable: apiKeyData.is_enable,
     permission_names: PermissionChecker.getPermissionDescriptions(apiKeyData.permissions),
     created_at: apiKeyData.created_at,
     expires_at: apiKeyData.expires_at,
@@ -184,6 +205,16 @@ export async function updateApiKey(db, id, updateData, repositoryFactory) {
   // 验证名称
   if (updateData.name && !updateData.name.trim()) {
     throw new ValidationError("密钥名称不能为空");
+  }
+
+  // 锁死 GUEST 密钥的 name/role，不允许修改；过期时间字段会在后续统一忽略
+  if ((keyExists.role || "GENERAL") === "GUEST") {
+    if (updateData.name !== undefined && updateData.name.trim() !== "guest") {
+      throw new ConflictError("游客密钥名称固定为 'guest'，不允许修改");
+    }
+    if (updateData.role !== undefined && updateData.role !== "GUEST") {
+      throw new ConflictError("游客密钥角色固定为 'GUEST'，不允许修改");
+    }
   }
 
   // 检查名称是否已存在（排除当前密钥）
@@ -222,8 +253,12 @@ export async function updateApiKey(db, id, updateData, repositoryFactory) {
     processedUpdateData.name = processedUpdateData.name.trim();
   }
 
+  if ((keyExists.role || "GENERAL") === "GUEST" && processedUpdateData.expires_at !== undefined) {
+    delete processedUpdateData.expires_at;
+  }
+
   // 检查是否有有效的更新字段
-  const validFields = ["name", "permissions", "role", "basic_path", "is_guest", "expires_at"];
+  const validFields = ["name", "permissions", "role", "basic_path", "is_enable", "expires_at"];
   const hasValidUpdates = validFields.some((field) => processedUpdateData[field] !== undefined);
 
   if (!hasValidUpdates) {
@@ -252,6 +287,9 @@ export async function deleteApiKey(db, id, repositoryFactory) {
   const keyExists = await apiKeyRepository.findById(id);
   if (!keyExists) {
     throw new NotFoundError("密钥不存在");
+  }
+  if ((keyExists.role || "GENERAL") === "GUEST") {
+    throw new ConflictError("游客密钥不允许删除，请通过禁用或修改权限控制访问");
   }
 
   // 删除该密钥关联的存储 ACL（subject_type = 'API_KEY'）

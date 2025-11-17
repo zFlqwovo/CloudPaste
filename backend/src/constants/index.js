@@ -71,5 +71,5 @@ export const S3ProviderTypes = {
 export const UserType = {
   ADMIN: "admin",
   API_KEY: "apiKey",
-  GUEST: "guest",
+  ANONYMOUS: "anonymous",
 };

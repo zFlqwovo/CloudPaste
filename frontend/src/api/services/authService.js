@@ -82,10 +82,9 @@ export function getAllApiKeys() {
  * @param {string} [role="GENERAL"] - 用户角色
  * @param {string} [customKey] - 自定义密钥（可选，仅限字母、数字、横杠和下划线）
  * @param {string} [basicPath="/"] - 基本路径（可选，默认为根路径'/'）
- * @param {boolean} [isGuest=false] - 是否为访客
  * @returns {Promise<Object>} 新创建的API密钥信息
  */
-export function createApiKey(name, expiresAt, permissions = 0, role = "GENERAL", customKey = null, basicPath = "/", isGuest = false) {
+export function createApiKey(name, expiresAt, permissions = 0, role = "GENERAL", customKey = null, basicPath = "/") {
   return post("/admin/api-keys", {
     name,
     expires_at: expiresAt,
@@ -93,7 +92,6 @@ export function createApiKey(name, expiresAt, permissions = 0, role = "GENERAL",
     role,
     custom_key: customKey,
     basic_path: basicPath,
-    is_guest: isGuest ? 1 : 0,
   });
 }
 
@@ -114,7 +112,7 @@ export function deleteApiKey(keyId) {
  * @param {number} [updateData.permissions] - 位标志权限值
  * @param {string} [updateData.role] - 用户角色
  * @param {string} [updateData.basic_path] - 基本路径
- * @param {boolean} [updateData.is_guest] - 是否为访客
+ * @param {boolean} [updateData.is_enable] - 是否启用
  * @param {string} [updateData.expires_at] - 新的过期时间，ISO格式字符串
  * @returns {Promise<Object>} 更新结果
  */
