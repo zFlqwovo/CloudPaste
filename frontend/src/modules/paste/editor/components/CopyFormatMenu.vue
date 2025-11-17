@@ -2,10 +2,10 @@
   <div
     v-if="visible"
     id="copyFormatMenu"
-    class="absolute bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700"
-    :style="{ top: `${position.y}px`, left: `${position.x}px` }"
+    class="vditor-hint vditor-panel--arrow absolute z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg"
+    :style="{ top: `${position.y}px`, left: `${position.x}px`, display: 'block' }"
   >
-    <div class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center" @click="copyAsMarkdown">
+    <div class="px-4 py-2 cursor-pointer flex items-center" @click="copyAsMarkdown">
       <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -14,7 +14,7 @@
       </svg>
       <span>{{ $t("markdown.copyAsMarkdown") }}</span>
     </div>
-    <div class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center" @click="copyAsHTML">
+    <div class="px-4 py-2 cursor-pointer flex items-center" @click="copyAsHTML">
       <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
           d="M9 16H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4l-4 4z"
@@ -28,7 +28,7 @@
       </svg>
       <span>{{ $t("markdown.copyAsHTML") }}</span>
     </div>
-    <div class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center" @click="copyAsPlainText">
+    <div class="px-4 py-2 cursor-pointer flex items-center" @click="copyAsPlainText">
       <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -38,7 +38,7 @@
       </svg>
       <span>{{ $t("markdown.copyAsPlainText") }}</span>
     </div>
-    <div class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center" @click="exportWordDocument">
+    <div class="px-4 py-2 cursor-pointer flex items-center" @click="exportWordDocument">
       <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -48,7 +48,7 @@
       </svg>
       <span>{{ $t("markdown.exportAsWord") }}</span>
     </div>
-    <div class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center" @click="exportAsPng">
+    <div class="px-4 py-2 cursor-pointer flex items-center" @click="exportAsPng">
       <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M17 21v-8h-8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -335,12 +335,5 @@ onUnmounted(() => {
 <style scoped>
 #copyFormatMenu {
   min-width: 180px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-  transform-origin: top left;
-}
-
-#copyFormatMenu div {
-  transition: background-color 0.15s ease-in-out;
 }
 </style>

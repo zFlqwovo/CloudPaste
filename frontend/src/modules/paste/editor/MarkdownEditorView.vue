@@ -267,6 +267,22 @@ const clearEditorContent = () => {
   editorContent.value = "";
 };
 
+// 根据当前工具栏按钮位置更新复制格式菜单的位置
+const updateCopyFormatMenuPosition = () => {
+  if (!copyFormatMenuVisible.value) {
+    return;
+  }
+
+  const copyFormatBtn = document.querySelector('.vditor-toolbar .vditor-tooltipped[data-type="copy-formats"]');
+  if (copyFormatBtn) {
+    const rect = copyFormatBtn.getBoundingClientRect();
+    copyFormatMenuPosition.value = {
+      x: rect.left,
+      y: rect.bottom + 5,
+    };
+  }
+};
+
 // 显示复制格式菜单
 const showCopyFormatsMenu = (position) => {
   if (!currentEditor.value) return;
@@ -296,6 +312,15 @@ const showCopyFormatsMenu = (position) => {
 const closeCopyFormatMenu = () => {
   copyFormatMenuVisible.value = false;
 };
+
+// 窗口尺寸变化时，保持菜单跟随工具栏按钮
+onMounted(() => {
+  window.addEventListener("resize", updateCopyFormatMenuPosition);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", updateCopyFormatMenuPosition);
+});
 
 // 显示二维码
 const showQRCode = () => {

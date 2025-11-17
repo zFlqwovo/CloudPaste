@@ -62,10 +62,11 @@ const isDev = import.meta.env.DEV;
     const detail = event.detail || {};
     const type = detail.type || "info";
     const content = detail.content || detail.message || "";
+    const duration = typeof detail.duration === "number" ? detail.duration : undefined;
 
     if (!content) return;
 
-    showMessage(type, content);
+    showMessage(type, content, duration);
   };
 
   const handleGlobalMessageClearEvent = () => {
@@ -381,7 +382,12 @@ const isDev = import.meta.env.DEV;
     <PWAInstallPrompt :dark-mode="isDarkMode" />
 
     <!-- 全局消息提示 -->
-    <div v-if="hasMessage" class="fixed bottom-4 right-4 z-50 max-w-sm w-full px-4">
+    <div
+      v-if="hasMessage"
+      class="fixed bottom-4 right-4 z-50 max-w-sm w-full px-4"
+      :role="messageType === 'error' || messageType === 'warning' ? 'alert' : 'status'"
+      :aria-live="messageType === 'error' || messageType === 'warning' ? 'assertive' : 'polite'"
+    >
       <div
         :class="[
           'flex items-start justify-between px-4 py-3 rounded shadow-lg border text-sm',

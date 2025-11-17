@@ -182,7 +182,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onBeforeUnmount } from "vue";
+import { ref, watch, onBeforeUnmount, onMounted } from "vue";
 import { useGlobalMessage } from "@/composables/core/useGlobalMessage.js";
 import { getInputClasses } from "./PasteViewUtils";
 import VditorUnified from "@/components/common/VditorUnified.vue";
@@ -349,17 +349,43 @@ const clearEditorContent = () => {
   }
 };
 
+// 根据当前工具栏按钮位置更新复制格式菜单的位置
+const updateCopyFormatMenuPosition = () => {
+  if (!copyFormatMenuVisible.value) {
+    return;
+  }
+
+  const copyFormatBtn = document.querySelector('.vditor-toolbar .vditor-tooltipped[data-type="copy-formats"]');
+  if (copyFormatBtn) {
+    const rect = copyFormatBtn.getBoundingClientRect();
+    copyFormatMenuPosition.value = {
+      x: rect.left,
+      y: rect.bottom + 5,
+    };
+  }
+};
+
 // 显示复制格式菜单
 const showCopyFormatsMenu = (position = null) => {
-  if (position) {
+  if (position && position.x !== undefined && position.y !== undefined) {
     // 如果传入了位置参数，直接使用（来自按钮点击事件）
     copyFormatMenuPosition.value = position;
   } else {
-    // 如果没有传入位置，使用默认位置
-    copyFormatMenuPosition.value = {
-      x: 100,
-      y: 100,
-    };
+    // 如果没有传入位置，则尝试基于工具栏按钮计算位置
+    const copyFormatBtn = document.querySelector('.vditor-toolbar .vditor-tooltipped[data-type="copy-formats"]');
+    if (copyFormatBtn) {
+      const rect = copyFormatBtn.getBoundingClientRect();
+      copyFormatMenuPosition.value = {
+        x: rect.left,
+        y: rect.bottom + 5,
+      };
+    } else {
+      // 回退到默认位置
+      copyFormatMenuPosition.value = {
+        x: 100,
+        y: 100,
+      };
+    }
   }
 
   // 显示菜单
@@ -567,6 +593,11 @@ watch(
 // 清理
 onBeforeUnmount(() => {
   copyFormatMenuVisible.value = false;
+  window.removeEventListener("resize", updateCopyFormatMenuPosition);
+});
+
+onMounted(() => {
+  window.addEventListener("resize", updateCopyFormatMenuPosition);
 });
 </script>
 

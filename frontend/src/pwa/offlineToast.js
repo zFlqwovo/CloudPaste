@@ -6,6 +6,8 @@ export function showOfflineToast(message = "当前页面暂时无法访问，请
       detail: {
         type: "warning",
         content: message,
+        // 离线场景默认采用持久警告，直到用户手动关闭或状态恢复
+        duration: 0,
       },
     })
   );
