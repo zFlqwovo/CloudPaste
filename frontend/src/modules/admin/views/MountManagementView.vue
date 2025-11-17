@@ -33,6 +33,7 @@ const {
   pagination,
   lastRefreshTime,
   pageSizeOptions,
+  viewMode,
 
   // 权限状态
   isAdmin,
@@ -49,9 +50,11 @@ const {
   handleFormSaveSuccess,
   confirmDelete,
   toggleActive,
+  toggleViewMode,
 
   // 工具方法
   formatDate,
+  formatDateOnly,
   formatCreator,
   getCreatorClass,
   formatStorageType,
@@ -125,25 +128,75 @@ onMounted(() => {
         </span>
       </div>
 
-      <!-- 搜索框 -->
-      <div class="max-w-md">
-        <div class="relative rounded-md shadow-sm">
-          <input
-            type="text"
-            v-model="searchQuery"
-            :placeholder="$t('admin.mount.search')"
-            class="w-full px-3 py-1.5 rounded-md focus:outline-none focus:ring-2"
-            :class="
-              darkMode
-                ? 'bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 border border-gray-600'
-                : 'bg-white text-gray-700 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 border border-gray-300'
-            "
-          />
-          <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <svg class="h-4 w-4" :class="darkMode ? 'text-gray-400' : 'text-gray-400'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+      <!-- 右侧：搜索框 + 视图切换 -->
+      <div class="flex items-center gap-2">
+        <!-- 搜索框 -->
+        <div class="max-w-md">
+          <div class="relative rounded-md shadow-sm">
+            <input
+              type="text"
+              v-model="searchQuery"
+              :placeholder="$t('admin.mount.search')"
+              class="w-full px-3 py-1.5 rounded-md focus:outline-none focus:ring-2"
+              :class="
+                darkMode
+                  ? 'bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 border border-gray-600'
+                  : 'bg-white text-gray-700 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 border border-gray-300'
+              "
+            />
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <svg class="h-4 w-4" :class="darkMode ? 'text-gray-400' : 'text-gray-400'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
+        </div>
+
+        <!-- 视图切换按钮组 -->
+        <div class="inline-flex rounded-md shadow-sm" role="group">
+          <!-- 网格视图按钮 -->
+          <button
+            @click="toggleViewMode('grid')"
+            type="button"
+            :class="[
+              'px-3 py-1.5 text-sm font-medium rounded-l-md border transition-colors',
+              viewMode === 'grid'
+                ? darkMode
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-blue-500 text-white border-blue-500'
+                : darkMode
+                  ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            ]"
+            :title="$t('admin.mount.viewMode.grid')"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+
+          <!-- 列表视图按钮 -->
+          <button
+            @click="toggleViewMode('list')"
+            type="button"
+            :class="[
+              'px-3 py-1.5 text-sm font-medium rounded-r-md border-t border-r border-b transition-colors',
+              viewMode === 'list'
+                ? darkMode
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-blue-500 text-white border-blue-500'
+                : darkMode
+                  ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            ]"
+            :title="$t('admin.mount.viewMode.list')"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -192,7 +245,196 @@ onMounted(() => {
 
     <!-- 挂载点列表 -->
     <div v-else class="flex-grow overflow-auto">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- 列表视图 -->
+      <div v-if="viewMode === 'list'">
+        <!-- 桌面端表格 -->
+        <div class="hidden md:block overflow-x-auto">
+          <table class="min-w-full divide-y" :class="darkMode ? 'divide-gray-700' : 'divide-gray-200'">
+            <thead :class="darkMode ? 'bg-gray-800' : 'bg-gray-50'">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("admin.mount.form.name") }}
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("admin.mount.form.mountPath") }}
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("admin.mount.form.storageType") }}
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("admin.mount.form.remark") }}
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("admin.mount.status.proxySign") }}
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("admin.mount.info.createdAt") }}
+                </th>
+                <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider" :class="darkMode ? 'text-gray-300' : 'text-gray-500'">
+                  {{ $t("common.actions") }}
+                </th>
+              </tr>
+            </thead>
+            <tbody :class="darkMode ? 'bg-gray-900 divide-gray-800' : 'bg-white divide-gray-200'" class="divide-y">
+              <tr v-for="mount in filteredMounts.slice(pagination.offset, pagination.offset + pagination.limit)"
+                  :key="mount.id"
+                  :class="darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'"
+                  class="transition-colors">
+                <!-- 名称 + 状态 -->
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex items-center">
+                    <span class="w-2 h-2 rounded-full mr-2" :class="mount.is_active ? 'bg-green-400' : 'bg-gray-400'"></span>
+                    <span class="text-sm font-medium" :class="darkMode ? 'text-white' : 'text-gray-900'">{{ mount.name }}</span>
+                  </div>
+                </td>
+                <!-- 挂载路径 -->
+                <td class="px-6 py-4">
+                  <div class="text-sm font-mono" :class="darkMode ? 'text-gray-300' : 'text-gray-600'" :title="mount.mount_path">
+                    <span class="inline-block max-w-xs truncate">{{ mount.mount_path }}</span>
+                  </div>
+                </td>
+                <!-- 存储类型 -->
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="text-sm" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ formatStorageType(mount) }}</span>
+                </td>
+                <!-- 备注 -->
+                <td class="px-6 py-4">
+                  <span class="text-sm inline-block max-w-xs truncate" :class="darkMode ? 'text-gray-400' : 'text-gray-500'" :title="mount.remark || '-'">
+                    {{ mount.remark || '-' }}
+                  </span>
+                </td>
+                <!-- 代理/签名状态 -->
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex flex-wrap gap-1">
+                    <span v-if="mount.web_proxy" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                          :class="darkMode ? 'bg-blue-900/50 text-blue-200' : 'bg-blue-100 text-blue-800'">
+                      {{ $t("admin.mount.status.proxy") }}
+                    </span>
+                    <span v-if="mount.enable_sign" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                          :class="darkMode ? 'bg-green-900/50 text-green-200' : 'bg-green-100 text-green-800'">
+                      {{ $t("admin.mount.status.signature") }}
+                    </span>
+                    <span v-if="!mount.web_proxy && !mount.enable_sign" class="text-xs" :class="darkMode ? 'text-gray-500' : 'text-gray-400'">-</span>
+                  </div>
+                </td>
+                <!-- 创建时间 -->
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="text-sm" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">
+                    {{ formatDateOnly(mount.created_at) }}
+                  </span>
+                </td>
+                <!-- 操作按钮 -->
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <div class="flex justify-center space-x-2">
+                    <template v-if="isAdmin">
+                      <!-- 编辑按钮 -->
+                      <button
+                        @click="openEditForm(mount)"
+                        class="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        :class="darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-900'"
+                        :title="$t('admin.mount.actions.edit')">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <!-- 启用/禁用按钮 -->
+                      <button
+                        @click="toggleActive(mount)"
+                        class="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        :class="mount.is_active
+                          ? (darkMode ? 'text-yellow-400 hover:text-yellow-300' : 'text-yellow-600 hover:text-yellow-900')
+                          : (darkMode ? 'text-green-400 hover:text-green-300' : 'text-green-600 hover:text-green-900')"
+                        :title="mount.is_active ? $t('admin.mount.actions.disable') : $t('admin.mount.actions.enable')">
+                        <svg v-if="mount.is_active" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <!-- 删除按钮 -->
+                      <button
+                        @click="confirmDelete(mount.id)"
+                        class="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        :class="darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-900'"
+                        :title="$t('admin.mount.actions.delete')">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </template>
+                    <template v-else>
+                      <span class="text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ $t("admin.mount.actions.view") }}</span>
+                    </template>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 移动端网格卡片 (复用现有网格) -->
+        <div class="md:hidden grid grid-cols-1 gap-4">
+          <div
+            v-for="mount in filteredMounts.slice(pagination.offset, pagination.offset + pagination.limit)"
+            :key="mount.id"
+            class="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg flex flex-col"
+            :class="darkMode ? 'bg-gray-700 border border-gray-600' : 'bg-white border border-gray-200'"
+          >
+            <div class="px-4 py-4 flex-1 flex flex-col justify-between">
+              <div>
+                <div class="flex justify-between items-start mb-3">
+                  <h3 class="text-base font-medium truncate" :class="darkMode ? 'text-white' : 'text-gray-900'" :title="mount.name">{{ mount.name }}</h3>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        :class="mount.is_active
+                          ? (darkMode ? 'bg-green-900/50 text-green-200' : 'bg-green-100 text-green-800')
+                          : (darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-800')">
+                    <span class="w-1.5 h-1.5 rounded-full mr-1" :class="mount.is_active ? 'bg-green-400' : 'bg-gray-400'"></span>
+                    {{ mount.is_active ? $t("admin.mount.status.enabled") : $t("admin.mount.status.disabled") }}
+                  </span>
+                </div>
+                <div class="mb-2 text-sm font-mono" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ mount.mount_path }}</div>
+                <div class="mb-2 text-sm" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ formatStorageType(mount) }}</div>
+                <div v-if="mount.remark" class="mb-2 text-sm truncate" :class="darkMode ? 'text-gray-400' : 'text-gray-500'" :title="mount.remark">{{ mount.remark }}</div>
+                <div v-if="mount.web_proxy || mount.enable_sign" class="mb-2 flex flex-wrap gap-1">
+                  <span v-if="mount.web_proxy" class="inline-flex items-center px-2 py-0.5 rounded text-xs"
+                        :class="darkMode ? 'bg-blue-900/50 text-blue-200' : 'bg-blue-100 text-blue-800'">{{ $t("admin.mount.status.proxy") }}</span>
+                  <span v-if="mount.enable_sign" class="inline-flex items-center px-2 py-0.5 rounded text-xs"
+                        :class="darkMode ? 'bg-green-900/50 text-green-200' : 'bg-green-100 text-green-800'">{{ $t("admin.mount.status.signature") }}</span>
+                </div>
+              </div>
+              <div class="flex justify-end space-x-2 mt-3">
+                <template v-if="isAdmin">
+                  <button @click="openEditForm(mount)" class="px-2.5 py-1.5 rounded-md text-xs transition-colors"
+                          :class="darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'">
+                    {{ $t("admin.mount.actions.edit") }}
+                  </button>
+                  <button @click="toggleActive(mount)" class="px-2.5 py-1.5 rounded-md text-xs transition-colors"
+                          :class="mount.is_active
+                            ? (darkMode ? 'bg-yellow-700 hover:bg-yellow-600 text-yellow-100' : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800')
+                            : (darkMode ? 'bg-green-700 hover:bg-green-600 text-green-100' : 'bg-green-100 hover:bg-green-200 text-green-800')">
+                    {{ mount.is_active ? $t("admin.mount.actions.disable") : $t("admin.mount.actions.enable") }}
+                  </button>
+                  <button @click="confirmDelete(mount.id)" class="px-2.5 py-1.5 rounded-md text-xs transition-colors"
+                          :class="darkMode ? 'bg-red-700 hover:bg-red-600 text-red-100' : 'bg-red-100 hover:bg-red-200 text-red-800'">
+                    {{ $t("admin.mount.actions.delete") }}
+                  </button>
+                </template>
+                <template v-else>
+                  <span class="text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ $t("admin.mount.actions.view") }}</span>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 网格视图 (保持原有布局) -->
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- 分页显示的挂载点 -->
         <div
           v-for="mount in filteredMounts.slice(pagination.offset, pagination.offset + pagination.limit)"

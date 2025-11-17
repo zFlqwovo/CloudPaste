@@ -32,6 +32,10 @@ export function useMountManagement() {
   const currentMount = ref(null);
   const searchQuery = ref("");
 
+  // 视图模式状态管理
+  const VIEW_MODE_KEY = 'mount-view-mode';
+  const viewMode = ref(localStorage.getItem(VIEW_MODE_KEY) || 'grid');
+
   // 挂载管理专用分页配置：每页默认 6 条，自定义可选项
   const pageSizeOptions = [6, 12, 24, 48, 96];
   base.pagination.limit = pageSizeOptions[0];
@@ -91,11 +95,24 @@ export function useMountManagement() {
   );
 
   /**
-   * 格式化日期显示
+   * 格式化日期显示（包含时分秒）
    */
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     return formatDateTimeWithSeconds(dateString);
+  };
+
+  /**
+   * 格式化日期显示（仅日期，不含时间）
+   */
+  const formatDateOnly = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   /**
@@ -471,6 +488,15 @@ export function useMountManagement() {
     return storageConfigsStore.getStorageTypeLabel(mount.storage_type) || mount.storage_type || "-";
   };
 
+  /**
+   * 切换视图模式
+   * @param {string} mode - 'grid' 或 'list'
+   */
+  const toggleViewMode = (mode) => {
+    viewMode.value = mode;
+    localStorage.setItem(VIEW_MODE_KEY, mode);
+  };
+
   return {
     // 继承基础功能
     ...base,
@@ -485,6 +511,7 @@ export function useMountManagement() {
     searchQuery,
     filteredMounts,
     pageSizeOptions,
+    viewMode,
 
     // 权限状态
     isAdmin,
@@ -503,9 +530,11 @@ export function useMountManagement() {
     handleFormSaveSuccess,
     confirmDelete,
     toggleActive,
+    toggleViewMode,
 
     // 工具方法
     formatDate,
+    formatDateOnly,
     getStorageConfigById,
     updateMountPagination,
     getStorageTypeClass,
