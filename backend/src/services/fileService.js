@@ -537,29 +537,29 @@ export class FileService {
 
     // 为每个文件添加字段（包括文件类型检测）
     const processedFiles = await Promise.all(
-        files.map(async (file) => {
-          // 添加文件类型信息
-          const fileType = await GetFileType(file.filename, this.db);
-          const fileTypeName = await getFileTypeName(file.filename, this.db);
+      files.map(async (file) => {
+        // 添加文件类型信息
+        const fileType = await GetFileType(file.filename, this.db);
+        const fileTypeName = await getFileTypeName(file.filename, this.db);
 
-          const result = {
-            ...file,
-            has_password: file.password ? true : false,
-            type: fileType, // 整数类型常量 (0-6)
-            typeName: fileTypeName, // 类型名称（用于调试）
-          };
+        const result = {
+          ...file,
+          has_password: file.password ? true : false,
+          type: fileType, // 整数类型常量 (0-6)
+          typeName: fileTypeName, // 类型名称（用于调试）
+        };
 
-          // 添加API密钥名称
-          if (file.created_by && file.created_by.startsWith("apikey:")) {
-            const keyId = file.created_by.substring(7);
-            const keyName = keyNamesMap.get(keyId);
-            if (keyName) {
-              result.key_name = keyName;
-            }
+        // 添加API密钥名称
+        if (file.created_by && file.created_by.startsWith("apikey:")) {
+          const keyId = file.created_by.substring(7);
+          const keyName = keyNamesMap.get(keyId);
+          if (keyName) {
+            result.key_name = keyName;
           }
+        }
 
-          return result;
-        })
+        return result;
+      })
     );
 
     return processedFiles;

@@ -37,22 +37,24 @@ API 密钥由管理员在后台创建，使用位标志权限系统，支持以�
 
 **权限位标志值：**
 
-- **1 (TEXT)**: 文本分享权限 - 允许创建、查看、修改和删除文本分享
-- **2 (FILE_SHARE)**: 文件分享权限 - 允许创建和管理文件分享链接
-- **256 (MOUNT_VIEW)**: 挂载页查看权限 - 允许浏览挂载页内容
+- **1 (TEXT_SHARE)**: 文本分享权限 - 允许创建/分享文本
+- **2 (FILE_SHARE)**: 文件分享权限 - 允许创建/分享文件
+- **4 (TEXT_MANAGE)**: 文本管理权限 - 允许列出/修改/删除自己的文本分享
+- **8 (FILE_MANAGE)**: 文件管理权限 - 允许列出/修改/删除自己的文件分享
+- **256 (MOUNT_VIEW)**: 挂载页查看权限 - 允许浏览挂载页
 - **512 (MOUNT_UPLOAD)**: 上传权限 - 允许上传文件和创建目录
-- **1024 (MOUNT_COPY)**: 复制权限 - 允许复制文件和目录
-- **2048 (MOUNT_RENAME)**: 重命名权限 - 允许重命名文件和目录
-- **4096 (MOUNT_DELETE)**: 删除权限 - 允许删除文件和目录
-- **65536 (WEBDAV_READ)**: WebDAV 读取权限 - 允许通过 WebDAV 读取文件（GET、PROPFIND 等）
-- **131072 (WEBDAV_MANAGE)**: WebDAV 管理权限 - 允许通过 WebDAV 管理文件（PUT、DELETE、MKCOL 等）
+- **1024 (MOUNT_COPY)**: 复制权限 - 允许复制文件/目录
+- **2048 (MOUNT_RENAME)**: 重命名权限 - 允许重命名文件/目录
+- **4096 (MOUNT_DELETE)**: 删除权限 - 允许删除文件/目录
+- **65536 (WEBDAV_READ)**: WebDAV 读取权限 - 允许通过 WebDAV 读取文件（GET/PROPFIND 等）
+- **131072 (WEBDAV_MANAGE)**: WebDAV 管理权限 - 允许通过 WebDAV 管理文件（PUT/DELETE/MKCOL 等）
 
 **权限组合示例：**
 
-- `259` = TEXT + FILE_SHARE + MOUNT_VIEW (1+2+256) - 基础查看权限
+- `15` = TEXT_SHARE + TEXT_MANAGE + FILE_SHARE + FILE_MANAGE (1+2+4+8) - 拥有完整的文本/文件分享与管理权限
 - `771` = 基础权限 + MOUNT_UPLOAD (1+2+256+512) - 包含上传权限
 - `7939` = 除 WebDAV 外的所有权限 (1+2+256+512+1024+2048+4096) - 挂载页完整权限
-- `198915` = 所有权限 (1+2+256+512+1024+2048+4096+65536+131072) - 完整权限
+- `204559` = ALL_PERMISSIONS (1+2+4+8+256+512+1024+2048+4096+65536+131072) - 拥有所有权限
 
 **路径限制：**
 
@@ -809,6 +811,55 @@ X-Custom-Auth-Key: <api_key>
       "success": true
     }
     ```
+- `GET /api/admin/api-keys/:id/storage-acl`
+
+  - 用于获取指定 API 密钥的存储 ACL 白名单
+  - 权限：需要管理员权限
+  - 参数：id - 密钥 ID
+  - 响应：返回该密钥允许使用的 `storage_config_id` 列表
+    ```json
+    {
+      "code": 200,
+      "message": "获取存储 ACL 成功",
+      "data": {
+        "subject_type": "API_KEY",
+        "subject_id": "密钥ID",
+        "storage_config_ids": ["config-id-a", "config-id-b"]
+      },
+      "success": true
+    }
+    ```
+  - 说明：
+    - 当 `storage_config_ids` 为空数组时，表示未为该密钥配置存储 ACL 白名单，此时该密钥可以使用所有公开存储配置（仍受 `basic_path` 和权限位限制）。
+
+- `PUT /api/admin/api-keys/:id/storage-acl`
+
+  - 用于整体更新指定 API 密钥的存储 ACL 白名单
+  - 权限：需要管理员权限
+  - 参数：id - 密钥 ID
+  - 请求体：
+    ```json
+    {
+      "storage_config_ids": ["config-id-a", "config-id-b"]
+    }
+    ```
+  - 响应：
+    ```json
+    {
+      "code": 200,
+      "message": "存储 ACL 已更新",
+      "data": {
+        "subject_type": "API_KEY",
+        "subject_id": "密钥ID",
+        "storage_config_ids": ["config-id-a", "config-id-b"]
+      },
+      "success": true
+    }
+    ```
+  - 说明：
+    - `storage_config_ids` 为非空数组：该密钥只能使用这些存储配置（并且必须是公开的 `is_public = 1`）。
+    - `storage_config_ids` 为空数组：清空白名单，恢复为“可以使用所有公开存储配置”的默认模式。
+
 
 ### 系统设置 API
 

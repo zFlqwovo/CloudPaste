@@ -94,6 +94,7 @@ export default {
       basicPathPlaceholder: "/",
       basicPathHelp: "Set the basic path that the API key can access, defaults to root path",
       selectPath: "Select Path",
+      storageAcl: "Allowed storage configs (optional)",
       securityTip: "Security Tip",
       securityMessage: "Please keep your API key safe and do not use it in public places or insecure environments.",
       pathSelector: {
@@ -111,6 +112,7 @@ export default {
       creating: "Creating...",
       processing: "Creating...",
       cancel: "Cancel",
+      close: "Close",
       errors: {
         nameRequired: "Key name cannot be empty",
         customKeyRequired: "Custom key cannot be empty",
@@ -151,6 +153,7 @@ export default {
       basicPathPlaceholder: "/",
       basicPathHelp: "Set the basic path that the API key can access, defaults to root path",
       selectPath: "Select Path",
+      storageAcl: "Allowed storage configs (optional)",
       securityTip: "Security Tip",
       securityMessage: "Please keep your API key safe and do not use it in public places or insecure environments.",
       pathSelector: {
@@ -196,5 +199,10 @@ export default {
     confirmBulkDelete: "Are you sure you want to delete the selected {count} keys? This action cannot be undone.",
     selectKeysFirst: "Please select keys to delete first",
     bulkDeleteConfirm: "Are you sure you want to delete the selected {count} keys? This action cannot be undone.",
+    storageAcl: {
+      help: "Empty: all public configs. Selected: chosen only.",
+      empty: "No storage configs available or not loaded yet.",
+      public: "Public (API)",
+    },
   },
 };

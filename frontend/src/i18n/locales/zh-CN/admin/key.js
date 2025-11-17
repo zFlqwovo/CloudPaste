@@ -94,6 +94,7 @@ export default {
       basicPathPlaceholder: "/",
       basicPathHelp: "设置API密钥可访问的基本路径，默认为根路径",
       selectPath: "选择路径",
+      storageAcl: "允许访问的存储配置（可选）",
       securityTip: "安全提示",
       securityMessage: "请妥善保管您的API密钥，不要在公共场所或不安全的环境中使用。",
       pathSelector: {
@@ -111,6 +112,7 @@ export default {
       creating: "创建中...",
       processing: "创建中...",
       cancel: "取消",
+      close: "关闭",
       errors: {
         nameRequired: "密钥名称不能为空",
         customKeyRequired: "自定义密钥不能为空",
@@ -151,6 +153,7 @@ export default {
       basicPathPlaceholder: "/",
       basicPathHelp: "设置API密钥可访问的基本路径，默认为根路径",
       selectPath: "选择路径",
+      storageAcl: "允许访问的存储配置（可选）",
       securityTip: "安全提示",
       securityMessage: "请妥善保管您的API密钥，不要在公共场所或不安全的环境中使用。",
       pathSelector: {
@@ -196,5 +199,10 @@ export default {
     confirmBulkDelete: "确定要删除选中的 {count} 个密钥吗？此操作不可撤销。",
     selectKeysFirst: "请先选择要删除的密钥",
     bulkDeleteConfirm: "确定要删除选中的 {count} 个密钥吗？此操作不可撤销。",
+    storageAcl: {
+      help: "不勾选：可使用所有公开存储配置；勾选后：仅可使用已勾选的存储配置。",
+      empty: "暂无存储配置或尚未加载。",
+      public: "公开（API 密钥可用）",
+    },
   },
 };

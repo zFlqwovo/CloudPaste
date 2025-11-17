@@ -93,10 +93,59 @@ export function useAdminApiKeyService() {
     return resp;
   };
 
+  /**
+   * 获取指定 API 密钥的存储 ACL（storage_config_id 列表）
+   * @param {string} id - API 密钥 ID
+   * @returns {Promise<string[]>}
+   */
+  const getApiKeyStorageAcl = async (id) => {
+    const resp = await api.admin.getApiKeyStorageAcl(id);
+    if (!resp) {
+      throw new Error("获取存储 ACL 失败");
+    }
+
+    let payload = resp;
+    if (typeof resp === "object" && "success" in resp) {
+      if (!resp.success) {
+        throw new Error(resp.message || "获取存储 ACL 失败");
+      }
+      payload = resp.data ?? resp;
+    }
+
+    const ids = payload?.storage_config_ids ?? payload?.storageConfigIds ?? [];
+    return Array.isArray(ids) ? ids : [];
+  };
+
+  /**
+   * 更新指定 API 密钥的存储 ACL（整体替换）
+   * @param {string} id - API 密钥 ID
+   * @param {string[]} storageConfigIds - 允许访问的 storage_config_id 列表
+   * @returns {Promise<string[]>} 更新后的 storage_config_id 列表
+   */
+  const updateApiKeyStorageAcl = async (id, storageConfigIds) => {
+    const resp = await api.admin.updateApiKeyStorageAcl(id, storageConfigIds);
+    if (!resp) {
+      throw new Error("更新存储 ACL 失败");
+    }
+
+    let payload = resp;
+    if (typeof resp === "object" && "success" in resp) {
+      if (!resp.success) {
+        throw new Error(resp.message || "更新存储 ACL 失败");
+      }
+      payload = resp.data ?? resp;
+    }
+
+    const ids = payload?.storage_config_ids ?? payload?.storageConfigIds ?? [];
+    return Array.isArray(ids) ? ids : [];
+  };
+
   return {
     getAllApiKeys,
     deleteApiKey,
     updateApiKey,
     createApiKey,
+    getApiKeyStorageAcl,
+    updateApiKeyStorageAcl,
   };
 }

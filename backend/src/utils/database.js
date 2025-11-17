@@ -143,6 +143,24 @@ async function createStorageTables(db) {
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_storage_public ON ${DbTables.STORAGE_CONFIGS}(is_public)`).run();
   await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_default_per_admin ON ${DbTables.STORAGE_CONFIGS}(admin_id) WHERE is_default = 1`).run();
 
+  // 存储 ACL 表：主体 -> 存储配置访问白名单
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.PRINCIPAL_STORAGE_ACL} (
+        subject_type TEXT NOT NULL,
+        subject_id TEXT NOT NULL,
+        storage_config_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (subject_type, subject_id, storage_config_id)
+      )
+    `
+    )
+    .run();
+  await db
+    .prepare(`CREATE INDEX IF NOT EXISTS idx_psa_storage_config_id ON ${DbTables.PRINCIPAL_STORAGE_ACL}(storage_config_id)`)
+    .run();
+
   // 创建storage_mounts表 - 存储挂载配置
   await db
     .prepare(
@@ -632,9 +650,36 @@ async function executeMigrationForVersion(db, version) {
             SELECT 1 FROM ${DbTables.STORAGE_CONFIGS} t WHERE t.id = s.id
           )
         `
-        )
+          )
         .run();
       console.log("版本18：storage_configs 表与数据迁移完成。");
+      break;
+
+    case 19:
+      // 版本19：创建 principal_storage_acl 表（主体 -> 存储配置 ACL 白名单）
+      console.log("版本19：检查并创建 principal_storage_acl 表...");
+
+      await db
+        .prepare(
+          `
+          CREATE TABLE IF NOT EXISTS ${DbTables.PRINCIPAL_STORAGE_ACL} (
+            subject_type TEXT NOT NULL,
+            subject_id TEXT NOT NULL,
+            storage_config_id TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (subject_type, subject_id, storage_config_id)
+          )
+        `
+        )
+        .run();
+
+      await db
+        .prepare(
+          `CREATE INDEX IF NOT EXISTS idx_psa_storage_config_id ON ${DbTables.PRINCIPAL_STORAGE_ACL}(storage_config_id)`
+        )
+        .run();
+
+      console.log("版本19：principal_storage_acl 表检查/创建完成。");
       break;
 
     default:
@@ -1268,7 +1313,7 @@ export async function checkAndInitDatabase(db) {
     const versionSetting = await db.prepare(`SELECT value FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = 'schema_version'`).first();
 
     const currentVersion = versionSetting ? parseInt(versionSetting.value) : 0;
-    const targetVersion = 18; // 当前最新版本
+    const targetVersion = 19; // 当前最新版本
 
     if (currentVersion < targetVersion) {
       console.log(`需要更新数据库结构，当前版本:${currentVersion}，目标版本:${targetVersion}`);

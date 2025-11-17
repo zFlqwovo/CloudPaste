@@ -1,6 +1,6 @@
 /**
  * 统一认证服务
- * 职责：具体的认证逻辑、身份识别、权限检查
+ * 具体的认证逻辑、身份识别、权限检查
  */
 
 import { Permission, PermissionChecker } from "../../constants/permissions.js";

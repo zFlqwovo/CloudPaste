@@ -244,11 +244,23 @@ export async function deleteApiKey(db, id, repositoryFactory) {
   // 使用 ApiKeyRepository
   const factory = resolveRepositoryFactory(db, repositoryFactory);
   const apiKeyRepository = factory.getApiKeyRepository();
+  const principalStorageAclRepository = factory.getPrincipalStorageAclRepository
+    ? factory.getPrincipalStorageAclRepository()
+    : null;
 
   // 检查密钥是否存在
   const keyExists = await apiKeyRepository.findById(id);
   if (!keyExists) {
     throw new NotFoundError("密钥不存在");
+  }
+
+  // 删除该密钥关联的存储 ACL（subject_type = 'API_KEY'）
+  if (principalStorageAclRepository) {
+    try {
+      await principalStorageAclRepository.replaceBindings("API_KEY", id, []);
+    } catch (error) {
+      console.warn("删除 API Key 关联的存储 ACL 失败，将继续删除密钥本身：", error);
+    }
   }
 
   // 删除密钥
@@ -272,50 +284,74 @@ export async function getApiKeyByKey(db, key, repositoryFactory) {
 }
 
 /**
- * 根据API密钥的基本路径筛选可访问的挂载点
+ * 根据 API 密钥的 basicPath + 存储 ACL 筛选可访问的挂载点
  * @param {D1Database} db - D1数据库实例
- * @param {string} basicPath - API密钥的基本路径
+ * @param {string} basicPath - API 密钥的基础路径
+ * @param {string|null} subjectType - 主体类型，例如 'API_KEY'，用于存储 ACL（可选）
+ * @param {string|null} subjectId - 主体 ID，例如 api_keys.id，用于存储 ACL（可选）
+ * @param {import("../repositories").RepositoryFactory} [repositoryFactory] - Repository 工厂（可选）
  * @returns {Promise<Array>} 可访问的挂载点列表
  */
-export async function getAccessibleMountsByBasicPath(db, basicPath, repositoryFactory) {
+export async function getAccessibleMountsByBasicPath(db, basicPath, subjectType, subjectId, repositoryFactory) {
   // 使用 Repository 获取数据
   const factory = resolveRepositoryFactory(db, repositoryFactory);
   const mountRepository = factory.getMountRepository();
-  const s3ConfigRepository = factory.getStorageConfigRepository();
+  const storageConfigRepository = factory.getStorageConfigRepository();
+  const principalStorageAclRepository = factory.getPrincipalStorageAclRepository
+    ? factory.getPrincipalStorageAclRepository()
+    : null;
 
   // 获取所有活跃的挂载点
   const allMounts = await mountRepository.findMany(DbTables.STORAGE_MOUNTS, { is_active: 1 }, { orderBy: "sort_order ASC, name ASC" });
 
   if (!allMounts || allMounts.length === 0) return [];
 
-  // 为每个挂载点获取S3配置信息
-  const mountsWithS3Info = await Promise.all(
+  // 为每个挂载点获取存储配置的公开性信息（当前主要针对对象存储）
+  const mountsWithStorageInfo = await Promise.all(
     allMounts.map(async (mount) => {
       if (mount.storage_config_id) {
-        const s3Config = await s3ConfigRepository.findById(mount.storage_config_id);
+        const storageConfig = await storageConfigRepository.findById(mount.storage_config_id);
         return {
           ...mount,
-          is_public: s3Config?.is_public || 0,
+          is_public: storageConfig?.is_public || 0,
         };
       }
       return {
         ...mount,
-        is_public: 1, // 非S3类型默认为公开
+        is_public: 1, // 无存储配置引用时默认视为公开
       };
     })
   );
 
-  // 根据基本路径和S3配置公开性筛选可访问的挂载点
+  // 若提供主体信息，则加载该主体的 storage_config 白名单（存储 ACL）
+  let allowedConfigIdsSet = null;
+  if (principalStorageAclRepository && subjectType && subjectId) {
+    try {
+      const allowedConfigIds = await principalStorageAclRepository.findConfigIdsBySubject(subjectType, subjectId);
+      if (Array.isArray(allowedConfigIds) && allowedConfigIds.length > 0) {
+        allowedConfigIdsSet = new Set(allowedConfigIds);
+      }
+    } catch (error) {
+      console.warn("加载存储 ACL 失败，将回退到仅基于 is_public + basicPath 的过滤逻辑：", error);
+    }
+  }
+
+  // 根据 basicPath + 存储公开性 + 存储 ACL 筛选可访问的挂载点
   const inaccessibleMounts = []; // 收集无法访问的挂载点信息
-  const accessibleMounts = mountsWithS3Info.filter((mount) => {
-    // 首先检查S3配置的公开性
-    // 对于S3类型的挂载点，必须使用公开的S3配置
+  const accessibleMounts = mountsWithStorageInfo.filter((mount) => {
+    // 首先检查存储配置是否“公开可用”
+    // 对于对象存储类挂载点，必须使用 is_public = 1 的配置
     if (mount.storage_config_id && mount.is_public !== 1) {
       inaccessibleMounts.push(mount.name);
       return false;
     }
 
-    // 然后检查路径权限
+    // 然后检查是否命中主体的存储 ACL 白名单（如果有）
+    if (allowedConfigIdsSet && mount.storage_config_id && !allowedConfigIdsSet.has(mount.storage_config_id)) {
+      return false;
+    }
+
+    // 最后检查路径权限（basicPath 与挂载路径的父子关系）
     const normalizedBasicPath = basicPath === "/" ? "/" : basicPath.replace(/\/+$/, "");
     const normalizedMountPath = mount.mount_path.replace(/\/+$/, "") || "/";
 
@@ -339,7 +375,9 @@ export async function getAccessibleMountsByBasicPath(db, basicPath, repositoryFa
 
   // 如果有无法访问的挂载点，统一输出一条日志
   if (inaccessibleMounts.length > 0) {
-    console.log(`API密钥用户无法访问 ${inaccessibleMounts.length} 个非公开S3配置的挂载点: ${inaccessibleMounts.join(", ")}`);
+    console.log(
+      `API密钥用户无法访问 ${inaccessibleMounts.length} 个非公开存储配置的挂载点: ${inaccessibleMounts.join(", ")}`
+    );
   }
 
   return accessibleMounts;

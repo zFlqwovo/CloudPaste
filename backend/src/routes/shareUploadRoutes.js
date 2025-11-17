@@ -57,12 +57,12 @@ router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
   const shareService = new FileShareService(db, encryptionSecret, repositoryFactory);
 
   const result = await shareService.uploadDirectToStorageAndShare(
-      filename,
-      bodyStream,
-      declaredLength,
-      userIdOrInfo,
-      userType,
-      shareParams
+    filename,
+    bodyStream,
+    declaredLength,
+    userIdOrInfo,
+    userType,
+    shareParams
   );
 
   return jsonOk(c, result, "文件上传成功");

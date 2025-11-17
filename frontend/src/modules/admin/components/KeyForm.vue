@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, shallowRef } from "vue";
+import { ref, computed, watch, shallowRef, onMounted } from "vue";
 import { h } from "vue"; //递归组件
 import { useI18n } from "vue-i18n";
 import { Permission, PermissionChecker } from "@/constants/permissions.js";
@@ -12,7 +12,7 @@ import { useAdminStorageConfigService } from "@/modules/admin/services/storageCo
 const directoryCache = shallowRef(new Map());
 
 const fsService = useFsService();
-const { getAllApiKeys, updateApiKey, createApiKey } = useAdminApiKeyService();
+const { getAllApiKeys, updateApiKey, createApiKey, getApiKeyStorageAcl, updateApiKeyStorageAcl } = useAdminApiKeyService();
 const { getMountsList } = useAdminMountService();
 const { getStorageConfigs } = useAdminStorageConfigService();
 
@@ -360,11 +360,16 @@ const permissions = ref({
 
 const basicPath = ref("/");
 
+// 存储配置 & 桶 ACL 相关状态
+const storageConfigs = ref([]);
+const selectedStorageConfigIds = ref([]);
+
 // 路径选择器相关状态
 const isLoadingMounts = ref(false);
 const mountsList = ref([]);
 const selectedPath = ref("/");
 const rootDirectories = shallowRef([]); // 添加根目录列表状态
+const allPublicMounts = ref([]); // 所有基于公开存储配置的挂载点基准集合
 
 // 自定义过期时间选项
 const expirationOptions = computed(() => {
@@ -437,10 +442,27 @@ const resetForm = () => {
   };
   basicPath.value = "/";
   selectedPath.value = "/";
+  selectedStorageConfigIds.value = [];
   error.value = null;
   activeTab.value = "basic";
   // 清除目录缓存
   directoryCache.value.clear();
+};
+
+// 加载指定密钥的存储 ACL（用于编辑模式）
+const loadStorageAclForKey = async (keyId) => {
+  if (!keyId) {
+    selectedStorageConfigIds.value = [];
+    return;
+  }
+
+  try {
+    const ids = await getApiKeyStorageAcl(keyId);
+    selectedStorageConfigIds.value = Array.isArray(ids) ? ids : [];
+  } catch (error) {
+    console.error("加载存储 ACL 失败:", error);
+    selectedStorageConfigIds.value = [];
+  }
 };
 
 // 监听编辑模式变化，同步表单数据
@@ -455,6 +477,8 @@ watch(
       permissions.value = convertPermissionsFromBitFlag(newVal.permissions);
       basicPath.value = newVal.basic_path || "/";
       selectedPath.value = newVal.basic_path || "/";
+      // 加载存储 ACL
+      loadStorageAclForKey(newVal.id);
 
       // 设置过期时间
       if (newVal.expires_at) {
@@ -500,26 +524,64 @@ watch(
   { immediate: true }
 );
 
+// 根据 ACL 过滤挂载点并更新根目录视图
+const applyAclToMounts = () => {
+  const baseMounts = allPublicMounts.value || [];
+
+  // 如果未配置存储 ACL，则显示所有基于公开存储配置的挂载点
+  if (!selectedStorageConfigIds.value || selectedStorageConfigIds.value.length === 0) {
+    mountsList.value = baseMounts;
+  } else {
+    const allowedSet = new Set(selectedStorageConfigIds.value);
+    mountsList.value = baseMounts.filter((mount) => {
+      // 对于没有绑定存储配置的挂载点，暂时不受 ACL 限制
+      if (!mount.storage_config_id) {
+        return true;
+      }
+      return allowedSet.has(mount.storage_config_id);
+    });
+  }
+
+  rootDirectories.value = mountsList.value.map((mount) => ({
+    name: mount.name,
+    path: mount.mount_path,
+    isDirectory: true,
+  }));
+
+  // ACL 变化后目录结构可能变化，清空目录缓存以避免显示过期节点
+  directoryCache.value.clear();
+};
+
 // 加载挂载点列表
 const loadMounts = async () => {
-  if (mountsList.value.length > 0) return; // 如果已经加载过，不再重复加载
+  // 如果已经加载过基础挂载数据，则仅根据最新 ACL 重新应用过滤
+  if (allPublicMounts.value.length > 0 && storageConfigs.value.length > 0) {
+    applyAclToMounts();
+    return;
+  }
 
   isLoadingMounts.value = true;
   try {
-    // 先获取所有公开的存储配置
-    let publicStorageConfigs = [];
+    // 先获取所有存储配置，并缓存到本地状态，供桶 ACL 选择使用
+    let storageConfigItems = [];
     try {
       const { items } = await getStorageConfigs();
-      publicStorageConfigs = (Array.isArray(items) ? items : []).filter((config) => config.is_public === true || config.is_public === 1);
+      storageConfigItems = Array.isArray(items) ? items : [];
     } catch (storageError) {
       console.error("加载存储配置列表失败:", storageError);
     }
 
+    // 仅公开的存储配置用于 ACL 选择和挂载过滤（与后端行为保持一致）
+    const publicStorageConfigs = storageConfigItems.filter(
+      (config) => config.is_public === true || config.is_public === 1
+    );
+    storageConfigs.value = publicStorageConfigs;
+
     // 获取所有挂载点
     const mounts = await getMountsList();
 
-    // 过滤挂载点：必须激活，且如果是S3类型，其配置ID必须在公开配置列表中
-    mountsList.value = (Array.isArray(mounts) ? mounts : []).filter((mount) => {
+    // 基础挂载集合：必须激活，且其 storage_config_id 必须落在公开配置列表中
+    allPublicMounts.value = (Array.isArray(mounts) ? mounts : []).filter((mount) => {
       // 确保挂载点处于激活状态
       if (!mount.is_active) {
         return false;
@@ -533,12 +595,7 @@ const loadMounts = async () => {
       return false;
     });
 
-    // 初始化根目录列表
-    rootDirectories.value = mountsList.value.map((mount) => ({
-      name: mount.name,
-      path: mount.mount_path,
-      isDirectory: true,
-    }));
+    applyAclToMounts();
   } catch (error) {
     console.error("加载挂载点列表失败:", error);
     mountsList.value = [];
@@ -564,6 +621,23 @@ const confirmPathSelection = () => {
   basicPath.value = selectedPath.value;
   activeTab.value = "basic"; // 返回基本信息标签页
 };
+
+// 初始化时预加载可用的存储配置（供桶 ACL 选择使用）
+onMounted(() => {
+  loadMounts().catch((error) => {
+    console.error("初始化加载存储配置和挂载点失败:", error);
+  });
+});
+
+// 当存储 ACL 发生变化时，重新应用 ACL 过滤以影响“基础路径”可选挂载点
+watch(
+  () => selectedStorageConfigIds.value,
+  () => {
+    if (allPublicMounts.value.length > 0) {
+      applyAclToMounts();
+    }
+  }
+);
 
 // 处理表单提交
 const handleSubmit = async () => {
@@ -645,6 +719,7 @@ const handleSubmit = async () => {
       }
 
       await updateApiKey(props.keyData.id, updateData);
+      await updateApiKeyStorageAcl(props.keyData.id, selectedStorageConfigIds.value);
 
       emit("updated", {
         ...props.keyData,
@@ -660,6 +735,9 @@ const handleSubmit = async () => {
       if (!createdKey || !createdKey.key) {
         throw new Error(t("admin.keyManagement.createModal.errors.createFailed", "创建密钥失败"));
       }
+
+      // 为新建密钥配置桶 ACL
+      await updateApiKeyStorageAcl(createdKey.id, selectedStorageConfigIds.value);
 
       emit(
         "created",
@@ -1066,6 +1144,86 @@ defineExpose({
           <p class="mt-1 text-sm" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
             {{ $t(isEditMode ? "admin.keyManagement.editModal.basicPathHelp" : "admin.keyManagement.createModal.basicPathHelp", "设置API密钥可访问的基本路径，默认为根路径") }}
           </p>
+        </div>
+
+        <!-- 存储配置访问控制（桶 ACL） -->
+        <div>
+          <label class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
+            {{
+              $t(
+                isEditMode ? "admin.keyManagement.editModal.storageAcl" : "admin.keyManagement.createModal.storageAcl",
+                "可访问存储配置（可选）"
+              )
+            }}
+          </label>
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              {{
+                $t(
+                  "admin.keyManagement.storageAcl.help",
+                  "不选择表示允许访问所有公开的存储配置。"
+                )
+              }}
+            </p>
+            <p v-if="storageConfigs.length > 0" class="text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              {{ selectedStorageConfigIds.length }} / {{ storageConfigs.length }}
+            </p>
+          </div>
+          <div
+            class="max-h-40 overflow-y-auto border rounded-md p-2"
+            :class="darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-300 bg-white'"
+          >
+            <div v-if="storageConfigs.length === 0" class="text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+              {{ $t("admin.keyManagement.storageAcl.empty", "暂无存储配置或尚未加载。") }}
+            </div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label
+                v-for="config in storageConfigs"
+                :key="config.id"
+                class="flex items-start space-x-2 cursor-pointer rounded-md border px-2 py-1.5 transition"
+                :class="
+                  selectedStorageConfigIds.includes(config.id)
+                    ? darkMode
+                      ? 'border-primary-500 bg-primary-500/10'
+                      : 'border-primary-500 bg-primary-50'
+                    : darkMode
+                      ? 'border-gray-700 hover:border-gray-500'
+                      : 'border-gray-300 hover:border-gray-400'
+                "
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 mt-0.5 rounded"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-primary-500' : 'bg-white border-gray-300 text-primary-500'"
+                  :value="config.id"
+                  v-model="selectedStorageConfigIds"
+                />
+                <div class="min-w-0">
+                  <div class="flex items-center space-x-1">
+                    <span class="truncate text-sm font-medium">
+                      {{ config.name || config.id }}
+                    </span>
+                    <span
+                      class="px-1.5 py-0.5 text-[11px] rounded-full"
+                      :class="darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'"
+                    >
+                      {{ config.storage_type || "UNKNOWN" }}
+                    </span>
+                    <span
+                      v-if="config.is_public === 1 || config.is_public === true"
+                      class="px-1.5 py-0.5 text-[11px] rounded-full"
+                      :class="darkMode ? 'bg-green-900/40 text-green-300' : 'bg-green-100 text-green-700'"
+                    >
+                      {{ $t("admin.keyManagement.storageAcl.public", "公开") }}
+                    </span>
+                  </div>
+                  <p v-if="config.remark" class="mt-0.5 text-[11px] truncate" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+                    {{ config.remark }}
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
         </div>
 
         <!-- 提示信息 -->

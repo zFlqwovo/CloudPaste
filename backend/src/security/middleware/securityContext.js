@@ -1,7 +1,7 @@
 import { performAuth } from "../auth/authGateway.js";
 
 /**
- * securityContext 的职责非常单一：
+ * securityContext ：
  * 1. 通过 performAuth 解析 Authorization / X-Custom-Auth-Key。
  * 2. 将 authResult 映射为更轻量的 principal 并挂载到 context（供 authorize / 业务层读取）。
  * 3. 不做任何权限判断或拒绝逻辑，让后续的 authorize 按策略决定是否放行。

@@ -50,17 +50,17 @@ export const PermissionGroup = {
 
   // 完整权限组合
   ALL_PERMISSIONS:
-      Permission.TEXT_SHARE |
-      Permission.FILE_SHARE |
-      Permission.TEXT_MANAGE |
-      Permission.FILE_MANAGE |
-      Permission.MOUNT_VIEW |
-      Permission.MOUNT_UPLOAD |
-      Permission.MOUNT_COPY |
-      Permission.MOUNT_RENAME |
-      Permission.MOUNT_DELETE |
-      Permission.WEBDAV_READ |
-      Permission.WEBDAV_MANAGE,
+    Permission.TEXT_SHARE |
+    Permission.FILE_SHARE |
+    Permission.TEXT_MANAGE |
+    Permission.FILE_MANAGE |
+    Permission.MOUNT_VIEW |
+    Permission.MOUNT_UPLOAD |
+    Permission.MOUNT_COPY |
+    Permission.MOUNT_RENAME |
+    Permission.MOUNT_DELETE |
+    Permission.WEBDAV_READ |
+    Permission.WEBDAV_MANAGE,
 };
 
 /**
@@ -82,12 +82,12 @@ export const Role = {
     displayName: "普通用户",
     // 默认同时具备创建和管理文本/文件分享的能力
     permissions:
-        Permission.TEXT_SHARE |
-        Permission.TEXT_MANAGE |
-        Permission.FILE_SHARE |
-        Permission.FILE_MANAGE |
-        PermissionGroup.MOUNT_BASIC |
-        Permission.WEBDAV_READ,
+      Permission.TEXT_SHARE |
+      Permission.TEXT_MANAGE |
+      Permission.FILE_SHARE |
+      Permission.FILE_MANAGE |
+      PermissionGroup.MOUNT_BASIC |
+      Permission.WEBDAV_READ,
     description: "可以使用文本分享、文件分享（含管理）、基础挂载页操作和WebDAV读取功能",
   },
 
@@ -118,11 +118,11 @@ export const PermissionTemplate = {
     name: "BASIC",
     displayName: "基础权限",
     permissions:
-        Permission.TEXT_SHARE |
-        Permission.TEXT_MANAGE |
-        Permission.FILE_SHARE |
-        Permission.FILE_MANAGE |
-        PermissionGroup.MOUNT_BASIC,
+      Permission.TEXT_SHARE |
+      Permission.TEXT_MANAGE |
+      Permission.FILE_SHARE |
+      Permission.FILE_MANAGE |
+      PermissionGroup.MOUNT_BASIC,
     description: "可以使用文本分享、文件分享（含管理）和基础挂载页操作",
   },
 
@@ -131,12 +131,12 @@ export const PermissionTemplate = {
     name: "FULL",
     displayName: "完整权限",
     permissions:
-        Permission.TEXT_SHARE |
-        Permission.TEXT_MANAGE |
-        Permission.FILE_SHARE |
-        Permission.FILE_MANAGE |
-        PermissionGroup.MOUNT_FULL |
-        PermissionGroup.WEBDAV_FULL,
+      Permission.TEXT_SHARE |
+      Permission.TEXT_MANAGE |
+      Permission.FILE_SHARE |
+      Permission.FILE_MANAGE |
+      PermissionGroup.MOUNT_FULL |
+      PermissionGroup.WEBDAV_FULL,
     description: "可以使用所有功能，包括文本/文件管理、文件系统管理和WebDAV访问",
   },
 };

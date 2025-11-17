@@ -87,91 +87,91 @@ export const registerFilesProtectedRoutes = (router) => {
     const fileRepository = repositoryFactory.getFileRepository();
 
     for (const id of ids) {
+    await (async () => {
+      let file;
+
+      if (userType === UserType.ADMIN) {
+        file = await fileRepository.findByIdWithStorageConfig(id);
+        if (!file) {
+          result.failed.push({ id, error: "文件不存在" });
+          return;
+        }
+      } else {
+        file = await fileRepository.findByIdAndCreator(id, `apikey:${userId}`);
+        if (!file) {
+          result.failed.push({ id, error: "文件不存在或无权删除" });
+          return;
+        }
+      }
+
+      if (file.storage_config_id) {
+        storageConfigIds.add(file.storage_config_id);
+      }
+
       await (async () => {
-        let file;
+        if (deleteMode === "both" && file.file_path) {
+          const { MountManager } = await import("../../storage/managers/MountManager.js");
+          const { FileSystem } = await import("../../storage/fs/FileSystem.js");
 
-        if (userType === UserType.ADMIN) {
-          file = await fileRepository.findByIdWithStorageConfig(id);
-          if (!file) {
-            result.failed.push({ id, error: "文件不存在" });
-            return;
-          }
-        } else {
-          file = await fileRepository.findByIdAndCreator(id, `apikey:${userId}`);
-          if (!file) {
-            result.failed.push({ id, error: "文件不存在或无权删除" });
-            return;
-          }
+          const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
+          const fileSystem = new FileSystem(mountManager);
+
+          await fileSystem
+            .batchRemoveItems([file.file_path], userType === UserType.ADMIN ? userId : `apikey:${userId}`, userType)
+            .catch((fsError) => {
+              console.error(`删除文件系统文件失败 (ID: ${id}):`, fsError);
+            });
         }
 
-        if (file.storage_config_id) {
-          storageConfigIds.add(file.storage_config_id);
-        }
+        // storage-first 或无 file_path 时，直接按存储配置删除对象（驱动直调）
+        if (deleteMode === "both" && file.storage_path && file.storage_config_id) {
+          const storageConfigRepo = repositoryFactory.getStorageConfigRepository();
+          const storageConfig = storageConfigRepo?.findByIdWithSecrets
+            ? await storageConfigRepo.findByIdWithSecrets(file.storage_config_id).catch(() => null)
+            : await storageConfigRepo.findById(file.storage_config_id).catch(() => null);
 
-        await (async () => {
-          if (deleteMode === "both" && file.file_path) {
-            const { MountManager } = await import("../../storage/managers/MountManager.js");
-            const { FileSystem } = await import("../../storage/fs/FileSystem.js");
-
-            const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
-            const fileSystem = new FileSystem(mountManager);
-
-            await fileSystem
-                .batchRemoveItems([file.file_path], userType === UserType.ADMIN ? userId : `apikey:${userId}`, userType)
-                .catch((fsError) => {
-                  console.error(`删除文件系统文件失败 (ID: ${id}):`, fsError);
-                });
-          }
-
-          // storage-first 或无 file_path 时，直接按存储配置删除对象（驱动直调）
-          if (deleteMode === "both" && file.storage_path && file.storage_config_id) {
-            const storageConfigRepo = repositoryFactory.getStorageConfigRepository();
-            const storageConfig = storageConfigRepo?.findByIdWithSecrets
-                ? await storageConfigRepo.findByIdWithSecrets(file.storage_config_id).catch(() => null)
-                : await storageConfigRepo.findById(file.storage_config_id).catch(() => null);
-
-            if (storageConfig) {
-              try {
-                const { StorageFactory } = await import("../../storage/factory/StorageFactory.js");
-                if (!storageConfig.storage_type) {
-                  throw new ValidationError("存储配置缺少 storage_type");
-                }
-                const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, encryptionSecret);
-                await driver.initialize?.();
-                if (typeof driver.deleteObjectByStoragePath === "function") {
-                  await driver.deleteObjectByStoragePath(file.storage_path, { db });
-                } else if (typeof driver.batchRemoveItems === "function") {
-                  await driver.batchRemoveItems([file.storage_path], { subPath: file.storage_path, db });
-                }
-              } catch (deleteError) {
-                console.error(`删除存储文件失败 (ID: ${id}):`, deleteError);
+          if (storageConfig) {
+            try {
+              const { StorageFactory } = await import("../../storage/factory/StorageFactory.js");
+              if (!storageConfig.storage_type) {
+                throw new ValidationError("存储配置缺少 storage_type");
               }
-            } else {
-              console.warn(`未找到存储配置，跳过对象删除 (fileId: ${id}, storage_config_id: ${file.storage_config_id})`);
+              const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, encryptionSecret);
+              await driver.initialize?.();
+              if (typeof driver.deleteObjectByStoragePath === "function") {
+                await driver.deleteObjectByStoragePath(file.storage_path, { db });
+              } else if (typeof driver.batchRemoveItems === "function") {
+                await driver.batchRemoveItems([file.storage_path], { subPath: file.storage_path, db });
+              }
+            } catch (deleteError) {
+              console.error(`删除存储文件失败 (ID: ${id}):`, deleteError);
             }
+          } else {
+            console.warn(`未找到存储配置，跳过对象删除 (fileId: ${id}, storage_config_id: ${file.storage_config_id})`);
           }
-        })().catch((deleteError) => {
-          console.error(`删除文件存储失败 (ID: ${id}):`, deleteError);
-        });
-
-        if (userType === UserType.ADMIN) {
-          await fileRepository.deleteFilePasswordRecord(id);
         }
-        await fileRepository.deleteFile(id);
-
-        result.success++;
-      })().catch((error) => {
-        console.error(`删除文件失败 (ID: ${id}):`, error);
-        result.failed.push({ id, error: error.message || "删除失败" });
+      })().catch((deleteError) => {
+        console.error(`删除文件存储失败 (ID: ${id}):`, deleteError);
       });
-    }
 
-    for (const storageConfigId of storageConfigIds) {
-      invalidateFsCache({ storageConfigId, reason: "files-batch-delete", db });
-    }
+      if (userType === UserType.ADMIN) {
+        await fileRepository.deleteFilePasswordRecord(id);
+      }
+      await fileRepository.deleteFile(id);
 
-    return jsonOk(c, result, `批量删除完成，成功: ${result.success}，失败: ${result.failed.length}`);
-  });
+      result.success++;
+    })().catch((error) => {
+      console.error(`删除文件失败 (ID: ${id}):`, error);
+      result.failed.push({ id, error: error.message || "删除失败" });
+    });
+  }
+
+  for (const storageConfigId of storageConfigIds) {
+    invalidateFsCache({ storageConfigId, reason: "files-batch-delete", db });
+  }
+
+  return jsonOk(c, result, `批量删除完成，成功: ${result.success}，失败: ${result.failed.length}`);
+});
 
   router.put("/api/files/:id", requireFilesAccess, async (c) => {
     const db = c.env.DB;

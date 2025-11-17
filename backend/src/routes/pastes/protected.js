@@ -49,12 +49,12 @@ export const registerPastesProtectedRoutes = (router) => {
 
       const results = Array.isArray(result.results) ? result.results : [];
       return jsonOk(
-          c,
-          {
-            results,
-            pagination: result.pagination,
-          },
-          "获取成功",
+        c,
+        {
+          results,
+          pagination: result.pagination,
+        },
+        "获取成功",
       );
     }
 
@@ -66,13 +66,13 @@ export const registerPastesProtectedRoutes = (router) => {
     const results = Array.isArray(result.results) ? result.results : [];
 
     return jsonOk(
-        c,
-        {
-          results,
-          pagination: result.pagination,
-          key_info: apiKeyInfo,
-        },
-        "获取成功",
+      c,
+      {
+        results,
+        pagination: result.pagination,
+        key_info: apiKeyInfo,
+      },
+      "获取成功",
     );
   });
 

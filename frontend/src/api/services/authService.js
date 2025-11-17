@@ -122,6 +122,27 @@ export function updateApiKey(keyId, updateData) {
   return put(`/admin/api-keys/${keyId}`, updateData);
 }
 
+/**
+ * 获取指定 API 密钥的存储 ACL（可访问的 storage_config_id 白名单）
+ * @param {string} keyId - API 密钥 ID
+ * @returns {Promise<Object>} 存储 ACL 信息
+ */
+export function getApiKeyStorageAcl(keyId) {
+  return get(`/admin/api-keys/${keyId}/storage-acl`);
+}
+
+/**
+ * 更新指定 API 密钥的存储 ACL（整体替换）
+ * @param {string} keyId - API 密钥 ID
+ * @param {string[]} storageConfigIds - 允许访问的 storage_config_id 列表
+ * @returns {Promise<Object>} 更新后的 ACL 信息
+ */
+export function updateApiKeyStorageAcl(keyId, storageConfigIds) {
+  return put(`/admin/api-keys/${keyId}/storage-acl`, {
+    storage_config_ids: Array.isArray(storageConfigIds) ? storageConfigIds : [],
+  });
+}
+
 // 兼容性导出 - 保持向后兼容
 export const login = adminLogin;
 export const logout = adminLogout;
