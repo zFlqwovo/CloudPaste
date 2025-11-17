@@ -156,6 +156,7 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
+import { formatLocalDateTimeWithSeconds, formatNowForFilename } from "@/utils/timeUtils.js";
 import { useAdminBase } from "@/composables/admin-management/useAdminBase.js";
 import { useAdminBackupService } from "@/modules/admin/services/backupService.js";
 
@@ -219,7 +220,7 @@ export default {
     };
 
     const formatLogTime = (timestamp) => {
-      return timestamp.toLocaleTimeString();
+      return formatLocalDateTimeWithSeconds(timestamp);
     };
 
     const getLogTypeColor = (type) => {
@@ -250,14 +251,7 @@ export default {
 
     // 生成本地时区的详细时间戳
     const generateLocalTimestamp = () => {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      const hour = String(now.getHours()).padStart(2, "0");
-      const minute = String(now.getMinutes()).padStart(2, "0");
-      const second = String(now.getSeconds()).padStart(2, "0");
-      return `${year}-${month}-${day}-${hour}-${minute}-${second}`;
+      return formatNowForFilename();
     };
 
     // 生成模块备份文件名

@@ -3,15 +3,8 @@
     <!-- 文件篮按钮 -->
     <button
       @click="toggleBasket"
-      class="relative inline-flex items-center px-2 sm:px-3 py-1.5 rounded-md transition-colors text-xs sm:text-sm font-medium"
-      :class="[
-        hasCollection
-          ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-md'
-          : darkMode
-          ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-          : 'bg-gray-200 hover:bg-gray-300 text-gray-700',
-      ]"
-      :title="hasCollection ? t('fileBasket.panel.summary', { fileCount: collectionCount, directoryCount: directoryCount }) : t('fileBasket.panel.empty')"
+      class="relative inline-flex items-center px-2 sm:px-3 py-1.5 rounded-md transition-colors text-xs sm:text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white shadow-md"
+      :title="basketTitle"
     >
       <!-- 文件列表图标 (Lucide Files) -->
       <svg class="w-4 h-4 mr-1 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -28,15 +21,12 @@
       <span class="whitespace-nowrap">{{ basketButtonText }}</span>
 
       <!-- 文件数量徽章 -->
-      <span v-if="collectionCount > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm">
-        {{ collectionCount > 99 ? "99+" : collectionCount }}
-      </span>
     </button>
   </div>
 </template>
 
 <script setup>
-import { storeToRefs } from "pinia";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useFileBasket } from "@/composables/file-system/useFileBasket.js";
 
@@ -50,15 +40,17 @@ const props = defineProps({
 });
 
 // 使用文件篮composable
-const fileBasket = useFileBasket();
-const { collectionCount, hasCollection, directoryCount, basketButtonText } = storeToRefs(fileBasket);
+const { collectionCount, hasCollection, directoryCount, basketButtonText, toggleBasket } = useFileBasket();
 
-// 切换文件篮面板
-const toggleBasket = () => {
-  try {
-    fileBasket.toggleBasket();
-  } catch (error) {
-    console.error("切换文件篮面板失败:", error);
+
+// 文件篮按钮 title 信息
+const basketTitle = computed(() => {
+  if (!hasCollection.value) {
+    return t("fileBasket.panel.empty");
   }
-};
+  return t("fileBasket.panel.summary", {
+    fileCount: collectionCount.value,
+    directoryCount: directoryCount.value,
+  });
+});
 </script>

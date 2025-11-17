@@ -81,7 +81,7 @@ const error = ref(null);
 const chartType = ref("bar"); // 'bar' 或 'line'
 
 // 导入统一的时间处理工具
-import { formatCurrentTime } from "@/utils/timeUtils.js";
+import { formatCurrentTime, getUserLocale } from "@/utils/timeUtils.js";
 
 // 图表日期标签
 const dateLabels = computed(() => {
@@ -91,7 +91,8 @@ const dateLabels = computed(() => {
     const date = new Date();
     date.setDate(date.getDate() - i);
     // 使用 Intl.DateTimeFormat 确保正确的本地化
-    dates.push(new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(date));
+        const locale = getUserLocale();
+    dates.push(new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date));
   }
   return dates;
 });

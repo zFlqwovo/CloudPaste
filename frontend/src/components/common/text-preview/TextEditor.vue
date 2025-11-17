@@ -30,6 +30,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import loader from "@monaco-editor/loader";
+import { formatLocalDateTimeWithSeconds } from "@/utils/timeUtils.js";
 
 const { t } = useI18n();
 
@@ -118,7 +119,7 @@ const addEditorActions = (editor, monaco) => {
     contextMenuGroupId: "modification",
     contextMenuOrder: 1,
     run: function (ed) {
-      const timestamp = new Date().toLocaleString("zh-CN");
+      const timestamp = formatLocalDateTimeWithSeconds(new Date());
       const selection = ed.getSelection();
       ed.executeEdits("", [
         {

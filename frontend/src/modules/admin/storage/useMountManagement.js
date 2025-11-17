@@ -3,7 +3,7 @@ import { useAdminBase } from "@/composables/admin-management/useAdminBase.js";
 import { useAuthStore } from "@/stores/authStore.js";
 import { useStorageConfigsStore } from "@/stores/storageConfigsStore.js";
 import { useI18n } from "vue-i18n";
-import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
+import { formatDateTimeWithSeconds, formatDateTime } from "@/utils/timeUtils.js";
 import { useAdminMountService } from "@/modules/admin/services/mountService.js";
 import { useAdminApiKeyService } from "@/modules/admin/services/apiKeyService.js";
 
@@ -102,19 +102,16 @@ export function useMountManagement() {
     return formatDateTimeWithSeconds(dateString);
   };
 
-  /**
-   * 格式化日期显示（仅日期，不含时间）
-   */
+
   const formatDateOnly = (dateString) => {
     if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return formatDateTime(dateString, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
   };
-
+  
   /**
    * 加载存储配置列表
    */

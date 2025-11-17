@@ -149,10 +149,8 @@ const exportWordDocument = async () => {
       title: t("markdown.exportDocumentTitle"),
     });
 
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "-");
-    const fileName = `markdown-${dateStr}-${timeStr}.docx`;
+    const timestamp = formatNowForFilename();
+    const fileName = `markdown-${timestamp}.docx`;
 
     saveAs(blob, fileName);
     emit("status-message", t("markdown.messages.wordExported"));
@@ -175,10 +173,8 @@ const exportAsPng = async () => {
   emit("status-message", t("markdown.messages.exportingPng"));
 
   try {
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "-");
-    const fileName = `markdown-${dateStr}-${timeStr}.png`;
+    const timestamp = formatNowForFilename();
+    const fileName = `markdown-${timestamp}.png`;
 
     const editorContainer = document.getElementById("vditor");
     await new Promise((resolve) => setTimeout(resolve, 1000));
