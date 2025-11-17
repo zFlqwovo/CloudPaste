@@ -23,7 +23,6 @@ export function useFileOperations() {
 
   const loading = ref(false);
   const error = ref(/** @type {string | null} */ (null));
-  const showLinkCopiedNotification = ref(false);
 
   // ===== 下载文件 =====
 
@@ -208,11 +207,6 @@ export function useFileOperations() {
       const copySuccess = await copyToClipboard(presignedUrl);
 
       if (copySuccess) {
-        showLinkCopiedNotification.value = true;
-        setTimeout(() => {
-          showLinkCopiedNotification.value = false;
-        }, 3000);
-
         return {
           success: true,
           message: t("mount.messages.linkCopiedSuccess"),
@@ -244,7 +238,6 @@ export function useFileOperations() {
     // 状态
     loading,
     error,
-    showLinkCopiedNotification,
 
     // 操作
     downloadFile,
@@ -255,4 +248,3 @@ export function useFileOperations() {
     clearError,
   };
 }
-

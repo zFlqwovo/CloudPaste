@@ -254,20 +254,6 @@
       @close="showRenameDialog = false"
     />
 
-    <!-- 链接复制成功通知 -->
-    <div v-if="showLinkCopiedNotification" class="fixed bottom-4 right-4 z-50">
-      <div
-        class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-md transition-all duration-300"
-        :class="{ 'opacity-100': showLinkCopiedNotification, 'opacity-0': !showLinkCopiedNotification }"
-      >
-        <div class="flex items-center">
-          <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <p>{{ t("mount.linkCopied") }}</p>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -285,7 +271,7 @@ const { t } = useI18n();
 // 使用新的组合式函数
 const { sortField, sortOrder, handleSort, getSortIcon, createSortedItems, initializeSortState } = useDirectorySort();
 
-const { getFileLink, showLinkCopiedNotification } = useFileOperations();
+const { getFileLink } = useFileOperations();
 
 const props = defineProps({
   items: {
@@ -421,13 +407,10 @@ const handleItemSelect = (item, selected) => {
 const handleGetLink = async (item) => {
   const result = await getFileLink(item);
 
-  if (!result.success) {
-    emit("show-message", {
-      type: "error",
-      message: result.message,
-    });
-  }
-  // 成功的情况下，通知显示由 composable 内部处理
+  emit("show-message", {
+    type: result.success ? "success" : "error",
+    message: result.message,
+  });
 };
 
 // 处理消息显示

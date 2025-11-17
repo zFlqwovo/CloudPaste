@@ -677,6 +677,49 @@ X-Custom-Auth-Key: <api_key>
   - 授权：需要有效的 API 密钥
   - 响应：API 密钥验证状态和权限信息（详见下方完整示例）
 
+
+- `GET /api/public/guest-config`
+
+  - 描述：用于前端获取Guest API 密钥配置，支持"游客模式"登录
+  - 权限要求：无需身份验证
+  - 响应会返回以下字段：
+    - `enabled`: 是否有效（已启用 + 未禁用 + 未过期）
+    - `key`: 仅在有效时才返回 API 密钥的值，无效时为 null
+    - `name`: Guest 密钥名称（默认 GUEST）
+    - `permissions`: 位标志权限值
+    - `permissions_detail`: ▲text/file/mount/webdav 权限详细信息
+    - `basic_path`: 密钥用户的基础路径
+    - `expires_at`: 过期时间（ISO 8601 字符串）
+  - 响应示例：
+    ```json
+    {
+      "code": 200,
+      "message": "游客配置获取成功",
+      "success": true,
+      "data": {
+        "enabled": true,
+        "key": "guest",
+        "name": "guest",
+        "permissions": 768,
+        "permissions_detail": {
+          "text_share": true,
+          "text_manage": false,
+          "file_share": true,
+          "file_manage": false,
+          "mount_view": true,
+          "mount_upload": false,
+          "mount_copy": false,
+          "mount_rename": false,
+          "mount_delete": false,
+          "webdav_read": false,
+          "webdav_manage": false
+        },
+        "basic_path": "/public",
+        "expires_at": "9999-12-31T23:59:59Z"
+      }
+    }
+    ```
+
 - `GET /api/admin/dashboard/stats`
   - 描述：获取管理员仪表盘统计数据
   - 授权：需要管理员令牌

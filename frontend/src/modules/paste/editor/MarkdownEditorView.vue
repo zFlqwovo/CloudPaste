@@ -101,6 +101,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAuthStore } from "@/stores/authStore";
 import { usePasteService } from "@/modules/paste";
+import { useGlobalMessage } from "@/composables/core/useGlobalMessage.js";
 
 // 导入子组件
 import VditorUnified from "@/components/common/VditorUnified.vue";
@@ -116,6 +117,7 @@ const { t } = useI18n();
 // 使用认证Store
 const authStore = useAuthStore();
 const pasteService = usePasteService();
+const { showSuccess, showError, showWarning, showInfo } = useGlobalMessage();
 
 // Props
 const props = defineProps({
@@ -191,11 +193,25 @@ const handleFormChange = (formData) => {
 
 const handleStatusMessage = (payload) => {
   const message = typeof payload === "string" ? payload : payload?.message;
+  const type = typeof payload === "object" && payload?.type ? payload.type : "info";
+
   if (!message) return;
+
   savingStatus.value = message;
+
+  if (type === "error") {
+    showError(message);
+  } else if (type === "success") {
+    showSuccess(message);
+  } else if (type === "warning") {
+    showWarning(message);
+  } else {
+    showInfo(message);
+  }
+
   setTimeout(() => {
     savingStatus.value = "";
-  }, typeof payload === "object" && payload?.type === "error" ? 4000 : 3000);
+  }, type === "error" ? 4000 : 3000);
 };
 
 const handleCountdownEnd = () => {

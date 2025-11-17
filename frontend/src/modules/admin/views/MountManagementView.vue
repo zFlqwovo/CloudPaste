@@ -32,6 +32,7 @@ const {
   filteredMounts,
   pagination,
   lastRefreshTime,
+  pageSizeOptions,
 
   // 权限状态
   isAdmin,
@@ -41,6 +42,7 @@ const {
   loadMounts,
   loadStorageConfigs,
   handleOffsetChange,
+  handleLimitChange,
   openCreateForm,
   openEditForm,
   closeForm,
@@ -453,7 +455,14 @@ onMounted(() => {
 
     <!-- 分页组件 -->
     <div class="mt-2 mb-4 sm:mt-4 sm:mb-0">
-      <CommonPagination :dark-mode="darkMode" :pagination="pagination" mode="offset" @offset-changed="handleOffsetChange" />
+      <CommonPagination
+        :dark-mode="darkMode"
+        :pagination="pagination"
+        :page-size-options="pageSizeOptions"
+        mode="offset"
+        @offset-changed="handleOffsetChange"
+        @limit-changed="handleLimitChange"
+      />
     </div>
 
     <!-- 新建/编辑挂载点表单 -->

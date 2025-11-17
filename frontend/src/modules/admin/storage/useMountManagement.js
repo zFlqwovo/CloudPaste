@@ -1,4 +1,4 @@
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useAdminBase } from "@/composables/admin-management/useAdminBase.js";
 import { useAuthStore } from "@/stores/authStore.js";
 import { useStorageConfigsStore } from "@/stores/storageConfigsStore.js";
@@ -32,8 +32,9 @@ export function useMountManagement() {
   const currentMount = ref(null);
   const searchQuery = ref("");
 
-  // 重写分页默认设置为挂载点专用（每页6个）
-  base.pagination.limit = 6;
+  // 挂载管理专用分页配置：每页默认 6 条，自定义可选项
+  const pageSizeOptions = [6, 12, 24, 48, 96];
+  base.pagination.limit = pageSizeOptions[0];
 
   // 权限计算属性
   const isAdmin = computed(() => authStore.isAdmin);
@@ -79,6 +80,15 @@ export function useMountManagement() {
     base.pagination.total = filteredMounts.value.length;
     base.pagination.hasMore = base.pagination.offset + base.pagination.limit < base.pagination.total;
   };
+
+  // 监听过滤结果变化，自动同步分页信息
+  watch(
+    filteredMounts,
+    () => {
+      updateMountPagination();
+    },
+    { immediate: true }
+  );
 
   /**
    * 格式化日期显示
@@ -185,7 +195,17 @@ export function useMountManagement() {
    */
   const handleOffsetChange = (newOffset) => {
     base.handlePaginationChange(newOffset, "offset");
-    loadMounts();
+    // 挂载点列表使用前端分页，这里不需要重新请求后端
+  };
+
+  /**
+   * 处理每页数量变化
+   */
+  const handleLimitChange = (newLimit) => {
+    base.changePageSize(newLimit);
+    // 重置到第一页
+    base.handlePaginationChange(0, "offset");
+    updateMountPagination();
   };
 
   /**
@@ -464,6 +484,7 @@ export function useMountManagement() {
     currentMount,
     searchQuery,
     filteredMounts,
+    pageSizeOptions,
 
     // 权限状态
     isAdmin,
@@ -475,6 +496,7 @@ export function useMountManagement() {
     loadStorageConfigs,
     loadApiKeyNames,
     handleOffsetChange,
+    handleLimitChange,
     openCreateForm,
     openEditForm,
     closeForm,

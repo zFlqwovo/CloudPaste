@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { useRoute } from "vue-router";
 import EnvSwitcher from "./components/EnvSwitcher.vue";
 import LanguageSwitcher from "./components/LanguageSwitcher.vue";
@@ -20,7 +20,7 @@ const siteConfigStore = useSiteConfigStore();
 const { themeMode, isDarkMode, toggleThemeMode } = useThemeMode();
 
 // 全局消息
-const { hasMessage, messageType, messageContent, clearMessage } = useGlobalMessage();
+const { hasMessage, messageType, messageContent, clearMessage, showMessage } = useGlobalMessage();
 
 // 计算当前页面 - 基于路由
 const activePage = computed(() => {
@@ -58,6 +58,20 @@ const isDev = import.meta.env.DEV;
     isMobileMenuOpen.value = !isMobileMenuOpen.value;
   };
 
+  const handleGlobalMessageEvent = (event) => {
+    const detail = event.detail || {};
+    const type = detail.type || "info";
+    const content = detail.content || detail.message || "";
+
+    if (!content) return;
+
+    showMessage(type, content);
+  };
+
+  const handleGlobalMessageClearEvent = () => {
+    clearMessage();
+  };
+
   // 组件挂载时初始化
   onMounted(() => {
     // 在开发环境中始终显示环境切换器
@@ -76,9 +90,16 @@ const isDev = import.meta.env.DEV;
     }
 
     console.log("应用初始化完成");
+
+    window.addEventListener("global-message", handleGlobalMessageEvent);
+    window.addEventListener("global-message-clear", handleGlobalMessageClearEvent);
   });
 
   // 组件卸载时不再需要额外清理主题监听（由 useThemeMode 管理）
+  onBeforeUnmount(() => {
+    window.removeEventListener("global-message", handleGlobalMessageEvent);
+    window.removeEventListener("global-message-clear", handleGlobalMessageClearEvent);
+  });
 </script>
 
 <template>

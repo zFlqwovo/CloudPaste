@@ -246,7 +246,7 @@ const openEditModal = async () => {
     showEditModal.value = true;
   } catch (err) {
     console.error("获取文件详情出错:", err);
-    showError(t("fileView.errors.getDetailsFailed"), t("fileView.errors.getDetailsFailedMessage"));
+    showError(`${t("fileView.errors.getDetailsFailed")}: ${t("fileView.errors.getDetailsFailedMessage")}`);
     showEditModal.value = true;
   }
 };

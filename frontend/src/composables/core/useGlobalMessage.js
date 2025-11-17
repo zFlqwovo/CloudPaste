@@ -36,9 +36,9 @@ function createMessageState() {
    * 显示消息
    * @param {string} type - 消息类型 ('success', 'error', 'warning', 'info')
    * @param {string} content - 消息内容
-   * @param {number} duration - 显示时长（毫秒），默认4000ms
+   * @param {number} duration - 显示时长（毫秒），默认5000ms
    */
-  const showMessage = (type, content, duration = 4000) => {
+  const showMessage = (type, content, duration = 5000) => {
     // 清除之前的定时器
     if (currentTimeoutId) {
       clearTimeout(currentTimeoutId);
@@ -79,28 +79,28 @@ function createMessageState() {
   /**
    * 显示成功消息
    */
-  const showSuccess = (content, duration = 3000) => {
+  const showSuccess = (content, duration = 4000) => {
     showMessage("success", content, duration);
   };
 
   /**
    * 显示错误消息
    */
-  const showError = (content, duration = 5000) => {
+  const showError = (content, duration = 6000) => {
     showMessage("error", content, duration);
   };
 
   /**
    * 显示警告消息
    */
-  const showWarning = (content, duration = 4000) => {
+  const showWarning = (content, duration = 5000) => {
     showMessage("warning", content, duration);
   };
 
   /**
    * 显示信息消息
    */
-  const showInfo = (content, duration = 4000) => {
+  const showInfo = (content, duration = 5000) => {
     showMessage("info", content, duration);
   };
 
