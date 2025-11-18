@@ -17,11 +17,13 @@ CREATE TABLE pastes (
   id TEXT PRIMARY KEY,
   slug TEXT UNIQUE NOT NULL,
   content TEXT NOT NULL,
+  title TEXT,
   remark TEXT,
   password TEXT,
   expires_at DATETIME,
   max_views INTEGER,
   views INTEGER DEFAULT 0,  
+  is_public BOOLEAN NOT NULL DEFAULT 1,
   created_by TEXT,                     -- 创建者标识（管理员ID或API密钥ID）
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -31,6 +33,7 @@ CREATE TABLE pastes (
 CREATE INDEX idx_pastes_slug ON pastes(slug);
 CREATE INDEX idx_pastes_created_at ON pastes(created_at DESC);
 CREATE INDEX idx_pastes_created_by ON pastes(created_by);    -- 添加创建者索引
+CREATE INDEX idx_pastes_is_public ON pastes(is_public);
 
 
 

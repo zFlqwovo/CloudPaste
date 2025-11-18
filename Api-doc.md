@@ -295,11 +295,13 @@ X-Custom-Auth-Key: <api_key>
     ```json
     {
       "content": "要分享的文本内容", // 必填
-      "remark": "备注信息", // 可选
+      "title": "文本标题", // 可选，用于在列表和前台展示中区分不同文本
+      "remark": "备注信息", // 可选，用于管理和搜索
       "expires_at": "2023-12-31T23:59:59Z", // 可选，过期时间
       "max_views": 100, // 可选，最大查看次数
       "password": "访问密码", // 可选
-      "slug": "custom-slug" // 可选，自定义短链接
+      "slug": "custom-slug", // 可选，自定义短链接
+      "is_public": true // 可选，是否公开访问，默认 true；false 时仅管理员和创建者可访问
     }
     ```
   - 响应：创建的文本分享信息，包含访问链接
@@ -310,11 +312,13 @@ X-Custom-Auth-Key: <api_key>
       "data": {
         "id": "123",
         "slug": "abc123",
-        "url": "https://example.com/p/abc123",
+        "title": "文本标题",
+        "remark": "备注信息",
         "expires_at": "2023-12-31T23:59:59Z",
         "max_views": 100,
-        "views": 0,
-        "has_password": true
+        "is_public": true,
+        "hasPassword": true,
+        "created_at": "2023-05-01T12:00:00Z"
       },
       "success": true
     }
@@ -324,7 +328,53 @@ X-Custom-Auth-Key: <api_key>
 
   - 描述：获取文本分享内容
   - 参数：slug - 文本短链接
-  - 响应：文本分享内容，如果需要密码则返回密码提示
+  - 访问控制：
+    - 当 `is_public = true` 时，任何持有链接的用户都可以访问（仍受过期时间、最大查看次数和密码保护限制）。
+    - 当 `is_public = false` 时，仅管理员和创建者可以访问；其他用户（包括匿名和其他 API 密钥）将收到“不存在或已被删除”的响应（HTTP 404）。
+  - 响应：
+     - 如果文本未设置密码且可访问，将直接返回内容：
+       ```json
+       {
+         "code": 200,
+         "message": "获取文本内容成功",
+         "data": {
+           "slug": "abc123",
+           "title": "文本标题",
+           "content": "要分享的文本内容",
+           "remark": "备注信息",
+           "expires_at": "2023-12-31T23:59:59Z",
+           "max_views": 100,
+           "views": 1,
+           "created_at": "2023-05-01T12:00:00Z",
+           "created_by": "admin",
+           "is_public": true,
+           "hasPassword": false,
+           "isLastView": false
+         },
+         "success": true
+       }
+       ```
+     - 如果文本已设置密码，则只返回元信息并提示需要密码：
+       ```json
+       {
+         "code": 200,
+         "message": "获取文本信息成功",
+         "data": {
+           "slug": "abc123",
+           "title": "文本标题",
+           "remark": "备注信息",
+           "expires_at": "2023-12-31T23:59:59Z",
+           "max_views": 100,
+           "views": 0,
+           "created_at": "2023-05-01T12:00:00Z",
+           "created_by": "admin",
+           "is_public": true,
+           "hasPassword": true,
+           "requiresPassword": true
+         },
+         "success": true
+       }
+       ```
 
 - `POST /api/paste/:slug`
 
@@ -336,7 +386,7 @@ X-Custom-Auth-Key: <api_key>
       "password": "访问密码" // 必填
     }
     ```
-  - 响应：验证成功后返回文本分享内容
+  - 响应：验证成功后返回文本分享内容，字段与未加密的 `GET /api/paste/:slug` 响应相同，另外会包含 `plain_password`（仅在需要时返回）
 
 - `GET /api/raw/:slug`
 
@@ -344,6 +394,7 @@ X-Custom-Auth-Key: <api_key>
   - 参数：slug - 文本短链接
   - 查询参数：
     - `password` - 如果文本受密码保护，需提供密码
+  - 访问控制：与 `GET /api/paste/:slug` 相同，受 `is_public`、过期时间、最大查看次数及密码保护限制
   - 响应：纯文本格式的内容，Content-Type 为 text/plain
 
 #### 统一文本管理接口
@@ -361,13 +412,51 @@ X-Custom-Auth-Key: <api_key>
       - `limit` - 每页数量，默认为 30
       - `offset` - 偏移量，默认为 0
   - 响应：文本分享列表和分页信息，API 密钥用户只能看到自己创建的文本
+    ```json
+    {
+      "code": 200,
+      "message": "获取成功",
+      "data": {
+        "results": [
+          {
+            "id": "123",
+            "slug": "abc123",
+            "title": "文本标题",
+            "remark": "备注信息",
+            "expires_at": "2023-12-31T23:59:59Z",
+            "max_views": 100,
+            "view_count": 5,
+            "is_public": true,
+            "created_by": "admin",
+            "created_at": "2023-05-01T12:00:00Z",
+            "updated_at": "2023-05-02T08:00:00Z",
+            "has_password": false,
+            "content_preview": "内容前 200 字..."
+          }
+        ],
+        "pagination": {
+          "total": 1,
+          "limit": 10,
+          "offset": 0,
+          "hasMore": false,
+          "page": 1,
+          "totalPages": 1
+        }
+      },
+      "success": true
+    }
+    ```
 
 - `GET /api/pastes/:id`
 
   - 描述：获取单个文本详情（统一接口）
   - 授权：需要管理员令牌或有文本权限的 API 密钥
   - 参数：id - 文本 ID
-  - 响应：文本分享详细信息，API 密钥用户只能访问自己创建的文本
+  - 响应：文本分享详细信息，API 密钥用户只能访问自己创建的文本。返回字段包含：
+    - `id`, `slug`, `title`, `content`, `remark`
+    - `expires_at`, `max_views`, `views`, `is_public`
+    - `created_by`, `created_at`, `updated_at`
+    - `has_password`, `plain_password`（仅在有密码时，并且当前调用者有权限查看明文密码）
 
 - `DELETE /api/pastes/batch-delete`
 
@@ -385,7 +474,20 @@ X-Custom-Auth-Key: <api_key>
   - 描述：更新文本信息（统一接口）
   - 授权：需要管理员令牌或有文本权限的 API 密钥
   - 参数：slug - 文本短链接
-  - 请求体：可包含 remark, expires_at, max_views, password 等字段
+  - 请求体：可包含以下字段（至少需要 content）：
+    ```json
+    {
+      "content": "更新后的文本内容", // 必填
+      "title": "更新后的标题", // 可选
+      "remark": "更新后的备注信息", // 可选
+      "expires_at": "2024-01-31T23:59:59Z", // 可选
+      "max_views": 50, // 可选
+      "password": "新密码", // 可选
+      "clearPassword": true, // 可选，true 时清除密码
+      "newSlug": "new-slug", // 可选，更新短链接
+      "is_public": false // 可选，是否公开访问，false 表示仅管理员和创建者可访问
+    }
+    ```
   - 响应：更新后的文本信息，API 密钥用户只能更新自己创建的文本
 
 #### 管理员专用接口

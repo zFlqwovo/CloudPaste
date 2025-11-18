@@ -169,13 +169,13 @@ onUnmounted(() => {
     <!-- 卡片头部：slug + 状态标签 + 操作按钮 -->
     <div class="px-3 pt-3 pb-2 sm:px-4 sm:pt-4">
       <div class="flex items-start justify-between mb-2">
-        <!-- Slug -->
+        <!-- 标题 / 备注 / Slug -->
         <h3
           class="text-sm sm:text-base font-medium truncate flex-1 mr-2"
           :class="isExpired ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-400'"
-          :title="paste.slug"
+          :title="paste.title || paste.remark || paste.slug"
         >
-          {{ paste.slug }}
+          {{ paste.title || paste.remark || paste.slug }}
         </h3>
 
         <!-- 右侧：状态标签 + 操作按钮 -->
@@ -196,6 +196,47 @@ onUnmounted(() => {
                 <rect stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x="6" y="11" width="12" height="9" rx="2" />
               </svg>
               <span class="leading-none">加密</span>
+            </span>
+            <!-- 可见性图标徽章 -->
+            <span
+              :class="[
+                'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                paste.is_public
+                  ? darkMode
+                    ? 'bg-green-500/15 text-green-100 border-green-400/30'
+                    : 'bg-green-50 text-green-700 border-green-200'
+                  : darkMode
+                  ? 'bg-gray-500/15 text-gray-100 border-gray-400/30'
+                  : 'bg-gray-50 text-gray-700 border-gray-200',
+              ]"
+              :title="paste.is_public ? '公开访问' : '仅管理员和创建者可见'"
+            >
+              <!-- 公开图标 -->
+              <svg
+                v-if="paste.is_public"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                class="h-3.5 w-3.5"
+                :class="darkMode ? 'text-green-200' : 'text-green-600'"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <!-- 私密图标 -->
+              <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                class="h-3.5 w-3.5"
+                :class="darkMode ? 'text-gray-200' : 'text-gray-600'"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5s-3 1.343-3 3 1.343 3 3 3z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.5 20a8.38 8.38 0 017.5-4.5 8.38 8.38 0 017.5 4.5" />
+              </svg>
+              <span class="leading-none">{{ paste.is_public ? '公开' : '私密' }}</span>
             </span>
             <!-- 过期标签 -->
             <span v-if="isExpired" class="px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">

@@ -491,11 +491,13 @@ export class PasteRepository extends BaseRepository {
       SELECT
         id,
         slug,
+        title,
         remark,
         password IS NOT NULL as has_password,
         expires_at,
         max_views,
         views as view_count,
+        is_public,
         created_by,
         CASE
           WHEN LENGTH(content) > 200 THEN SUBSTR(content, 1, 200) || '...'
@@ -548,8 +550,8 @@ export class PasteRepository extends BaseRepository {
 
     // 查询数据
     const querySql = `
-      SELECT id, slug, content, remark, password IS NOT NULL as has_password,
-      expires_at, max_views, views, created_at, updated_at, created_by
+      SELECT id, slug, title, content, remark, password IS NOT NULL as has_password,
+      expires_at, max_views, views, is_public, created_at, updated_at, created_by
       FROM ${DbTables.PASTES}
       ${whereClause}
       ORDER BY created_at DESC
@@ -626,6 +628,11 @@ export class PasteRepository extends BaseRepository {
     }
 
     // 处理基本字段更新
+    if (updateData.title !== undefined) {
+      updateFields.push("title = ?");
+      params.push(updateData.title || null);
+    }
+
     if (updateData.content !== undefined) {
       updateFields.push("content = ?");
       params.push(updateData.content);
@@ -644,6 +651,11 @@ export class PasteRepository extends BaseRepository {
     if (updateData.max_views !== undefined) {
       updateFields.push("max_views = ?");
       params.push(updateData.max_views || null);
+    }
+
+    if (updateData.is_public !== undefined) {
+      updateFields.push("is_public = ?");
+      params.push(updateData.is_public ? 1 : 0);
     }
 
     if (resetViews) {

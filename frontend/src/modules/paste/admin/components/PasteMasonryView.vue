@@ -164,13 +164,13 @@ const handleCardClick = (paste) => {
 /* 确保瀑布流容器宽度自适应 */
 .paste-masonry-view {
   width: 100%;
-  padding: 0 1rem;
+  padding: 1.5rem 1rem 2rem 1rem; /* 上右下左：顶部和底部都留出呼吸空间 */
 }
 
 /* 移动端优化 */
 @media (max-width: 768px) {
   .paste-masonry-view {
-    padding: 0 0.5rem;
+    padding: 1rem 0.5rem 1.5rem 0.5rem; /* 移动端上下padding稍小 */
   }
 }
 </style>

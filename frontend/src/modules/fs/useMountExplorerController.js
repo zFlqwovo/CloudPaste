@@ -44,7 +44,8 @@ export function useMountExplorerController() {
   // 权限相关派生状态
   const isAdmin = computed(() => authStore.isAdmin);
   const hasApiKey = computed(() => authStore.isKeyUser && !!authStore.apiKey);
-  const hasFilePermission = computed(() => authStore.hasFilePermission);
+  // 这里的文件权限用于“从挂载页发起文件分享/上传”，对应 FILE_SHARE
+  const hasFilePermission = computed(() => authStore.hasFileSharePermission);
   const hasMountPermission = computed(() => authStore.hasMountPermission);
   const hasPermission = computed(() => authStore.hasMountPermission);
   const apiKeyInfo = computed(() => authStore.apiKeyInfo);

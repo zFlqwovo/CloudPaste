@@ -67,6 +67,7 @@ const {
   showQRCode,
   toggleSelectItem,
   toggleSelectAll,
+  toggleVisibility,
   clearSelection,
 } = usePasteManagement();
 
@@ -440,6 +441,7 @@ onMounted(() => {
             @edit="openEditModal"
             @delete="deletePaste"
             @show-qrcode="showQRCode"
+            @toggle-visibility="toggleVisibility"
           />
         </div>
 
