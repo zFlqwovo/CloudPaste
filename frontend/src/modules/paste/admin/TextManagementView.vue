@@ -5,6 +5,7 @@ import { usePasteManagement } from "@/modules/paste";
 // 导入子组件
 import PasteTable from "@/modules/paste/admin/components/PasteTable.vue";
 import PasteCardList from "@/modules/paste/admin/components/PasteCardList.vue";
+import PasteMasonryView from "@/modules/paste/admin/components/PasteMasonryView.vue";
 import PastePreviewModal from "@/modules/paste/admin/components/PastePreviewModal.vue";
 import PasteEditModal from "@/modules/paste/admin/components/PasteEditModal.vue";
 import CommonPagination from "@/components/common/CommonPagination.vue";
@@ -80,6 +81,20 @@ const globalSearchValue = ref("");
 const isSearchMode = ref(false);
 const searchResults = ref([]);
 const searchLoading = ref(false);
+
+// 视图模式状态 ('table' | 'masonry')
+const VIEW_MODE_KEY = "paste-admin-view-mode";
+const viewMode = ref(localStorage.getItem(VIEW_MODE_KEY) || "table");
+
+/**
+ * 切换视图模式
+ * @param {string} mode - 视图模式 ('table' | 'masonry')
+ */
+const switchViewMode = (mode) => {
+  viewMode.value = mode;
+  localStorage.setItem(VIEW_MODE_KEY, mode);
+  console.log(`视图模式已切换至: ${mode}`);
+};
 
 // 搜索处理函数 - 使用服务端搜索
 const handleGlobalSearch = async (searchValue) => {
@@ -220,35 +235,119 @@ onMounted(() => {
   <div class="p-3 sm:p-4 md:p-5 lg:p-6 flex-1 flex flex-col overflow-y-auto">
     <!-- 顶部操作栏 -->
     <div class="flex flex-col space-y-3 mb-4">
-      <!-- 标题和刷新按钮 -->
+      <!-- 标题和操作按钮组 -->
       <div class="flex justify-between items-center">
         <h2 class="text-lg sm:text-xl font-medium" :class="darkMode ? 'text-white' : 'text-gray-900'">文本管理</h2>
 
-        <!-- 刷新按钮 - 在所有屏幕尺寸显示 -->
-        <button
-          class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          @click="loadPastes"
-          :disabled="loading"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" :class="['h-3 w-3 sm:h-4 sm:w-4 mr-1', loading ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              v-if="!loading"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-            <circle v-if="loading" class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path
-              v-if="loading"
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <span class="hidden xs:inline">{{ loading ? "刷新中..." : "刷新" }}</span>
-          <span class="xs:hidden">{{ loading ? "..." : "刷" }}</span>
-        </button>
+        <div class="flex items-center space-x-2">
+          <!-- 视图模式切换按钮组 - 桌面端(表格/瀑布流) -->
+          <div class="hidden md:flex items-center rounded-md shadow-sm" role="group">
+            <!-- 表格视图按钮 -->
+            <button
+              type="button"
+              :class="[
+                'inline-flex items-center justify-center px-3 py-2 text-sm font-medium border focus:z-10 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-l-md',
+                viewMode === 'table'
+                  ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700'
+                  : darkMode
+                  ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+              ]"
+              @click="switchViewMode('table')"
+              title="表格视图"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <!-- 瀑布流视图按钮 -->
+            <button
+              type="button"
+              :class="[
+                'inline-flex items-center justify-center px-3 py-2 text-sm font-medium border focus:z-10 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-r-md',
+                viewMode === 'masonry'
+                  ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700'
+                  : darkMode
+                  ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+              ]"
+              @click="switchViewMode('masonry')"
+              title="瀑布流视图"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- 视图模式切换按钮组 - 移动端(列表/瀑布流) -->
+          <div class="md:hidden flex items-center rounded-md shadow-sm" role="group">
+            <!-- 列表视图按钮 -->
+            <button
+              type="button"
+              :class="[
+                'inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium border focus:z-10 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-l-md',
+                viewMode === 'table'
+                  ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700'
+                  : darkMode
+                  ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+              ]"
+              @click="switchViewMode('table')"
+              title="列表视图"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <!-- 瀑布流视图按钮 -->
+            <button
+              type="button"
+              :class="[
+                'inline-flex items-center justify-center px-2 py-1.5 text-xs font-medium border focus:z-10 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-r-md',
+                viewMode === 'masonry'
+                  ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700'
+                  : darkMode
+                  ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50',
+              ]"
+              @click="switchViewMode('masonry')"
+              title="瀑布流视图"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- 刷新按钮 - 在所有屏幕尺寸显示 -->
+          <button
+            class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            @click="loadPastes"
+            :disabled="loading"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" :class="['h-3 w-3 sm:h-4 sm:w-4 mr-1', loading ? 'animate-spin' : '']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                v-if="!loading"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+              <circle v-if="loading" class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path
+                v-if="loading"
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <span class="hidden xs:inline">{{ loading ? "刷新中..." : "刷新" }}</span>
+            <span class="xs:hidden">{{ loading ? "..." : "刷" }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- 搜索框 -->
@@ -323,8 +422,8 @@ onMounted(() => {
     <!-- 数据展示区域 -->
     <div class="overflow-hidden bg-white dark:bg-gray-800 shadow-md rounded-lg flex-1">
       <div class="flex flex-col h-full">
-        <!-- 桌面端表格组件 - 中等及以上设备显示 -->
-        <div class="hidden md:block flex-1 overflow-auto">
+        <!-- 桌面端 - 表格视图 (中等及以上设备显示) -->
+        <div v-if="viewMode === 'table'" class="hidden md:block flex-1 overflow-auto">
           <PasteTable
             :dark-mode="darkMode"
             :pastes="pastes"
@@ -344,8 +443,29 @@ onMounted(() => {
           />
         </div>
 
-        <!-- 移动端卡片组件 - 小于中等设备显示 -->
-        <div class="md:hidden flex-1 overflow-auto">
+        <!-- 桌面端 - 瀑布流视图 (中等及以上设备显示) -->
+        <div v-if="viewMode === 'masonry'" class="hidden md:block flex-1 overflow-auto">
+          <PasteMasonryView
+            :dark-mode="darkMode"
+            :pastes="pastes"
+            :selectedPastes="selectedPastes"
+            :loading="loading || searchLoading"
+            :copiedTexts="copiedTexts"
+            :copiedRawTexts="copiedRawTexts"
+            @toggle-select-all="toggleSelectAll"
+            @toggle-select-item="toggleSelectItem"
+            @view="goToViewPage"
+            @copy-link="copyLink"
+            @copy-raw-link="copyRawLink"
+            @preview="openPreview"
+            @edit="openEditModal"
+            @delete="deletePaste"
+            @show-qrcode="showQRCode"
+          />
+        </div>
+
+        <!-- 移动端 - 列表视图 (小于中等设备显示) -->
+        <div v-if="viewMode === 'table'" class="md:hidden flex-1 overflow-auto">
           <PasteCardList
             :dark-mode="darkMode"
             :pastes="pastes"
@@ -353,6 +473,27 @@ onMounted(() => {
             :loading="loading"
             :copiedTexts="copiedTexts"
             :copiedRawTexts="copiedRawTexts"
+            @toggle-select-item="toggleSelectItem"
+            @view="goToViewPage"
+            @copy-link="copyLink"
+            @copy-raw-link="copyRawLink"
+            @preview="openPreview"
+            @edit="openEditModal"
+            @delete="deletePaste"
+            @show-qrcode="showQRCode"
+          />
+        </div>
+
+        <!-- 移动端 - 瀑布流视图 (小于中等设备显示) -->
+        <div v-if="viewMode === 'masonry'" class="md:hidden flex-1 overflow-auto">
+          <PasteMasonryView
+            :dark-mode="darkMode"
+            :pastes="pastes"
+            :selectedPastes="selectedPastes"
+            :loading="loading || searchLoading"
+            :copiedTexts="copiedTexts"
+            :copiedRawTexts="copiedRawTexts"
+            @toggle-select-all="toggleSelectAll"
             @toggle-select-item="toggleSelectItem"
             @view="goToViewPage"
             @copy-link="copyLink"

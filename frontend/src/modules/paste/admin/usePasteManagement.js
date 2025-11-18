@@ -133,12 +133,19 @@ export function usePasteManagement() {
   };
 
   /**
-   * 打开预览弹窗
+   * 打开预览弹窗并加载完整内容
    * @param {Paste} paste
    */
-  const openPreview = (paste) => {
-    previewPaste.value = paste;
-    showPreview.value = true;
+  const openPreview = async (paste) => {
+    try {
+      // 加载完整的文本详情（包含 content 字段）
+      const detail = await pasteService.getPasteById(paste.id);
+      previewPaste.value = detail;
+      showPreview.value = true;
+    } catch (err) {
+      console.error("获取文本详情失败:", err);
+      base.showError("获取文本详情失败");
+    }
   };
 
   const closePreview = () => {
@@ -184,10 +191,10 @@ export function usePasteManagement() {
     return base.withLoading(async () => {
       try {
         const payload = {
-          content: updated.content ?? editingPaste.value.content,
-          remark: updated.remark ?? editingPaste.value.remark,
-          max_views: updated.max_views ?? editingPaste.value.max_views,
-          expires_at: updated.expires_at ?? editingPaste.value.expires_at,
+          content: Object.prototype.hasOwnProperty.call(updated, "content") ? updated.content : editingPaste.value.content,
+          remark: Object.prototype.hasOwnProperty.call(updated, "remark") ? updated.remark : editingPaste.value.remark,
+          max_views: Object.prototype.hasOwnProperty.call(updated, "max_views") ? updated.max_views : editingPaste.value.max_views,
+          expires_at: Object.prototype.hasOwnProperty.call(updated, "expires_at") ? updated.expires_at : editingPaste.value.expires_at,
         };
 
         if (Object.prototype.hasOwnProperty.call(updated, "newSlug")) {
