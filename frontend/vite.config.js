@@ -444,7 +444,7 @@ export default defineConfig(({ command, mode }) => {
       // 移除vditor排除配置，因为现在从本地dist目录加载
     },
     build: {
-      outDir: 'dist', // 显式指定输出目录
+      outDir: 'dist',
       minify: "terser",
       terserOptions: {
         compress: {
