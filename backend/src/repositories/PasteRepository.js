@@ -164,9 +164,9 @@ export class PasteRepository extends BaseRepository {
    */
   async deleteExpired(currentTime = new Date()) {
     const result = await this.execute(
-      `DELETE FROM ${DbTables.PASTES} 
+        `DELETE FROM ${DbTables.PASTES} 
        WHERE expires_at IS NOT NULL AND expires_at < ?`,
-      [currentTime.toISOString()]
+        [currentTime.toISOString()]
     );
 
     return {
@@ -181,7 +181,7 @@ export class PasteRepository extends BaseRepository {
    */
   async deleteOverViewLimit() {
     const result = await this.execute(
-      `DELETE FROM ${DbTables.PASTES} 
+        `DELETE FROM ${DbTables.PASTES} 
        WHERE max_views IS NOT NULL AND max_views > 0 AND views >= max_views`
     );
 
@@ -198,9 +198,9 @@ export class PasteRepository extends BaseRepository {
    */
   async findExpired(currentTime = new Date()) {
     const result = await this.query(
-      `SELECT * FROM ${DbTables.PASTES} 
+        `SELECT * FROM ${DbTables.PASTES} 
        WHERE expires_at IS NOT NULL AND expires_at < ?`,
-      [currentTime.toISOString()]
+        [currentTime.toISOString()]
     );
 
     return result.results || [];
@@ -212,7 +212,7 @@ export class PasteRepository extends BaseRepository {
    */
   async findOverViewLimit() {
     const result = await this.query(
-      `SELECT * FROM ${DbTables.PASTES} 
+        `SELECT * FROM ${DbTables.PASTES} 
        WHERE max_views IS NOT NULL AND max_views > 0 AND views >= max_views`
     );
 
@@ -274,9 +274,9 @@ export class PasteRepository extends BaseRepository {
    */
   async createPasswordRecord(pasteId, plainPassword) {
     return await this.execute(
-      `INSERT INTO ${DbTables.PASTE_PASSWORDS} (paste_id, plain_password, created_at, updated_at)
+        `INSERT INTO ${DbTables.PASTE_PASSWORDS} (paste_id, plain_password, created_at, updated_at)
        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-      [pasteId, plainPassword]
+        [pasteId, plainPassword]
     );
   }
 
@@ -299,10 +299,10 @@ export class PasteRepository extends BaseRepository {
    */
   async updatePasswordRecord(pasteId, plainPassword) {
     return await this.execute(
-      `UPDATE ${DbTables.PASTE_PASSWORDS}
+        `UPDATE ${DbTables.PASTE_PASSWORDS}
        SET plain_password = ?, updated_at = CURRENT_TIMESTAMP
        WHERE paste_id = ?`,
-      [plainPassword, pasteId]
+        [plainPassword, pasteId]
     );
   }
 
@@ -486,12 +486,13 @@ export class PasteRepository extends BaseRepository {
     const countResult = await this.queryFirst(countSql, countParams);
     const total = countResult?.total || 0;
 
-    // 查询数据（包含格式化字段）
+    // 查询数据：管理员列表统一返回完整 content，由前端自行截断预览
     const querySql = `
       SELECT
         id,
         slug,
         title,
+        content,
         remark,
         password IS NOT NULL as has_password,
         expires_at,
@@ -499,10 +500,6 @@ export class PasteRepository extends BaseRepository {
         views as view_count,
         is_public,
         created_by,
-        CASE
-          WHEN LENGTH(content) > 200 THEN SUBSTR(content, 1, 200) || '...'
-          ELSE content
-        END as content_preview,
         created_at,
         updated_at
       FROM ${DbTables.PASTES}${whereClause}

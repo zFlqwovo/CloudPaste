@@ -61,12 +61,28 @@ const hasPassword = (paste) => {
 import { getRemainingViews as getRemainingViewsUtil } from "@/utils/fileUtils.js";
 
 /**
- * 计算剩余可访问次数
+ * 计算剩余可访问次数（数值）
  * @param {Object} paste - 文本分享对象
- * @returns {string|number} 剩余访问次数或状态描述
+ * @returns {number} Infinity 表示无限制，0 表示已用完，正数表示剩余次数
  */
 const getRemainingViews = (paste) => {
-  return getRemainingViewsUtil(paste); // 不传t函数，使用中文
+  return getRemainingViewsUtil(paste);
+};
+
+/**
+ * 格式化剩余访问次数为展示文案
+ * @param {Object} paste - 文本分享对象
+ * @returns {string}
+ */
+const getRemainingViewsLabel = (paste) => {
+  const remaining = getRemainingViews(paste);
+  if (remaining === Infinity) {
+    return "无限制";
+  }
+  if (remaining === 0) {
+    return "已用完";
+  }
+  return `${remaining}`;
 };
 
 /**
@@ -254,9 +270,9 @@ const viewPaste = (slug) => {
                     :class="[
                       isExpired(paste)
                         ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                        : getRemainingViews(paste) === '已用完'
+                        : getRemainingViews(paste) === 0
                         ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                        : paste?.max_views && getRemainingViews(paste) < 3 && getRemainingViews(paste) !== '无限制'
+                        : paste?.max_views && getRemainingViews(paste) !== Infinity && getRemainingViews(paste) < 10
                         ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
                         : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
                     ]"
@@ -265,7 +281,7 @@ const viewPaste = (slug) => {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
-                    {{ paste ? getRemainingViews(paste) : "-" }}
+                    {{ paste ? getRemainingViewsLabel(paste) : "-" }}
                   </span>
                 </div>
               </div>

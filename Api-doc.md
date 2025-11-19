@@ -332,49 +332,49 @@ X-Custom-Auth-Key: <api_key>
     - 当 `is_public = true` 时，任何持有链接的用户都可以访问（仍受过期时间、最大查看次数和密码保护限制）。
     - 当 `is_public = false` 时，仅管理员和创建者可以访问；其他用户（包括匿名和其他 API 密钥）将收到“不存在或已被删除”的响应（HTTP 404）。
   - 响应：
-     - 如果文本未设置密码且可访问，将直接返回内容：
-       ```json
-       {
-         "code": 200,
-         "message": "获取文本内容成功",
-         "data": {
-           "slug": "abc123",
-           "title": "文本标题",
-           "content": "要分享的文本内容",
-           "remark": "备注信息",
-           "expires_at": "2023-12-31T23:59:59Z",
-           "max_views": 100,
-           "views": 1,
-           "created_at": "2023-05-01T12:00:00Z",
-           "created_by": "admin",
-           "is_public": true,
-           "hasPassword": false,
-           "isLastView": false
-         },
-         "success": true
-       }
-       ```
-     - 如果文本已设置密码，则只返回元信息并提示需要密码：
-       ```json
-       {
-         "code": 200,
-         "message": "获取文本信息成功",
-         "data": {
-           "slug": "abc123",
-           "title": "文本标题",
-           "remark": "备注信息",
-           "expires_at": "2023-12-31T23:59:59Z",
-           "max_views": 100,
-           "views": 0,
-           "created_at": "2023-05-01T12:00:00Z",
-           "created_by": "admin",
-           "is_public": true,
-           "hasPassword": true,
-           "requiresPassword": true
-         },
-         "success": true
-       }
-       ```
+    - 如果文本未设置密码且可访问，将直接返回内容：
+      ```json
+      {
+        "code": 200,
+        "message": "获取文本内容成功",
+        "data": {
+          "slug": "abc123",
+          "title": "文本标题",
+          "content": "要分享的文本内容",
+          "remark": "备注信息",
+          "expires_at": "2023-12-31T23:59:59Z",
+          "max_views": 100,
+          "views": 1,
+          "created_at": "2023-05-01T12:00:00Z",
+          "created_by": "admin",
+          "is_public": true,
+          "hasPassword": false,
+          "isLastView": false
+        },
+        "success": true
+      }
+      ```
+    - 如果文本已设置密码，则只返回元信息并提示需要密码：
+      ```json
+      {
+        "code": 200,
+        "message": "获取文本信息成功",
+        "data": {
+          "slug": "abc123",
+          "title": "文本标题",
+          "remark": "备注信息",
+          "expires_at": "2023-12-31T23:59:59Z",
+          "max_views": 100,
+          "views": 0,
+          "created_at": "2023-05-01T12:00:00Z",
+          "created_by": "admin",
+          "is_public": true,
+          "hasPassword": true,
+          "requiresPassword": true
+        },
+        "success": true
+      }
+      ```
 
 - `POST /api/paste/:slug`
 
@@ -431,7 +431,7 @@ X-Custom-Auth-Key: <api_key>
             "created_at": "2023-05-01T12:00:00Z",
             "updated_at": "2023-05-02T08:00:00Z",
             "has_password": false,
-            "content_preview": "内容前 200 字..."
+            "content": "完整内容..."
           }
         ],
         "pagination": {

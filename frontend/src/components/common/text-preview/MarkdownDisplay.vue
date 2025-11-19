@@ -33,7 +33,7 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
-import { loadVditor } from "@/utils/vditorLoader.js";
+import { loadVditor, VDITOR_ASSETS_BASE } from "@/utils/vditorLoader.js";
 
 const { t } = useI18n();
 
@@ -104,9 +104,9 @@ const renderMarkdown = async () => {
         mode: "dark-light", // 支持明暗主题
         theme: {
           current: props.darkMode ? "dark" : "light", // 根据darkMode设置主题
-          path: "/assets/vditor/dist/css/content-theme",
+          path: `${VDITOR_ASSETS_BASE}/dist/css/content-theme`,
         },
-        cdn: "/assets/vditor",
+        cdn: VDITOR_ASSETS_BASE,
         hljs: {
           lineNumber: true, // 代码块显示行号
           style: props.darkMode ? "vs2015" : "github", // 代码高亮样式

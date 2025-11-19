@@ -21,7 +21,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
-import { loadVditor } from "@/utils/vditorLoader.js";
+import { loadVditor, VDITOR_ASSETS_BASE } from "@/utils/vditorLoader.js";
 
 // 国际化函数
 const { t } = useI18n();
@@ -226,7 +226,7 @@ const getEditorConfig = () => {
     width: "100%",
     mode: defaultMode, // 保持原有的响应式模式逻辑
     theme: editorTheme,
-    cdn: "/assets/vditor",
+    cdn: VDITOR_ASSETS_BASE,
     resize: {
       enable: true,
       position: "bottom",
@@ -246,13 +246,13 @@ const getEditorConfig = () => {
       mode: "both",
       theme: {
         current: contentTheme,
-        path: "/assets/vditor/dist/css/content-theme",
+        path: `${VDITOR_ASSETS_BASE}/dist/css/content-theme`,
       },
       hljs: {
         lineNumber: !props.miniMode, // Mini 模式不显示行号
         style: props.darkMode ? "vs2015" : "github",
-        js: "/assets/vditor/dist/js/highlight.js/third-languages.js",
-        css: (style) => `/assets/vditor/dist/js/highlight.js/styles/${style}.min.css`,
+        js: `${VDITOR_ASSETS_BASE}/dist/js/highlight.js/third-languages.js`,
+        css: (style) => `${VDITOR_ASSETS_BASE}/dist/js/highlight.js/styles/${style}.min.css`,
       },
       actions: props.miniMode ? [] : ["desktop", "tablet", "mobile", "mp-wechat", "zhihu"],
       markdown: {

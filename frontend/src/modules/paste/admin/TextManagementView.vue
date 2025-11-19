@@ -63,6 +63,7 @@ const {
   submitEdit,
   copyLink,
   copyRawLink,
+  quickEditContent,
   goToViewPage,
   showQRCode,
   toggleSelectItem,
@@ -463,6 +464,7 @@ onMounted(() => {
             @edit="openEditModal"
             @delete="deletePaste"
             @show-qrcode="showQRCode"
+            @quick-edit-content="quickEditContent"
           />
         </div>
 
@@ -504,6 +506,7 @@ onMounted(() => {
             @edit="openEditModal"
             @delete="deletePaste"
             @show-qrcode="showQRCode"
+            @quick-edit-content="quickEditContent"
           />
         </div>
       </div>

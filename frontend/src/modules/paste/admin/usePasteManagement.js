@@ -242,19 +242,9 @@ export function usePasteManagement() {
 
   /**
    * 复制访问链接
-   * @param {Paste} paste
+   * @param {string} slug - 文本标识
    */
-  const resolvePasteContext = (payload) => {
-    if (!payload) return { slug: "", id: null };
-    if (typeof payload === "string") {
-      const found = pastes.value.find((item) => item.slug === payload);
-      return { slug: payload, id: found?.id ?? null };
-    }
-    return { slug: payload.slug || "", id: payload.id ?? null };
-  };
-
-  const copyLink = async (payload) => {
-    const { slug, id } = resolvePasteContext(payload);
+  const copyLink = async (slug) => {
     if (!slug) {
       base.showError("复制失败：缺少文本标识");
       return;
@@ -266,11 +256,10 @@ export function usePasteManagement() {
     try {
       const ok = await copyToClipboard(link);
       if (ok) {
-        const key = id ?? slug;
-        copiedTexts[key] = true;
+        copiedTexts[slug] = true;
         base.showSuccess("访问链接已复制");
         setTimeout(() => {
-          copiedTexts[key] = false;
+          copiedTexts[slug] = false;
         }, 2000);
       } else {
         base.showError("复制访问链接失败");
@@ -283,22 +272,25 @@ export function usePasteManagement() {
 
   /**
    * 复制 Raw 链接
-   * @param {Paste} paste
+   * @param {string} slug - 文本标识
    */
-  const copyRawLink = async (paste) => {
-    if (!paste || !paste.slug) {
+  const copyRawLink = async (slug) => {
+    if (!slug) {
       base.showError("复制失败：缺少文本标识");
       return;
     }
 
+    // 从列表中查找完整对象以获取 plain_password
+    const pasteObj = pastes.value.find((item) => item.slug === slug);
+
     try {
-      const rawLink = pasteService.getRawPasteUrl(paste.slug, paste.plain_password || null);
+      const rawLink = pasteService.getRawPasteUrl(slug, pasteObj?.plain_password || null);
       const ok = await copyToClipboard(rawLink);
       if (ok) {
-        copiedRawTexts[paste.slug] = true;
+        copiedRawTexts[slug] = true;
         base.showSuccess("Raw 链接已复制");
         setTimeout(() => {
-          copiedRawTexts[paste.slug] = false;
+          copiedRawTexts[slug] = false;
         }, 2000);
       } else {
         base.showError("复制 Raw 链接失败");
@@ -306,6 +298,48 @@ export function usePasteManagement() {
     } catch (err) {
       console.error("复制 Raw 链接失败:", err);
       base.showError("复制 Raw 链接失败");
+    }
+  };
+
+  /**
+   * 快速编辑内容（双击编辑功能）
+   * @param {Object} payload - { id, slug, content }
+   */
+  const quickEditContent = async (payload) => {
+    if (!payload || !payload.id || !payload.slug || !payload.content) {
+      base.showError("编辑失败：缺少必要参数");
+      return;
+    }
+
+    try {
+      // 获取完整数据（列表数据不包含content字段）
+      const fullPaste = await pasteService.getPasteById(payload.id);
+
+      // 合并更新数据（只更新 content 字段）
+      const updatePayload = {
+        title: fullPaste.title,
+        content: payload.content,
+        remark: fullPaste.remark,
+        max_views: fullPaste.max_views,
+        expires_at: fullPaste.expires_at,
+        is_public: fullPaste.is_public,
+      };
+
+      // 调用 API 更新
+      await pasteService.updatePaste(fullPaste.slug, updatePayload);
+
+      // 局部更新：直接修改对象属性
+      const index = pastes.value.findIndex((p) => p.id === payload.id);
+      if (index !== -1) {
+        // 直接修改属性而不是替换对象（避免触发整个列表重新渲染）
+        pastes.value[index].content = payload.content;
+      }
+
+      base.showSuccess("内容已更新");
+    } catch (err) {
+      console.error("更新文本内容失败:", err);
+      base.showError(err.message || "更新文本内容失败");
+      throw err;
     }
   };
 
@@ -462,6 +496,7 @@ export function usePasteManagement() {
     submitEdit,
     copyLink,
     copyRawLink,
+    quickEditContent,
     goToViewPage,
     showQRCode,
     toggleSelectAll,

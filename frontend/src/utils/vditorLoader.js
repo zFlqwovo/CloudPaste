@@ -2,21 +2,29 @@
  * Vditor 资源懒加载工具
  *
  * 统一管理：
- * - /assets/vditor/dist/index.css
- * - /assets/vditor/dist/index.min.js
+ * - 版本号常量：VDITOR_VERSION
+ * - 资源基础路径：VDITOR_ASSETS_BASE
+ *   - ${VDITOR_ASSETS_BASE}/dist/index.css
+ *   - ${VDITOR_ASSETS_BASE}/dist/index.min.js
  *
- * 特性：
  * - 单例加载，避免重复插入 <script>/<link>
  * - 并发安全，使用 vditorLoading 作为状态锁
  * - 简单的重试机制，确保 window.Vditor 可用
  */
 
+// Vditor 版本常量（与静态资源版本对应，用于后续升级）
+export const VDITOR_VERSION = "3.11.1";
+
+// Vditor 静态资源基础路径
+// 目录结构：public/assets/vditor/<版本>/dist/**
+export const VDITOR_ASSETS_BASE = `/assets/vditor/${VDITOR_VERSION}`;
+
 let VditorClass = null;
 let vditorCSSLoaded = false;
 let vditorLoading = false;
 
-const VDITOR_SCRIPT_SRC = "/assets/vditor/dist/index.min.js";
-const VDITOR_CSS_HREF = "/assets/vditor/dist/index.css";
+const VDITOR_SCRIPT_SRC = `${VDITOR_ASSETS_BASE}/dist/index.min.js`;
+const VDITOR_CSS_HREF = `${VDITOR_ASSETS_BASE}/dist/index.css`;
 
 /**
  * 加载 Vditor CSS（幂等）
@@ -42,7 +50,6 @@ export const loadVditor = async () => {
     while (vditorLoading) {
       // 简单轮询等待，避免多次并发初始化
       // 间隔 30ms 足够平衡响应和开销
-      // eslint-disable-next-line no-await-in-loop
       await new Promise((resolve) => setTimeout(resolve, 30));
     }
     return VditorClass;
@@ -98,4 +105,3 @@ export const loadVditor = async () => {
 
   return VditorClass;
 };
-
