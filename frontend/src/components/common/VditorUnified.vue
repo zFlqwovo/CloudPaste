@@ -21,43 +21,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
+import { loadVditor } from "@/utils/vditorLoader.js";
 
 // 国际化函数
 const { t } = useI18n();
-
-// 懒加载Vditor和CSS
-let VditorClass = null;
-let vditorCSSLoaded = false;
-
-const loadVditor = async () => {
-  if (!VditorClass) {
-    await loadVditorCSS();
-
-    // 从本地vditor目录加载Vditor
-    const script = document.createElement("script");
-    script.src = "/assets/vditor/dist/index.min.js";
-
-    return new Promise((resolve, reject) => {
-      script.onload = () => {
-        VditorClass = window.Vditor;
-        resolve(VditorClass);
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
-  return VditorClass;
-};
-
-const loadVditorCSS = async () => {
-  if (!vditorCSSLoaded) {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "/assets/vditor/dist/index.css";
-    document.head.appendChild(link);
-    vditorCSSLoaded = true;
-  }
-};
 
 // 优化的表情配置
 const getOptimizedEmojis = () => ({

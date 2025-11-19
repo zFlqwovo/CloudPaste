@@ -24,7 +24,15 @@ export function useMountExplorerController() {
   const authStore = useAuthStore();
   const fileSystemStore = useFileSystemStore();
 
-  const { currentPath, loading, error, hasPermissionForCurrentPath, directoryItems, isVirtualDirectory } = storeToRefs(fileSystemStore);
+  const {
+    currentPath,
+    loading,
+    error,
+    hasPermissionForCurrentPath,
+    directoryItems,
+    isVirtualDirectory,
+    directoryMeta,
+  } = storeToRefs(fileSystemStore);
 
   const filePreview = useFilePreview();
   const {
@@ -325,6 +333,7 @@ export function useMountExplorerController() {
     hasPermissionForCurrentPath,
     directoryItems,
     isVirtualDirectory,
+    directoryMeta,
     isAdmin,
     hasApiKey,
     hasFilePermission,

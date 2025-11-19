@@ -127,6 +127,15 @@ const routes = [
         },
       },
       {
+        path: "fs-meta-management",
+        name: "AdminFsMetaManagement",
+        component: createOfflineAwareImport(() => import("../modules/admin/views/FsMetaManagementView.vue"), "元信息管理"),
+        meta: {
+          title: "元信息管理 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
         path: "storage",
         name: "AdminStorage",
         component: createOfflineAwareImport(() => import("../modules/admin/views/StorageConfigView.vue"), "存储管理"),
@@ -566,6 +575,9 @@ router.afterEach(async (to, from) => {
         break;
       case "AdminMountManagement":
         title = `${t("pageTitle.adminModules.mountManagement")} - ${siteTitle}`;
+        break;
+      case "AdminFsMetaManagement":
+        title = `${t("pageTitle.adminModules.fsMetaManagement")} - ${siteTitle}`;
         break;
       case "AdminKeyManagement":
         title = `${t("pageTitle.adminModules.keyManagement")} - ${siteTitle}`;

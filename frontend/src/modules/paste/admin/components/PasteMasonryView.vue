@@ -86,10 +86,10 @@ const handleCardClick = (paste) => {
     <div v-else-if="pastes.length === 0" class="flex flex-col items-center justify-center py-16" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
         />
       </svg>
       <p class="text-lg font-medium">暂无文本分享数据</p>
@@ -100,14 +100,14 @@ const handleCardClick = (paste) => {
     <MasonryWall v-else :items="pastes" :column-width="columnWidth" :gap="gap" :ssr-columns="1">
       <template #default="{ item }">
         <PasteMasonryCard
-            :dark-mode="darkMode"
-            :paste="item"
-            @click="handleCardClick(item)"
-            @preview="emit('preview', item)"
-            @edit="emit('edit', item)"
-            @delete="emit('delete', item.id)"
-            @copy-link="emit('copy-link', item.slug)"
-            @show-qrcode="emit('show-qrcode', item.slug)"
+          :dark-mode="darkMode"
+          :paste="item"
+          @click="handleCardClick(item)"
+          @preview="emit('preview', item)"
+          @edit="emit('edit', item)"
+          @delete="emit('delete', item.id)"
+          @copy-link="emit('copy-link', item.slug)"
+          @show-qrcode="emit('show-qrcode', item.slug)"
         />
       </template>
     </MasonryWall>

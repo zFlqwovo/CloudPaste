@@ -26,7 +26,7 @@ const props = defineProps({
 const emit = defineEmits(["close", "view-paste", "copy-link"]);
 
 // 导入统一的时间处理工具
-import { formatDateTime, formatRelativeTime as formatRelativeTimeUtil, formatExpiry as formatExpiryUtil } from "@/utils/timeUtils.js";
+import { formatDateTime, formatExpiry as formatExpiryUtil } from "@/utils/timeUtils.js";
 
 /**
  * 格式化日期为本地日期时间字符串
@@ -37,27 +37,7 @@ const formatDate = (dateString) => {
   return formatDateTime(dateString);
 };
 
-/**
- * 格式化相对时间（如：3天后过期）
- * @param {string} dateString - UTC 时间字符串
- * @returns {string} 相对时间描述
- */
-const formatRelativeTime = (dateString) => {
-  if (!dateString) return "";
-
-  const relativeTime = formatRelativeTimeUtil(dateString);
-
-  // 为过期场景添加特殊处理
-  if (relativeTime.includes("前")) {
-    return "已过期";
-  } else if (relativeTime === "即将") {
-    return "即将过期";
-  } else if (relativeTime.includes("后")) {
-    return relativeTime.replace("后", "后过期");
-  }
-
-  return relativeTime;
-};
+ 
 
 /**
  * 格式化过期日期，同时显示具体日期和相对时间

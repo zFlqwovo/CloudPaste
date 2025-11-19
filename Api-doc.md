@@ -1182,6 +1182,22 @@ X-Custom-Auth-Key: <api_key>
     - `path` - 要列出内容的目录路径，默认为根目录("/")
   - 响应：目录内容列表，包含文件和子目录信息
   - 权限：API 密钥用户只能访问其 basic_path 权限范围内的目录
+  - 路径密码行为（如启用目录密码）：
+    - 额外请求头（可选）：
+      ```http
+      X-FS-Path-Token: encrypted:...
+      ```
+      - 该 token 由 `POST /api/fs/meta/password/verify` 接口返回；
+      - 用于访问设置了路径密码的目录及其子目录。
+    - 当目标路径未配置路径密码时：
+      - 与原行为完全一致，不需要该头。
+    - 当目标路径配置了路径密码时：
+      - 管理员用户：
+        - 不检查路径密码，直接放行（只要管理员登录有效）。
+      - 非管理员用户（API Key 等）：
+        - 未提供 token 或 token 无效 / 过期时：
+          - 返回 `403`，`code = "FS_PATH_PASSWORD_REQUIRED"`；
+          - 前端应据此弹出路径密码输入框，重新验证密码。
 
 - `GET /api/fs/get`
 
@@ -1731,3 +1747,96 @@ X-Custom-Auth-Key: <api_key>
 - 文件操作（上传、删除、重命名等）会自动清理相关的搜索缓存
 - 搜索缓存支持按挂载点和用户维度进行清理
 - 管理员可以通过 `/api/admin/cache/stats` 查看搜索缓存统计信息
+
+---
+
+## 目录 Meta 管理 API（FS Meta）
+
+> 用于在管理后台配置目录级元信息：顶部/底部 README、隐藏文件规则、路径密码等。  
+> 所有接口均 **仅限管理员** 使用。
+
+- `GET /api/fs-meta/list`
+
+  - 描述：获取所有目录元信息配置列表
+  - 授权：需要管理员令牌
+  - 查询参数：无
+  - 响应：
+    ```json
+    {
+      "code": 200,
+      "message": "获取元信息列表成功",
+      "success": true,
+      "data": [
+        {
+          "id": 1,
+          "path": "/claw",
+          "headerMarkdown": "# 说明",
+          "headerInherit": true,
+          "footerMarkdown": null,
+          "footerInherit": false,
+          "hidePatterns": ["^README\\.md$"],
+          "hideInherit": true,
+          "password": "1234",
+          "hasPassword": true,
+          "passwordInherit": true,
+          "createdAt": "2025-11-19T10:00:00.000Z",
+          "updatedAt": "2025-11-19T10:10:00.000Z"
+        }
+      ]
+    }
+    ```
+
+- `GET /api/fs-meta/:id`
+
+  - 描述：获取单条目录元信息配置
+  - 授权：需要管理员令牌
+  - 路径参数：
+    - `id` - 元信息记录 ID
+  - 响应：结构与列表中的单条记录相同
+
+- `POST /api/fs-meta/create`
+
+  - 描述：为指定路径创建新的目录元信息配置
+  - 授权：需要管理员令牌
+  - 请求体示例：
+    ```json
+    {
+      "path": "/claw",
+      "headerMarkdown": "# 目录说明",
+      "headerInherit": true,
+      "footerMarkdown": "",
+      "footerInherit": false,
+      "hidePatterns": ["^README\\.md$", "^top\\.md$"],
+      "hideInherit": true,
+      "password": "1234",
+      "passwordInherit": true
+    }
+    ```
+
+- `PUT /api/fs-meta/:id`
+
+  - 描述：更新指定 ID 的目录元信息配置
+  - 授权：需要管理员令牌
+  - 路径参数：
+    - `id` - 元信息记录 ID
+  - 请求体：与 `create` 基本一致，所有字段均为可选，未提供的字段保持不变
+    ```json
+    {
+      "path": "/claw/image",
+      "headerMarkdown": "子目录说明",
+      "headerInherit": false,
+      "footerMarkdown": null,
+      "footerInherit": false,
+      "hidePatterns": [],
+      "hideInherit": false,
+      "password": "9999",
+      "passwordInherit": true
+    }
+    ```
+
+- `DELETE /api/fs-meta/:id`
+
+  - 描述：删除指定 ID 的目录元信息记录
+  - 授权：需要管理员令牌
+  - 路径参数：
+    - `id` - 元信息记录 ID

@@ -255,6 +255,44 @@ async function createFileTables(db) {
 }
 
 /**
+ * 创建 FS 目录 Meta 相关表
+ * @param {D1Database} db - D1数据库实例
+ */
+async function createFsMetaTables(db) {
+  console.log("创建 FS 目录 Meta 表...");
+
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.FS_META} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        path TEXT NOT NULL,
+
+        header_markdown TEXT NULL,
+        header_inherit BOOLEAN NOT NULL DEFAULT 0,
+
+        footer_markdown TEXT NULL,
+        footer_inherit BOOLEAN NOT NULL DEFAULT 0,
+
+        hide_patterns TEXT NULL,
+        hide_inherit BOOLEAN NOT NULL DEFAULT 0,
+
+        password TEXT NULL,
+        password_inherit BOOLEAN NOT NULL DEFAULT 0,
+
+        extra JSON NULL,
+
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    )
+    .run();
+
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_fs_meta_path ON ${DbTables.FS_META}(path)`).run();
+}
+
+/**
  * 创建系统设置表
  * @param {D1Database} db - D1数据库实例
  */
@@ -456,6 +494,7 @@ export async function initDatabase(db) {
   await createAdminTables(db);
   await createStorageTables(db);
   await createFileTables(db);
+  await createFsMetaTables(db);
   await createSystemTables(db);
 
   // 创建索引
@@ -731,12 +770,16 @@ async function executeMigrationForVersion(db, version) {
       break;
 
     case 21:
-      // 版本21：为 pastes 表添加 title 和 is_public 字段，并补充索引
+      // 版本21：为 pastes 表添加 title 和 is_public 字段，并补充索引；同时创建 fs_meta 表
       console.log("版本21：为 pastes 表添加 title 和 is_public 字段...");
       await addTableField(db, DbTables.PASTES, "title", "title TEXT");
       await addTableField(db, DbTables.PASTES, "is_public", "is_public BOOLEAN NOT NULL DEFAULT 1");
       await db.prepare(`CREATE INDEX IF NOT EXISTS idx_pastes_is_public ON ${DbTables.PASTES}(is_public)`).run();
       console.log("版本21：pastes 表 title / is_public 字段与索引检查/创建完成。");
+
+      console.log("版本21：检查并创建 fs_meta 目录 Meta 表...");
+      await createFsMetaTables(db);
+      console.log("版本21：fs_meta 表及其索引检查/创建完成。");
       break;
 
     default:
