@@ -496,12 +496,8 @@ const buildShareResultEntry = (record, meta = {}) => {
   }
   if (!shareUrl) return null;
 
-  const previewUrl = record.previewUrl || record.proxy_preview_url || record.proxyPreviewUrl || shareUrl;
-  const downloadUrl =
-    record.proxy_download_url ||
-    record.proxyDownloadUrl ||
-    record.downloadUrl ||
-    (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
+  const previewUrl = record.previewUrl || record.proxyPreviewUrl || shareUrl;
+  const downloadUrl = record.proxyDownloadUrl || record.downloadUrl || (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
 
   return {
     id: record.id || meta.fileId || slug || record.storage_path || record.filename,

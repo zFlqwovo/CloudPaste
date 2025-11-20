@@ -650,12 +650,8 @@ const buildShareResultEntry = (item) => {
   } else if (record.url) {
     shareUrl = record.url.startsWith("http") || !origin ? record.url : `${origin.replace(/\/$/,"")}${record.url}`;
   }
-  const previewUrl = record.previewUrl || record.proxy_preview_url || record.proxyPreviewUrl || shareUrl;
-  const downloadUrl =
-    record.proxy_download_url ||
-    record.proxyDownloadUrl ||
-    record.downloadUrl ||
-    (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
+  const previewUrl = record.previewUrl || record.proxyPreviewUrl || shareUrl;
+  const downloadUrl = record.proxyDownloadUrl || record.downloadUrl || (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
 
   return {
     id: record.id || meta.fileId || item?.id || slug,

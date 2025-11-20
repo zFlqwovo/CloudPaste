@@ -7,8 +7,7 @@ import { ensureRepositoryFactory } from "../utils/repositories.js";
 import { verifyPassword } from "../utils/crypto.js";
 import { getEffectiveMimeType, getContentTypeAndDisposition } from "../utils/fileUtils.js";
 import { getFileBySlug, isFileAccessible } from "./fileService.js";
-import { StorageFactory } from "../storage/factory/StorageFactory.js";
-import { StorageConfigUtils } from "../storage/utils/StorageConfigUtils.js";
+import { ObjectStore } from "../storage/object/ObjectStore.js";
 
 /**
  * 文件查看服务类
@@ -64,15 +63,12 @@ export class FileViewService {
     try {
       console.log(`开始删除过期文件: ${file.id}`);
 
-      // 通过 Driver 按存储路径删除对象
+      // 通过 ObjectStore 按存储路径删除对象
       if (file.storage_path && file.storage_config_id && file.storage_type) {
         try {
-          const config = await StorageConfigUtils.getStorageConfig(this.db, file.storage_type, file.storage_config_id);
-          const driver = await StorageFactory.createDriver(file.storage_type, config, this.encryptionSecret);
-          if (typeof driver.deleteObjectByStoragePath === "function") {
-            await driver.deleteObjectByStoragePath(file.storage_path, { db: this.db });
-            console.log(`已从存储删除文件: ${file.storage_path}`);
-          }
+          const objectStore = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
+          await objectStore.deleteByStoragePath(file.storage_config_id, file.storage_path, { db: this.db });
+          console.log(`已从存储删除文件: ${file.storage_path}`);
         } catch (e) {
           console.warn("删除存储对象失败（已忽略以完成记录删除）:", e?.message || e);
         }
@@ -161,17 +157,14 @@ export class FileViewService {
       // 获取文件的MIME类型
       const contentType = getEffectiveMimeType(result.file.mimetype, result.file.filename);
 
-      // 通过 Driver 生成直链（按存储路径）
+      // 通过 ObjectStore + StorageStrategy 生成直链
       let presignedUrl = null;
       try {
-        const config = await StorageConfigUtils.getStorageConfig(this.db, result.file.storage_type, result.file.storage_config_id);
-        const driver = await StorageFactory.createDriver(result.file.storage_type, config, this.encryptionSecret);
-        if (typeof driver.generateDownloadUrlByStoragePath === "function") {
-          presignedUrl = await driver.generateDownloadUrlByStoragePath(result.file.storage_path, {
-            forceDownload,
-            contentType,
-          });
-        }
+        const objectStore = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
+        const links = await objectStore.generateLinksByStoragePath(result.file.storage_config_id, result.file.storage_path, {
+          forceDownload,
+        });
+        presignedUrl = links?.download?.url || null;
       } catch (e) {
         console.error("生成存储直链失败:", e);
       }

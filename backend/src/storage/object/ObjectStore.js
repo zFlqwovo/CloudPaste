@@ -10,6 +10,7 @@ import { shouldUseRandomSuffix, getFileNameAndExt, generateShortId } from "../..
 import { ValidationError, NotFoundError } from "../../http/errors.js";
 import { ApiStatus } from "../../constants/index.js";
 import { PathPolicy } from "../../services/share/PathPolicy.js";
+import { resolveStorageLinks } from "../utils/StorageStrategy.js";
 
 export class ObjectStore {
   constructor(db, encryptionSecret, repositoryFactory) {
@@ -139,6 +140,54 @@ export class ObjectStore {
       size: Number(size) || 0,
       storage_config_id,
     };
+  }
+
+  // 生成预览/下载链接（storage-first 场景）
+  async generateLinksByStoragePath(storage_config_id, key, options = {}) {
+    const storageConfig = await this._getStorageConfig(storage_config_id);
+    if (!storageConfig.storage_type) {
+      throw new ValidationError("存储配置缺少 storage_type");
+    }
+    const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
+
+    const links = await resolveStorageLinks({
+      driver,
+      storageConfig,
+      path: key,
+      request: options.request || null,
+      forceDownload: options.forceDownload || false,
+      userType: options.userType || null,
+      userId: options.userId || null,
+    });
+
+    return {
+      preview: links.preview,
+      download: links.download,
+      proxyPolicy: links.proxyPolicy || null,
+    };
+  }
+
+  // 删除存储对象（storage-first）
+  async deleteByStoragePath(storage_config_id, key, options = {}) {
+    const storageConfig = await this._getStorageConfig(storage_config_id);
+    if (!storageConfig.storage_type) {
+      throw new ValidationError("存储配置缺少 storage_type");
+    }
+    const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
+
+    if (typeof driver.deleteObjectByStoragePath === "function") {
+      await driver.deleteObjectByStoragePath(key, options);
+      invalidateFsCache({ storageConfigId: storage_config_id, reason: "delete-object", db: this.db });
+      return { success: true };
+    }
+
+    if (typeof driver.batchRemoveItems === "function") {
+      await driver.batchRemoveItems([key], { subPath: key, db: this.db, ...options });
+      invalidateFsCache({ storageConfigId: storage_config_id, reason: "delete-object", db: this.db });
+      return { success: true };
+    }
+
+    throw new ValidationError("当前驱动不支持按存储路径删除");
   }
 }
 

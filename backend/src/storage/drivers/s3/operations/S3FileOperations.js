@@ -197,25 +197,25 @@ export class S3FileOperations {
                   const previewProxy = await this.driver.generateProxyUrl(path, { mount, request, download: false, db });
                   const downloadProxy = await this.driver.generateProxyUrl(path, { mount, request, download: true, db });
 
-                  result.preview_url = previewProxy.url;
-                  result.download_url = downloadProxy.url;
+                  result.previewUrl = previewProxy.url;
+                  result.downloadUrl = downloadProxy.url;
                   console.log(`为文件[${result.name}]生成代理URL: ✓预览 ✓下载`);
                 } catch (error) {
                   console.warn(`代理URL生成失败，回退到预签名URL:`, error);
                   // 回退到预签名URL
                   const previewUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, false, null, cacheOptions);
-                  result.preview_url = previewUrl;
+                  result.previewUrl = previewUrl;
 
                   const downloadUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, true, null, cacheOptions);
-                  result.download_url = downloadUrl;
+                  result.downloadUrl = downloadUrl;
                 }
               } else {
                 // 直链模式：返回S3预签名URL
                 const previewUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, false, null, cacheOptions);
-                result.preview_url = previewUrl;
+                result.previewUrl = previewUrl;
 
                 const downloadUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, true, null, cacheOptions);
-                result.download_url = downloadUrl;
+                result.downloadUrl = downloadUrl;
                 console.log(`为文件[${result.name}]生成预签名URL: ✓预览 ✓下载`);
               }
             } catch (urlError) {
@@ -277,25 +277,25 @@ export class S3FileOperations {
                     const previewProxy = await this.driver.generateProxyUrl(path, { mount, request, download: false, db });
                     const downloadProxy = await this.driver.generateProxyUrl(path, { mount, request, download: true, db });
 
-                    result.preview_url = previewProxy.url;
-                    result.download_url = downloadProxy.url;
+                    result.previewUrl = previewProxy.url;
+                    result.downloadUrl = downloadProxy.url;
                     console.log(`为文件[${result.name}]生成代理URL(GET): ✓预览 ✓下载`);
                   } catch (error) {
                     console.warn(`代理URL生成失败，回退到预签名URL:`, error);
                     // 回退到预签名URL
                     const previewUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, false, null, cacheOptions);
-                    result.preview_url = previewUrl;
+                    result.previewUrl = previewUrl;
 
                     const downloadUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, true, null, cacheOptions);
-                    result.download_url = downloadUrl;
+                    result.downloadUrl = downloadUrl;
                   }
                 } else {
                   // 直链模式：返回S3预签名URL（保持现有逻辑）
                   const previewUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, false, null, cacheOptions);
-                  result.preview_url = previewUrl;
+                  result.previewUrl = previewUrl;
 
                   const downloadUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, null, true, null, cacheOptions);
-                  result.download_url = downloadUrl;
+                  result.downloadUrl = downloadUrl;
                   console.log(`为文件[${result.name}]生成预签名URL(GET): ✓预览 ✓下载`);
                 }
               } catch (urlError) {

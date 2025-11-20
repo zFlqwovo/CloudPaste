@@ -144,8 +144,8 @@ export class ShareRecordService {
           previewUrl: useProxyFlag ? urls.proxyPreviewUrl : urls.previewUrl,
           downloadUrl: useProxyFlag ? urls.proxyDownloadUrl : urls.downloadUrl,
           // 直链字段统一移除，仅保留代理与通用字段
-          proxy_preview_url: urls.proxyPreviewUrl,
-          proxy_download_url: urls.proxyDownloadUrl,
+          proxyPreviewUrl: urls.proxyPreviewUrl,
+          proxyDownloadUrl: urls.proxyDownloadUrl,
           use_proxy: useProxyFlag,
           created_by: existing.created_by,
           used_original_filename: originalFilenameUsed,
@@ -221,8 +221,8 @@ export class ShareRecordService {
       previewUrl: useProxyFlag ? urls.proxyPreviewUrl : urls.previewUrl,
       downloadUrl: useProxyFlag ? urls.proxyDownloadUrl : urls.downloadUrl,
       // 直链字段统一移除，仅保留代理与通用字段
-      proxy_preview_url: urls.proxyPreviewUrl,
-      proxy_download_url: urls.proxyDownloadUrl,
+      proxyPreviewUrl: urls.proxyPreviewUrl,
+      proxyDownloadUrl: urls.proxyDownloadUrl,
       use_proxy: useProxyFlag,
       created_by: createdBy,
       used_original_filename: originalFilenameUsed,
