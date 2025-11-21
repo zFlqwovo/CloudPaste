@@ -5,7 +5,7 @@
 
 import { ApiStatus } from "../../../../constants/index.js";
 import { AppError, ValidationError, S3DriverError } from "../../../../http/errors.js";
-import { generatePresignedPutUrl, buildS3Url } from "../utils/s3Utils.js";
+import { generateUploadUrl, buildS3Url } from "../utils/s3Utils.js";
 import { S3Client, PutObjectCommand, ListMultipartUploadsCommand, ListPartsCommand, UploadPartCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
@@ -235,7 +235,7 @@ export class S3UploadOperations {
    * @param {Object} options - 选项参数
    * @returns {Promise<Object>} 预签名上传URL信息
    */
-  async generatePresignedUploadUrl(s3SubPath, options = {}) {
+  async generateUploadUrl(s3SubPath, options = {}) {
     const { fileName, fileSize, expiresIn = 3600 } = options;
 
     return handleFsError(
@@ -243,10 +243,22 @@ export class S3UploadOperations {
         // 推断MIME类型
         const contentType = getMimeTypeFromFilename(fileName);
 
-        const presignedUrl = await generatePresignedPutUrl(this.config, s3SubPath, contentType, this.encryptionSecret, expiresIn);
+        // 构建最终的 S3 对象 Key（与直接上传逻辑保持一致）
+        let finalS3Path;
+        const { isCompleteFilePath } = await import("../utils/S3PathUtils.js");
+        if (s3SubPath && isCompleteFilePath(s3SubPath, fileName)) {
+          // s3SubPath 已包含完整文件路径
+          finalS3Path = s3SubPath;
+        } else if (s3SubPath && !s3SubPath.endsWith("/")) {
+          finalS3Path = `${s3SubPath}/${fileName}`;
+        } else {
+          finalS3Path = `${s3SubPath || ""}${fileName}`;
+        }
 
-        // 生成S3直接访问URL
-        const s3Url = buildS3Url(this.config, s3SubPath);
+        const presignedUrl = await generateUploadUrl(this.config, finalS3Path, contentType, this.encryptionSecret, expiresIn);
+
+        // 生成 S3 直接访问 URL
+        const s3Url = buildS3Url(this.config, finalS3Path);
 
         return {
           success: true,
@@ -254,7 +266,7 @@ export class S3UploadOperations {
           publicUrl: s3Url,
           contentType: contentType,
           expiresIn: expiresIn,
-          storagePath: s3SubPath,
+          storagePath: finalS3Path,
           fileName: fileName,
           fileSize: fileSize,
         };

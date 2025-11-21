@@ -148,6 +148,25 @@ export function useUploaderClient() {
     });
   };
 
+  const createDirectShareUploadSession = ({ payload, events, uppyOptions } = {}) => {
+    return createDriverSession({
+      payload,
+      storageConfigId: payload?.storage_config_id,
+      events,
+      uppyOptions,
+      installPlugin: (driver, uppy, payloadRef, lifecycleEvents = {}) => {
+        const impl =
+          typeof driver.share.applyDirectShareUploader === "function"
+            ? driver.share.applyDirectShareUploader.bind(driver)
+            : driver.share.applyShareUploader.bind(driver);
+        impl(uppy, {
+          payload: payloadRef,
+          onShareRecord: lifecycleEvents.onShareRecord,
+        });
+      },
+    });
+  };
+
   const createUrlUploadSession = ({ payload, events, uppyOptions } = {}) => {
     return createDriverSession({
       payload,
@@ -180,6 +199,7 @@ export function useUploaderClient() {
 
   return {
     createShareUploadSession,
+    createDirectShareUploadSession,
     createUrlUploadSession,
     createFsUploadSession,
   };

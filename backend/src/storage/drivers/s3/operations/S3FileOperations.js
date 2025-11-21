@@ -4,7 +4,7 @@
  */
 
 import { AppError, NotFoundError, ConflictError, ValidationError, S3DriverError } from "../../../../http/errors.js";
-import { generatePresignedUrl, createS3Client } from "../utils/s3Utils.js";
+import { generateDownloadUrl, createS3Client } from "../utils/s3Utils.js";
 import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from "@aws-sdk/client-s3";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
@@ -255,12 +255,12 @@ export class S3FileOperations {
   }
 
   /**
-   * 生成文件预签名URL
+   * 生成文件预签名下载URL
    * @param {string} s3SubPath - S3子路径
    * @param {Object} options - 选项参数
    * @returns {Promise<Object>} 预签名URL信息
    */
-  async generatePresignedUrl(s3SubPath, options = {}) {
+  async generateDownloadUrl(s3SubPath, options = {}) {
     const { expiresIn = 604800, forceDownload = false, userType, userId, mount } = options;
 
     return handleFsError(
@@ -271,7 +271,7 @@ export class S3FileOperations {
           enableCache: mount?.cache_ttl > 0,
         };
 
-        const presignedUrl = await generatePresignedUrl(this.config, s3SubPath, this.encryptionSecret, expiresIn, forceDownload, null, cacheOptions);
+        const presignedUrl = await generateDownloadUrl(this.config, s3SubPath, this.encryptionSecret, expiresIn, forceDownload, null, cacheOptions);
 
         // 提取文件名
         const fileName = s3SubPath.split("/").filter(Boolean).pop() || "file";
@@ -285,8 +285,8 @@ export class S3FileOperations {
           forceDownload: forceDownload,
         };
       },
-      "获取文件预签名URL",
-      "获取文件预签名URL失败"
+      "获取文件下载预签名URL",
+      "获取文件下载预签名URL失败"
     );
   }
 

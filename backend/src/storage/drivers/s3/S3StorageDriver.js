@@ -412,26 +412,6 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
-   * 通过存储路径生成下载直链
-   * @param {string} storagePath
-   * @param {Object} options
-   * @param {boolean} options.forceDownload
-   * @param {string} options.contentType
-   * @returns {Promise<string>} 预签名URL
-   */
-  async generateDownloadUrlByStoragePath(storagePath, options = {}) {
-    this._ensureInitialized();
-    try {
-      const { forceDownload = false, contentType = null, expiresIn = null } = options || {};
-      const { generatePresignedUrl } = await import("./utils/s3Utils.js");
-      const url = await generatePresignedUrl(this.config, storagePath, this.encryptionSecret, expiresIn, forceDownload, contentType, { enableCache: false });
-      return url;
-    } catch (error) {
-      throw this._rethrow(error, "生成下载URL失败");
-    }
-  }
-
-  /**
    * 复制文件或目录
    * @param {string} sourcePath - 源路径
    * @param {string} targetPath - 目标路径
@@ -471,46 +451,61 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
-   * 生成预签名URL
+   * 生成预签名下载URL
    * @param {string} path - 文件路径
    * @param {Object} options - 选项参数
-   * @param {string} options.operation - 操作类型：'download' 或 'upload'
    * @returns {Promise<Object>} 预签名URL信息
    */
-  async generatePresignedUrl(path, options = {}) {
+  async generateDownloadUrl(path, options = {}) {
     this._ensureInitialized();
 
-    const { mount, subPath, db, operation = "download" } = options;
-
-    // 规范化S3子路径
+    const { mount, subPath, db } = options;
     const s3SubPath = normalizeS3SubPath(subPath, false);
 
-    // 更新挂载点的最后使用时间
-    if (db && mount.id) {
+    if (db && mount?.id) {
       await updateMountLastUsed(db, mount.id);
     }
 
-    // 根据操作类型委托给不同的模块
     try {
-      if (operation === "upload") {
-        const { fileName, fileSize, expiresIn } = options;
-        return await this.uploadOps.generatePresignedUploadUrl(s3SubPath, {
-          fileName,
-          fileSize,
-          expiresIn,
-        });
-      } else {
-        const { expiresIn, forceDownload, userType, userId } = options;
-        return await this.fileOps.generatePresignedUrl(s3SubPath, {
-          expiresIn,
-          forceDownload,
-          userType,
-          userId,
-          mount,
-        });
-      }
+      const { expiresIn, forceDownload, userType, userId } = options;
+      return await this.fileOps.generateDownloadUrl(s3SubPath, {
+        expiresIn,
+        forceDownload,
+        userType,
+        userId,
+        mount,
+      });
     } catch (error) {
-      throw this._rethrow(error, operation === "upload" ? "生成上传URL失败" : "生成下载URL失败");
+      throw this._rethrow(error, "生成下载URL失败");
+    }
+  }
+
+  /**
+   * 生成预签名上传URL
+   * @param {string} path - 目标路径
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 预签名URL信息
+   */
+  async generateUploadUrl(path, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, subPath, db } = options;
+    // 对于 FS 视图，使用 subPath 规范化；对于 ObjectStore 等 storage-first 场景，直接使用传入的 path 作为对象 Key
+    const s3SubPath = subPath != null ? normalizeS3SubPath(subPath, false) : path;
+
+    if (db && mount?.id) {
+      await updateMountLastUsed(db, mount.id);
+    }
+
+    try {
+      const { fileName, fileSize, expiresIn } = options;
+      return await this.uploadOps.generateUploadUrl(s3SubPath, {
+        fileName,
+        fileSize,
+        expiresIn,
+      });
+    } catch (error) {
+      throw this._rethrow(error, "生成上传URL失败");
     }
   }
 

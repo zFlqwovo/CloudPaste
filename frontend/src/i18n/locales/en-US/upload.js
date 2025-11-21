@@ -105,6 +105,12 @@ export default {
     customFileName: "Custom Filename",
     customFilename: "Custom filename (optional)",
     uploadMethod: "Upload Method",
+    uploadMode: "Upload Mode",
+    uploadModes: {
+      presign: "S3 Presigned",
+      direct: "Direct Upload",
+      presignOnly: "(S3 Only)",
+    },
     presignedUpload: "Presigned Upload",
     multipartUpload: "Multipart Upload",
     presignedUploadDesc: "Pre-signed URL direct upload to storage",

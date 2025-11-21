@@ -5,15 +5,16 @@ import { buildAuthHeadersForRequest } from "@/modules/security/index.js";
 
 /**
  * WebDAV 存储驱动（前端）
- * - 仅支持后端直传 /fs/upload，禁用预签名与分片
- * - share/url 上传暂不支持，直接抛出错误
+ * - FS：通过 Uppy + XHRUpload 直传到 /fs/upload
+ * - Share：通过 Uppy + XHRUpload 直传到 /share/upload（后端负责写入 + 创建分享记录）
+ * - URL 分享暂不支持，直接抛出错误
  */
 export class WebDavDriver {
   constructor(config = {}) {
     this.config = config;
     this.capabilities = createCapabilities({
       share: {
-        direct: false,
+        direct: true,
         url: false,
       },
       fs: {
@@ -24,12 +25,14 @@ export class WebDavDriver {
     });
 
     this.share = {
-      applyShareUploader: () => {
-        throw new Error("WebDAV 暂不支持分享上传");
-      },
+      // 直接分享上传（多存储通用，通过 /share/upload）
+      applyShareUploader: this.applyShareUploader.bind(this),
+      // WebDAV 不支持预签名分享上传
       applyUrlUploader: () => {
         throw new Error("WebDAV 暂不支持外链拉取上传");
       },
+      // 为 direct share 模式提供显式入口（与 S3 对齐）
+      applyDirectShareUploader: this.applyShareUploader.bind(this),
     };
 
     this.fs = {
@@ -39,6 +42,91 @@ export class WebDavDriver {
 
   get storageConfigId() {
     return this.config?.id ?? null;
+  }
+
+  /**
+   * WebDAV 分享上传：通过 Uppy + XHRUpload 调用后端 /api/share/upload
+   * - 与 FS/Share 其他驱动保持一致：统一走 Uppy 管线
+   * - 后端负责写入存储并创建分享记录，响应中返回 share 记录
+   */
+  applyShareUploader(uppy, { payload, onShareRecord } = {}) {
+    if (!uppy) {
+      throw new Error("applyShareUploader 需要提供 Uppy 实例");
+    }
+
+    const storageConfigId = payload?.storage_config_id || this.storageConfigId;
+    if (!storageConfigId) {
+      throw new Error("缺少 storage_config_id，无法初始化 WebDAV 分享上传");
+    }
+
+    const baseMeta = {
+      storage_config_id: storageConfigId,
+      path: payload?.path || "",
+      slug: payload?.slug || "",
+      remark: payload?.remark || "",
+      password: payload?.password || "",
+      expires_in: payload?.expires_in || "0",
+      max_views: payload?.max_views ?? 0,
+      use_proxy: payload?.use_proxy,
+      original_filename: payload?.original_filename,
+    };
+
+    const headers = buildAuthHeadersForRequest({});
+    try {
+      uppy.setMeta(baseMeta);
+    } catch {}
+
+    uppy.use(XHRUpload, {
+      id: "WebDavShareUpload",
+      endpoint: getFullApiUrl("/share/upload"),
+      method: "POST",
+      formData: true,
+      fieldName: "file",
+      limit: 3,
+      allowedMetaFields: [
+        "storage_config_id",
+        "path",
+        "slug",
+        "remark",
+        "password",
+        "expires_in",
+        "max_views",
+        "use_proxy",
+        "original_filename",
+      ],
+      headers,
+    });
+
+    // 监听 upload-success，从响应中提取分享记录并透传给上层
+    const handleSuccess = (file, response) => {
+      try {
+        const body = response && (response.body || response);
+        const payloadBody = body && typeof body === "object" ? body : null;
+        if (!payloadBody || payloadBody.success !== true) return;
+        const shareRecord = payloadBody.data;
+        if (!shareRecord) return;
+
+        try {
+          uppy.setFileMeta(file.id, {
+            ...(file.meta || {}),
+            shareRecord,
+            fileId: shareRecord.id,
+          });
+        } catch {}
+
+        try {
+          uppy.emit("share-record", { file, shareRecord });
+        } catch {}
+
+        try {
+          onShareRecord?.({ file, shareRecord });
+        } catch {}
+      } catch {
+        // 响应解析失败时静默忽略，由上层根据 success/message 处理错误
+      }
+    };
+
+    uppy.on("upload-success", handleSuccess);
   }
 
   /**

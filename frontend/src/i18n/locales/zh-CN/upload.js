@@ -105,6 +105,12 @@ export default {
     customFileName: "自定义文件名",
     customFilename: "自定义文件名（可选）",
     uploadMethod: "上传方式",
+    uploadMode: "上传方式",
+    uploadModes: {
+      presign: "S3预签名",
+      direct: "直接上传",
+      presignOnly: "(仅S3)",
+    },
     presignedUpload: "预签名上传",
     multipartUpload: "分片上传",
     presignedUploadDesc: "预签名URL直传到存储",

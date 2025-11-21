@@ -71,6 +71,22 @@ export function useShareUploadController() {
   };
 
   /**
+   * 创建基于 /share/upload 的直传分享会话（多存储通用）。
+   */
+  const createDirectShareSession = ({ payload, events, uppyOptions } = {}) => {
+    disposeShareSession();
+
+    const session = uploaderClient.createDirectShareUploadSession({
+      payload,
+      events,
+      uppyOptions,
+    });
+
+    activeShareSession.value = session;
+    return session;
+  };
+
+  /**
    * 创建 URL 上传会话（Url Upload）。
    *
    * 与 Share 类似，调用方负责 addFiles / start。
@@ -79,6 +95,22 @@ export function useShareUploadController() {
     disposeUrlSession();
 
     const session = uploaderClient.createUrlUploadSession({
+      payload,
+      events,
+      uppyOptions,
+    });
+
+    activeUrlSession.value = session;
+    return session;
+  };
+
+  /**
+   * 创建基于 /share/upload 的 URL 直传分享会话（与文件直传共享同一底层实现）。
+   */
+  const createUrlDirectSession = ({ payload, events, uppyOptions } = {}) => {
+    disposeUrlSession();
+
+    const session = uploaderClient.createDirectShareUploadSession({
       payload,
       events,
       uppyOptions,
@@ -125,6 +157,15 @@ export function useShareUploadController() {
   };
 
   /**
+   * 基于 /share/upload 的直传分享上传（S3/WebDAV 等多存储通用）。
+   */
+  const startDirectShareUpload = ({ files = [], payload, buildMeta, events, uppyOptions } = {}) => {
+    const session = createDirectShareSession({ payload, events, uppyOptions });
+    const ids = Array.isArray(files) && files.length ? session.addFiles(files, buildMeta) : [];
+    return { session, ids };
+  };
+
+  /**
    * 便捷方法：启动单次 URL 上传（调用方负责构造文件描述）。
    * 保持与 startShareUpload 一致的调用方式。
    */
@@ -140,9 +181,12 @@ export function useShareUploadController() {
     activeShareSession,
     activeUrlSession,
     createShareSession,
+    createDirectShareSession,
     createUrlSession,
+    createUrlDirectSession,
     createFsUploadSession,
     startShareUpload,
+    startDirectShareUpload,
     startUrlUpload,
     disposeShareSession,
     disposeUrlSession,

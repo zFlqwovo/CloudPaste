@@ -13,7 +13,13 @@ const requireFilesCreate = usePolicy("files.create");
 const router = new Hono();
 
 
-// “直传即分享”
+const parseFormData = async (c, next) => {
+  const formData = await c.req.formData();
+  c.set("formData", formData);
+  await next();
+};
+
+// “直传即分享”（storage-first，S3 直传）
 router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
   const db = c.env.DB;
   const encryptionSecret = getEncryptionSecret(c);
@@ -60,6 +66,59 @@ router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
     filename,
     bodyStream,
     declaredLength,
+    userIdOrInfo,
+    userType,
+    shareParams
+  );
+
+  return jsonOk(c, result, "文件上传成功");
+});
+
+// 通用分享上传：通过 ObjectStore + File，多存储通用
+router.post("/api/share/upload", requireFilesCreate, parseFormData, async (c) => {
+  const db = c.env.DB;
+  const encryptionSecret = getEncryptionSecret(c);
+  const repositoryFactory = useRepositories(c);
+
+  const formData = c.get("formData");
+  const file = formData.get("file");
+  if (!file) {
+    throw new ValidationError("缺少文件参数");
+  }
+
+  const storageConfigId = formData.get("storage_config_id") || null;
+  const path = formData.get("path") || null;
+  const slug = formData.get("slug") || null;
+  const remark = formData.get("remark") || "";
+  const password = formData.get("password") || null;
+  const expiresIn = Number(formData.get("expires_in") || 0);
+  const maxViews = Number(formData.get("max_views") || 0);
+  const useProxyRaw = formData.get("use_proxy");
+  const originalFilenameRaw = formData.get("original_filename");
+
+  const principalInfo = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
+  const { type: userType, userId, apiKeyInfo } = principalInfo;
+  const userIdOrInfo = userType === UserType.ADMIN ? userId : apiKeyInfo;
+
+  const shareService = new FileShareService(db, encryptionSecret, repositoryFactory);
+
+  const shareParams = {
+    storage_config_id: storageConfigId,
+    path: path || null,
+    slug: slug || null,
+    remark,
+    password,
+    expiresIn,
+    maxViews,
+    override: false,
+    useProxy:useProxyRaw === "true"? true: useProxyRaw === "false"? false: undefined,
+    originalFilename: originalFilenameRaw === "true",
+    contentType: file.type || undefined,
+    request: c.req.raw,
+  };
+
+  const result = await shareService.uploadFileViaObjectStoreAndShare(
+    file,
     userIdOrInfo,
     userType,
     shareParams
@@ -181,50 +240,4 @@ router.get("/api/share/url/proxy", requireFilesCreate, async (c) => {
 });
 
 // URL → 预签名：根据URL元信息生成上传预签名
-router.post("/api/share/url/presign", requireFilesCreate, parseJsonBody, async (c) => {
-  const db = c.env.DB;
-  const encryptionSecret = getEncryptionSecret(c);
-  const repositoryFactory = useRepositories(c);
-
-  const body = c.get("jsonBody") || {};
-  const { url, path = null, storage_config_id = null } = body;
-  if (!url) {
-    throw new ValidationError("缺少URL参数");
-  }
-
-  const principalInfo = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
-  const { type: userType, userId, apiKeyInfo } = principalInfo;
-  const userIdOrInfo = userType === UserType.ADMIN ? userId : apiKeyInfo;
-
-  const shareService = new FileShareService(db, encryptionSecret, repositoryFactory);
-
-  // 1) 元信息（可被调用方覆盖）
-  const meta = await shareService.validateUrlMetadata(url);
-  const filename = body.filename || meta.filename || "download";
-  const contentType = body.contentType || meta.contentType || "application/octet-stream";
-  const fileSize = typeof body.fileSize === "number" ? body.fileSize : (meta.size || undefined);
-
-  // 2) 生成预签名
-  const presign = await shareService.createPresignedShareUpload({
-    filename,
-    fileSize,
-    contentType,
-    path,
-    storage_config_id,
-    userIdOrInfo,
-    userType,
-  });
-
-  // 返回给客户端：presign + 元数据 + 提交建议
-  const commitSuggestion = {
-    key: presign.key,
-    storage_config_id: presign.storage_config_id || storage_config_id || null,
-    filename,
-    size: fileSize || null,
-    etag: null, // 客户端 PUT 完成后从响应头获取
-  };
-
-  return jsonOk(c, { presign, metadata: meta, commit_suggestion: commitSuggestion }, "URL 预签名生成成功");
-});
-
 export default router;

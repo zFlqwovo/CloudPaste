@@ -133,14 +133,38 @@ export class StorageDriver {
   }
 
   /**
-   * 生成预签名URL
+   * 生成预签名URL - 兼容入口
    * @param {string} path - 文件路径
    * @param {Object} options - 选项参数
    * @param {string} options.operation - 操作类型：'download' 或 'upload'
    * @returns {Promise<Object>} 预签名URL信息
    */
   async generatePresignedUrl(path, options = {}) {
-    throw new Error("generatePresignedUrl方法必须在子类中实现");
+    const op = options?.operation || "download";
+    if (op === "upload") {
+      return await this.generateUploadUrl(path, options);
+    }
+    return await this.generateDownloadUrl(path, options);
+  }
+
+  /**
+   * 生成预签名下载URL
+   * @param {string} path - 文件路径
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 预签名下载URL信息
+   */
+  async generateDownloadUrl(path, options = {}) {
+    throw new Error("generateDownloadUrl方法必须在子类中实现");
+  }
+
+  /**
+   * 生成预签名上传URL
+   * @param {string} path - 目标路径
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 预签名上传URL信息
+   */
+  async generateUploadUrl(path, options = {}) {
+    throw new Error("generateUploadUrl方法必须在子类中实现");
   }
 
   /**

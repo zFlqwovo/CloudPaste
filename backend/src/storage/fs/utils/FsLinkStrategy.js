@@ -39,13 +39,12 @@ export async function generateFileLink(fs, path, userIdOrInfo, userType, options
 
   // 未强制代理时：具备预签名能力的驱动优先走预签名
   if (driver.hasCapability(CAPABILITIES.PRESIGNED)) {
-    const result = await driver.generatePresignedUrl(path, {
+    const result = await driver.generateDownloadUrl(path, {
       mount,
       subPath,
       db,
       userIdOrInfo,
       userType,
-      operation: options.operation || "download",
       expiresIn: options.expiresIn,
       forceDownload,
     });
@@ -89,4 +88,3 @@ export async function generateFileLink(fs, path, userIdOrInfo, userType, options
     expose: true,
   });
 }
-

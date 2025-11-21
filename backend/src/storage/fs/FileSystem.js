@@ -14,7 +14,7 @@ import {
   exists as featureExists,
 } from "./features/read.js";
 import {
-  generatePresignedUrl as featureGeneratePresignedUrl,
+  generateUploadUrl as featureGenerateUploadUrl,
   generateFileLink as featureGenerateFileLink,
   commitPresignedUpload as featureCommitPresignedUpload,
 } from "./features/presign.js";
@@ -231,15 +231,15 @@ export class FileSystem {
   }
 
   /**
-   * 生成预签名URL（严格模式，仅支持具备 PRESIGNED 能力的驱动）
+   * 生成预签名上传URL（严格模式，仅支持具备 PRESIGNED 能力的驱动）
    * @param {string} path - 文件路径
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
    * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 预签名URL信息
+   * @returns {Promise<Object>} 预签名上传URL信息
    */
-  async generatePresignedUrl(path, userIdOrInfo, userType, options = {}) {
-    return await featureGeneratePresignedUrl(this, path, userIdOrInfo, userType, options);
+  async generateUploadUrl(path, userIdOrInfo, userType, options = {}) {
+    return await featureGenerateUploadUrl(this, path, userIdOrInfo, userType, options);
   }
 
   /**

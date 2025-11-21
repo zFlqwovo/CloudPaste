@@ -260,6 +260,7 @@
                     ]"
                     :disabled="!storageConfigs.length || loading || isUploading"
                     required
+                    @change="onStorageConfigChange"
                   >
                     <option value="" disabled selected>{{ storageConfigs.length ? t("file.selectStorage") : t("file.noStorage") }}</option>
                     <option v-for="config in storageConfigs" :key="config.id" :value="config.id">{{ formatStorageOptionLabel(config) }}</option>
@@ -426,8 +427,33 @@
               </div>
             </div>
 
+            <!-- 上传方式选择 -->
+            <div class="mt-6 mb-5 flex items-center gap-6">
+              <label class="flex items-center cursor-pointer" :class="!canUsePresignMode || isUploading ? 'opacity-50 cursor-not-allowed' : ''">
+                <input
+                  type="radio"
+                  v-model="uploadMode"
+                  value="presign"
+                  :disabled="!canUsePresignMode || isUploading"
+                  class="w-4 h-4 mr-2"
+                />
+                <span :class="darkMode ? 'text-gray-300' : 'text-gray-700'">{{ t("file.uploadModes.presign") }}</span>
+                <span v-if="!canUsePresignMode" class="ml-1 text-xs" :class="darkMode ? 'text-gray-500' : 'text-gray-400'">{{ t("file.uploadModes.presignOnly") }}</span>
+              </label>
+              <label class="flex items-center cursor-pointer" :class="isUploading ? 'opacity-50 cursor-not-allowed' : ''">
+                <input
+                  type="radio"
+                  v-model="uploadMode"
+                  value="direct"
+                  :disabled="isUploading"
+                  class="w-4 h-4 mr-2"
+                />
+                <span :class="darkMode ? 'text-gray-300' : 'text-gray-700'">{{ t("file.uploadModes.direct") }}</span>
+              </label>
+            </div>
+
             <!-- 表单按钮 -->
-            <div class="submit-section mt-6 flex flex-row items-center gap-3">
+            <div class="submit-section flex flex-row items-center gap-3">
               <button
                 type="submit"
                 :disabled="selectedFiles.length === 0 || !formData.storage_config_id || isUploading || loading"
@@ -542,6 +568,7 @@ const {
 const {
   activeShareSession,
   startShareUpload,
+  startDirectShareUpload,
   disposeShareSession,
 } = useShareUploadController();
 
@@ -562,6 +589,22 @@ const lastLoaded = ref(0);
 const lastTime = ref(0);
 const shareRecordMap = new Map();
 const pendingShareItems = ref([]);
+
+// 上传模式:'direct' 或 'presign'，默认S3预签名
+const uploadMode = ref("presign");
+
+// 当前存储配置
+const currentStorageConfig = computed(() => {
+  return storageConfigs.value.find(config => config.id === formData.storage_config_id);
+});
+
+// 是否可以使用预签名模式(仅S3支持)
+const canUsePresignMode = computed(() => {
+  const config = currentStorageConfig.value;
+  if (!config) return false;
+  const storageType = config.storage_type || config.provider_type || "";
+  return storageType.toUpperCase() === "S3";
+});
 
 const uppyIdByIndex = new Map();
 const pendingErrorDescriptors = [];
@@ -803,6 +846,13 @@ const computeFileSlug = (index) => {
   return selectedFiles.value.length > 1 ? `${formData.slug}-${index + 1}` : formData.slug;
 };
 
+// 存储配置变更时，仅在不支持预签名时才切换到直传
+const onStorageConfigChange = () => {
+  if (!canUsePresignMode.value && uploadMode.value === "presign") {
+    uploadMode.value = "direct";
+  }
+};
+
 const updateOverallProgress = (currentIndex, loaded, total) => {
   const totalSize = selectedFiles.value.reduce((sum, file) => sum + file.size, 0);
   if (!totalSize) {
@@ -880,8 +930,14 @@ const submitUpload = async () => {
 
   let ids = [];
   const basePayload = buildPayloadForFile(formData);
+
+  // 根据uploadMode选择上传方式
+  const uploadFn = uploadMode.value === "presign" && canUsePresignMode.value
+    ? startShareUpload  // 预签名模式 (S3专用)
+    : startDirectShareUpload;  // 直传模式 (通用)
+
   try {
-    ({ ids } = startShareUpload({
+    ({ ids } = uploadFn({
       files: selectedFiles.value,
       payload: basePayload,
       events: {
@@ -986,7 +1042,13 @@ const retryUpload = async (index) => {
 
   try {
     const payload = buildPayloadForFile(formData, computeFileSlug(index));
-    const { session } = startShareUpload({
+
+    // 根据uploadMode选择上传方式
+    const uploadFn = uploadMode.value === "presign" && canUsePresignMode.value
+      ? startShareUpload  // 预签名模式 (S3专用)
+      : startDirectShareUpload;  // 直传模式 (通用)
+
+    const { session } = uploadFn({
       files: [selectedFiles.value[index]],
       payload,
       events: {

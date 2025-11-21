@@ -22,13 +22,10 @@ function pickUrl(result) {
 
 function hasPresignedCapability(driver) {
   try {
-    if (typeof driver?.hasCapability === "function") {
-      return driver.hasCapability(CAPABILITIES.PRESIGNED);
-    }
+    return typeof driver?.hasCapability === "function" && driver.hasCapability(CAPABILITIES.PRESIGNED);
   } catch {
-    // ignore
+    return false;
   }
-  return typeof driver?.generatePresignedUrl === "function";
 }
 
 /**
@@ -81,7 +78,7 @@ export async function resolveStorageLinks({
 
   // 2) 无 custom_host：若驱动具备预签名能力，则使用预签名直链
   if (hasPresignedCapability(driver)) {
-    const previewRes = await driver.generatePresignedUrl(path, {
+    const previewRes = await driver.generateDownloadUrl(path, {
       subPath: path,
       forceDownload: false,
       expiresIn: null,
@@ -89,7 +86,7 @@ export async function resolveStorageLinks({
       userId,
       mount,
     });
-    const downloadRes = await driver.generatePresignedUrl(path, {
+    const downloadRes = await driver.generateDownloadUrl(path, {
       subPath: path,
       forceDownload: true,
       expiresIn: null,
@@ -109,4 +106,3 @@ export async function resolveStorageLinks({
   // 分享层可通过自身的 /api/file-view / /api/file-download 代理链路访问
   return { preview: null, download: null, proxyPolicy };
 }
-

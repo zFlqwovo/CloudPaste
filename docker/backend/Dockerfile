@@ -1,5 +1,5 @@
 # 第一阶段：构建sqlite3模块
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ RUN apk add --no-cache --virtual .build-deps python3 make g++ sqlite-dev && \
     apk del .build-deps
 
 # 第二阶段：创建最终镜像
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
