@@ -297,6 +297,27 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
+   * 在当前挂载点中搜索文件
+   * @param {string} query - 搜索关键字
+   * @param {Object} options - 搜索选项
+   * @param {Object} options.mount - 挂载点对象
+   * @param {string|null} options.searchPath - 搜索路径范围（可选）
+   * @param {number} options.maxResults - 最大结果数量
+   * @param {D1Database} options.db - 数据库实例
+   * @returns {Promise<Array<Object>>} 搜索结果
+   */
+  async search(query, options = {}) {
+    this._ensureInitialized();
+    const { mount, searchPath = null, maxResults = 1000, db } = options;
+    return await this.searchOps.searchInMount(query, {
+      mount,
+      searchPath,
+      maxResults,
+      db,
+    });
+  }
+
+  /**
    * 创建目录
    * @param {string} path - 目录路径
    * @param {Object} options - 选项参数

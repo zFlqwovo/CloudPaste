@@ -39,6 +39,7 @@ export default {
       nameHint: "用于标识挂载点的名称",
       storageType: "存储类型",
       storageTypeHint: "选择存储后端类型",
+      selectStorageType: "请选择存储类型",
       storageConfig: "存储配置",
       storageConfigPlaceholder: "请选择存储配置",
       storageConfigHint: "选择要使用的存储配置",

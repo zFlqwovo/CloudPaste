@@ -39,6 +39,7 @@ export default {
       nameHint: "Name to identify the mount point",
       storageType: "Storage Type",
       storageTypeHint: "Select storage backend type",
+      selectStorageType: "Please select a storage type",
       storageConfig: "Storage Configuration",
       storageConfigPlaceholder: "Select storage configuration",
       storageConfigHint: "Choose the storage configuration to use",

@@ -3,6 +3,7 @@ import { ApiStatus, UserType } from "../../constants/index.js";
 import { generateFileId, generateUniqueFileSlug } from "../../utils/common.js";
 import { hashPassword } from "../../utils/crypto.js";
 import { generateFileDownloadUrl } from "../fileService.js";
+import { getEffectiveMimeType } from "../../utils/fileUtils.js";
 
 export class ShareRecordService {
   constructor(db, encryptionSecret, repositoryFactory) {
@@ -67,6 +68,7 @@ export class ShareRecordService {
     // use_proxy 默认关闭代理，未显式传入时走直链
     const useProxyFlag = useProxy ? 1 : 0;
     const passwordHash = password ? await hashPassword(password) : null;
+    const normalizedMimeType = mimeType ?? getEffectiveMimeType(undefined, filename) ?? "application/octet-stream";
 
     const relativePath = (storageSubPath || "").replace(/^\/+/u, "");
     const storagePath = mount?.storage_config_id ? relativePath : (uploadResult?.storagePath || fsPath || filename);
@@ -87,7 +89,7 @@ export class ShareRecordService {
         await fileRepository.updateFile(existing.id, {
           filename,
           size,
-          mimetype: mimeType,
+          mimetype: normalizedMimeType,
           etag: uploadResult?.etag || null,
           remark,
           expires_at: expiresAt,
@@ -108,7 +110,7 @@ export class ShareRecordService {
           id: existing.id,
           slug: existing.slug,
           filename,
-          mimetype: mimeType,
+          mimetype: normalizedMimeType,
           size,
           remark,
           created_at: createdAt,
@@ -132,7 +134,7 @@ export class ShareRecordService {
           id: existing.id,
           slug: existing.slug,
           filename,
-          mimetype: mimeType,
+          mimetype: normalizedMimeType,
           size,
           remark,
           created_at: createdAt,
@@ -164,7 +166,7 @@ export class ShareRecordService {
       storage_type: storageType,
       storage_path: storagePath,
       file_path: fsPath,
-      mimetype: mimeType,
+      mimetype: normalizedMimeType,
       size,
       etag: uploadResult?.etag || null,
       remark,
@@ -185,7 +187,7 @@ export class ShareRecordService {
       id: fileId,
       slug: finalSlug,
       filename,
-      mimetype: mimeType,
+      mimetype: normalizedMimeType,
       size,
       remark,
       created_at: now,
@@ -209,7 +211,7 @@ export class ShareRecordService {
       id: fileId,
       slug: finalSlug,
       filename,
-      mimetype: mimeType,
+      mimetype: normalizedMimeType,
       size,
       remark,
       created_at: now,

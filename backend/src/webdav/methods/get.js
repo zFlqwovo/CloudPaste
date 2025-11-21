@@ -148,19 +148,25 @@ export async function handleGet(c, path, userId, userType, db) {
     const { mount } = await mountManager.getDriverByPath(path, userId, userType);
 
     if (mount.webdav_policy === "302_redirect") {
-      // 302重定向模式：生成预签名URL并重定向
+      // 302重定向模式：生成可用文件链接并重定向
       console.log(`WebDAV GET - 使用302重定向模式: ${path}`);
 
-      const presignedResult = await fileSystem.generatePresignedUrl(path, userId, userType, {
+      const linkResult = await fileSystem.generateFileLink(path, userId, userType, {
         operation: "download",
         forceDownload: false, // WebDAV通常不强制下载
+        request: c.req.raw,
       });
+
+      const location = linkResult?.url;
+      if (!location) {
+        return createWebDAVErrorResponse("无法生成文件直链", 500);
+      }
 
       return new Response(null, {
         status: 302,
         headers: getStandardWebDAVHeaders({
           customHeaders: {
-            Location: presignedResult.presignedUrl,
+            Location: location,
             "Cache-Control": "no-cache",
           },
         }),

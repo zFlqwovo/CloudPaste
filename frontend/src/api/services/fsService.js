@@ -155,7 +155,15 @@ export async function getFileLink(path, expiresIn = null, forceDownload = false)
     params.expires_in = expiresIn.toString();
   }
 
-  return get("/fs/file-link", { params });
+  const resp = await get("/fs/file-link", { params });
+  if (!resp || resp.success === false) {
+    throw new Error(resp?.message || "获取文件直链失败");
+  }
+  const url = resp?.data?.url;
+  if (!url) {
+    throw new Error(resp?.message || "获取文件直链失败");
+  }
+  return url;
 }
 
 /**

@@ -144,7 +144,7 @@ export class FileService {
     proxyPreviewUrl = appendPasswordParam(proxyPreviewUrl);
     proxyDownloadUrl = appendPasswordParam(proxyDownloadUrl);
 
-    // 使用 ObjectStore + StorageStrategy 生成直链
+    // 使用 ObjectStore + ObjectLinkStrategy 生成直链
     let directPreviewUrl = "";
     let directDownloadUrl = "";
     if (file?.storage_type && file?.storage_path) {

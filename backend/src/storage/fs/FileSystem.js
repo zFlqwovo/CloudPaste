@@ -7,8 +7,17 @@
 import { ValidationError, AuthorizationError, DriverError } from "../../http/errors.js";
 import { ApiStatus } from "../../constants/index.js";
 import { CAPABILITIES } from "../interfaces/capabilities/index.js";
-import { listDirectory as featureListDirectory, getFileInfo as featureGetFileInfo, downloadFile as featureDownloadFile, exists as featureExists } from "./features/read.js";
-import { generatePresignedUrl as featureGeneratePresignedUrl, commitPresignedUpload as featureCommitPresignedUpload } from "./features/presign.js";
+import {
+  listDirectory as featureListDirectory,
+  getFileInfo as featureGetFileInfo,
+  downloadFile as featureDownloadFile,
+  exists as featureExists,
+} from "./features/read.js";
+import {
+  generatePresignedUrl as featureGeneratePresignedUrl,
+  generateFileLink as featureGenerateFileLink,
+  commitPresignedUpload as featureCommitPresignedUpload,
+} from "./features/presign.js";
 import { uploadFile as featureUploadFile, uploadStream as featureUploadStream, uploadDirect as featureUploadDirect, createDirectory as featureCreateDirectory, updateFile as featureUpdateFile } from "./features/write.js";
 import { renameItem as featureRenameItem, copyItem as featureCopyItem, batchRemoveItems as featureBatchRemoveItems, batchCopyItems as featureBatchCopyItems, handleCrossStorageCopy as featureHandleCrossStorageCopy, commitCrossStorageCopy as featureCommitCrossStorageCopy } from "./features/ops.js";
 import {
@@ -25,6 +34,7 @@ import { ensureRepositoryFactory } from "../../utils/repositories.js";
 import { getAccessibleMountsForUser } from "../../security/helpers/access.js";
 import { UserType } from "../../constants/index.js";
 import { FsMetaService } from "../../services/fsMetaService.js";
+import { sortSearchResults } from "./utils/SearchUtils.js";
 
 export class FileSystem {
   /**
@@ -221,7 +231,7 @@ export class FileSystem {
   }
 
   /**
-   * 生成预签名URL
+   * 生成预签名URL（严格模式，仅支持具备 PRESIGNED 能力的驱动）
    * @param {string} path - 文件路径
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
@@ -230,6 +240,18 @@ export class FileSystem {
    */
   async generatePresignedUrl(path, userIdOrInfo, userType, options = {}) {
     return await featureGeneratePresignedUrl(this, path, userIdOrInfo, userType, options);
+  }
+
+  /**
+   * 生成通用文件链接（根据驱动能力与挂载配置在预签名与代理之间做决策）
+   * @param {string} path - 文件路径
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @param {Object} options - 选项参数
+   * @returns {Promise<Object>} 文件链接信息 { url, type, expiresIn?, proxyPolicy? }
+   */
+  async generateFileLink(path, userIdOrInfo, userType, options = {}) {
+    return await featureGenerateFileLink(this, path, userIdOrInfo, userType, options);
   }
 
   /**
@@ -578,9 +600,8 @@ export class FileSystem {
       }
     }
 
-    // 排序和分页
-    const { S3SearchOperations } = await import("../drivers/s3/operations/S3SearchOperations.js");
-    const sortedResults = S3SearchOperations.sortSearchResults(allResults, query);
+    // 排序和分页（使用通用排序工具）
+    const sortedResults = sortSearchResults(allResults, query);
     const total = sortedResults.length;
     const paginatedResults = sortedResults.slice(offset, offset + limit);
 

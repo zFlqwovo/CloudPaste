@@ -37,6 +37,10 @@ const formData = ref({
   total_storage_bytes: null,
   custom_host: "",
   signature_expires_in: 3600,
+  // WebDAV
+  username: "",
+  password: "",
+  tls_insecure_skip_verify: false,
 });
 
 // 提供商列表
@@ -50,6 +54,7 @@ const providerTypes = [
 
 const storageTypes = [
   { value: "S3", label: "S3 / 对象存储" },
+  { value: "WEBDAV", label: "WebDAV" },
 ];
 
 // 存储容量单位列表
@@ -118,6 +123,11 @@ const showPlain = ref(false);
 const revealing = ref(false);
 const fetchedPlain = ref(false);
 
+// WebDAV 密码显示控制
+const showWebDavPassword = ref(false);
+const revealingWebDav = ref(false);
+const fetchedWebDavPassword = ref(false);
+
 const toggleReveal = async () => {
   if (!props.isEdit || !props?.config?.id) {
     showPlain.value = !showPlain.value;
@@ -142,8 +152,32 @@ const toggleReveal = async () => {
   showPlain.value = !showPlain.value;
 };
 
+const toggleWebDavPasswordReveal = async () => {
+  if (!props.isEdit || !props?.config?.id) {
+    showWebDavPassword.value = !showWebDavPassword.value;
+    return;
+  }
+  if (!showWebDavPassword.value && !fetchedWebDavPassword.value) {
+    revealingWebDav.value = true;
+    try {
+      const resp = await getStorageConfigReveal(props.config.id, "plain");
+      const data = resp?.data || resp;
+      if (data) {
+        formData.value.password = data.password || "";
+        fetchedWebDavPassword.value = true;
+      }
+    } catch (e) {
+      error.value = e?.message || "获取WebDAV密码失败";
+    } finally {
+      revealingWebDav.value = false;
+    }
+  }
+  showWebDavPassword.value = !showWebDavPassword.value;
+};
+
 // 计算表单标题
 const isS3Type = computed(() => formData.value.storage_type === "S3");
+const isWebDavType = computed(() => formData.value.storage_type === "WEBDAV");
 
 const formTitle = computed(() => {
   return props.isEdit ? "编辑存储配置" : "添加存储配置";
@@ -160,8 +194,13 @@ const formatUrl = (field) => {
   if (formData.value[field]) {
     let url = formData.value[field].trim();
 
-    // 移除末尾的斜杠
-    url = url.replace(/\/+$/, "");
+    if (field === "endpoint_url" && isWebDavType.value) {
+      if (!url.endsWith("/")) {
+        url = `${url}/`;
+      }
+    } else {
+      url = url.replace(/\/+$/, "");
+    }
 
     formData.value[field] = url;
   }
@@ -172,6 +211,50 @@ const formatBucketName = () => {
     // 只去除空格
     formData.value.bucket_name = formData.value.bucket_name.trim();
   }
+};
+
+const normalizeDefaultFolder = (value) => {
+  if (!value) return "";
+  return value.toString().replace(/^\/+/, "");
+};
+
+const buildPayload = () => {
+  const base = {
+    name: formData.value.name,
+    storage_type: formData.value.storage_type,
+    is_public: formData.value.is_public,
+    total_storage_bytes: formData.value.total_storage_bytes,
+  };
+
+  if (isS3Type.value) {
+    return {
+      ...base,
+      provider_type: formData.value.provider_type,
+      endpoint_url: formData.value.endpoint_url,
+      bucket_name: formData.value.bucket_name,
+      region: formData.value.region,
+      access_key_id: formData.value.access_key_id,
+      secret_access_key: formData.value.secret_access_key,
+      path_style: formData.value.path_style,
+      default_folder: normalizeDefaultFolder(formData.value.default_folder),
+      custom_host: formData.value.custom_host || "",
+      signature_expires_in: formData.value.signature_expires_in,
+    };
+  }
+
+  if (isWebDavType.value) {
+    return {
+      ...base,
+      endpoint_url: formData.value.endpoint_url,
+      username: formData.value.username,
+      password: formData.value.password,
+      default_folder: normalizeDefaultFolder(formData.value.default_folder),
+      tls_insecure_skip_verify: formData.value.tls_insecure_skip_verify,
+      custom_host: formData.value.custom_host || "",
+    };
+  }
+
+  return base;
 };
 
 // URL格式验证
@@ -203,7 +286,13 @@ const formValid = computed(() => {
     return s3FieldsValid && urlValid && formData.value.access_key_id && formData.value.secret_access_key;
   }
 
-  // 其他类型暂时只要求名称
+  if (isWebDavType.value) {
+    const urlValid = formData.value.endpoint_url && isValidUrl(formData.value.endpoint_url);
+    const customHostValid = isValidUrl(formData.value.custom_host);
+    const passwordOk = props.isEdit ? true : Boolean(formData.value.password);
+    return urlValid && customHostValid && formData.value.username && passwordOk;
+  }
+
   return true;
 });
 
@@ -261,14 +350,27 @@ watch(
         formData.value.region = props.config.region || "";
         formData.value.default_folder = props.config.default_folder || "";
         formData.value.path_style = props.config.path_style === 1 || props.config.path_style === true;
+        formData.value.custom_host = props.config.custom_host || "";
+        formData.value.signature_expires_in = props.config.signature_expires_in || 3600;
+        formData.value.access_key_id = "";
+        formData.value.secret_access_key = "";
+      } else if (formData.value.storage_type === "WEBDAV") {
+        formData.value.endpoint_url = props.config.endpoint_url || "";
+        formData.value.username = props.config.username || "";
+        formData.value.password = "";
+        formData.value.default_folder = props.config.default_folder || "";
+        formData.value.tls_insecure_skip_verify = props.config.tls_insecure_skip_verify === 1 || props.config.tls_insecure_skip_verify === true;
+        formData.value.custom_host = props.config.custom_host || "";
+        formData.value.access_key_id = "";
+        formData.value.secret_access_key = "";
+        formData.value.provider_type = "";
+        formData.value.bucket_name = "";
+        formData.value.region = "";
+        formData.value.path_style = false;
+        formData.value.signature_expires_in = null;
       }
 
       formData.value.is_public = props.config.is_public === 1 || props.config.is_public === true;
-      formData.value.custom_host = props.config.custom_host || "";
-      formData.value.signature_expires_in = props.config.signature_expires_in || 3600;
-
-      formData.value.access_key_id = "";
-      formData.value.secret_access_key = "";
 
       if (props.config.total_storage_bytes) {
         setStorageSizeFromBytes(props.config.total_storage_bytes);
@@ -291,6 +393,9 @@ watch(
         total_storage_bytes: getDefaultStorageByProvider("Cloudflare R2"),
         custom_host: "",
         signature_expires_in: 3600,
+        username: "",
+        password: "",
+        tls_insecure_skip_verify: false,
       };
       updateEndpoint();
       setStorageSizeFromBytes(formData.value.total_storage_bytes);
@@ -307,6 +412,27 @@ watch(
       const defaultBytes = getDefaultStorageByProvider(newProvider);
       formData.value.total_storage_bytes = defaultBytes;
       setStorageSizeFromBytes(defaultBytes);
+    }
+  }
+);
+
+watch(
+  () => formData.value.storage_type,
+  (type) => {
+    if (type === "WEBDAV") {
+      formData.value.provider_type = "";
+      formData.value.bucket_name = "";
+      formData.value.region = "";
+      formData.value.path_style = false;
+      formData.value.signature_expires_in = null;
+      formData.value.access_key_id = "";
+      formData.value.secret_access_key = "";
+      formData.value.username = formData.value.username || "";
+      formData.value.password = "";
+      formData.value.default_folder = formData.value.default_folder || "";
+    } else if (type === "S3") {
+      formData.value.provider_type = formData.value.provider_type || "Cloudflare R2";
+      formData.value.signature_expires_in = formData.value.signature_expires_in || 3600;
     }
   }
 );
@@ -335,7 +461,7 @@ const submitForm = async () => {
     if (props.isEdit && props.config?.id) {
       // 更新现有配置
       // 创建一个新对象，避免修改原始表单数据
-      const updateData = { ...formData.value };
+      const updateData = { ...buildPayload() };
 
       // 如果是编辑模式，且密钥字段为空，则从更新数据中移除这些字段
       // 这样后端将保留原有的密钥值
@@ -347,10 +473,14 @@ const submitForm = async () => {
         delete updateData.secret_access_key;
       }
 
+      if (isWebDavType.value && (!updateData.password || updateData.password.trim() === "")) {
+        delete updateData.password;
+      }
+
       savedConfig = await updateStorageConfig(props.config.id, updateData);
     } else {
       // 创建新配置
-      savedConfig = await createStorageConfig(formData.value);
+      savedConfig = await createStorageConfig(buildPayload());
     }
 
     success.value = props.isEdit ? "存储配置更新成功！" : "存储配置创建成功！";
@@ -409,7 +539,7 @@ const closeModal = () => {
               >
                 <option v-for="type in storageTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
               </select>
-              <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">当前版本支持 S3 兼容对象存储，更多类型即将上线。</p>
+              <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">支持 S3 兼容对象存储和 WebDAV 存储</p>
             </div>
 
             <!-- 配置名称 -->
@@ -426,6 +556,32 @@ const closeModal = () => {
                 placeholder="例如：我的备份存储"
               />
               <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">为此配置指定一个易于识别的名称</p>
+            </div>
+
+            <div>
+              <label for="storage_size" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'"> 存储容量限制 </label>
+              <div class="flex space-x-2">
+                <input
+                  type="number"
+                  id="storage_size"
+                  v-model="storageSize"
+                  min="0"
+                  step="0.01"
+                  class="block w-2/3 px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500'"
+                  placeholder="例如：10"
+                />
+                <select
+                  v-model="storageUnit"
+                  class="block w-1/3 px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'"
+                >
+                  <option v-for="unit in storageUnits" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
+                </select>
+              </div>
+              <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+                {{ formData.provider_type === "Cloudflare R2" ? "默认为10GB" : formData.provider_type === "Backblaze B2" ? "默认为10GB" : "默认为5GB" }}
+              </p>
             </div>
 
             <div v-if="isS3Type" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -463,34 +619,117 @@ const closeModal = () => {
               </div>
             </div>
 
-            <div v-else class="rounded-md border border-dashed p-3 text-xs" :class="darkMode ? 'border-gray-600 text-gray-300' : 'border-gray-300 text-gray-600'">
-              非 S3 类型的详细表单正在开发中，目前仅支持 S3 兼容存储。
+            <div v-else-if="isWebDavType" class="space-y-3">
+              <div>
+                <label for="endpoint_url" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+                  WebDAV 端点 <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="webdav_endpoint_url"
+                  v-model="formData.endpoint_url"
+                  required
+                  @blur="formatUrl('endpoint_url')"
+                  class="block w-full px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                  :class="[
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500',
+                    formData.endpoint_url && !isValidUrl(formData.endpoint_url) ? 'border-red-500' : '',
+                  ]"
+                  placeholder="https://dav.example.com/dav/"
+                />
+                <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">需包含协议与路径前缀，末尾建议保留斜杠</p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="username" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+                    用户名 <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="username"
+                    v-model="formData.username"
+                    required
+                    @blur="trimInput('username')"
+                    class="block w-full px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                    :class="darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500'"
+                    placeholder="dav-user"
+                  />
+                </div>
+
+                <div>
+                  <label for="password" class="block text-sm font-medium mb-1 flex items-center justify-between" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+                    <span>密码 <span class="text-red-500" v-if="!isEdit">*</span></span>
+                    <button
+                      type="button"
+                      @click="toggleWebDavPasswordReveal"
+                      class="ml-2 inline-flex items-center px-2 py-1 rounded text-xs"
+                      :class="darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                      :title="showWebDavPassword ? '隐藏密码' : '显示密码'"
+                      :disabled="revealingWebDav"
+                    >
+                      <svg v-if="!revealingWebDav && !showWebDavPassword" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <circle cx="12" cy="12" r="3" stroke-width="2" />
+                      </svg>
+                      <svg v-else-if="!revealingWebDav && showWebDavPassword" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a10.05 10.05 0 013.47-5.23M6.1 6.1C7.93 5.103 9.91 4.5 12 4.5c4.477 0 8.268 2.943 9.542 7-.337 1.075-.84 2.08-1.48 2.985M3 3l18 18" />
+                      </svg>
+                      <svg v-else class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </button>
+                  </label>
+                  <input
+                    :type="showWebDavPassword ? 'text' : 'password'"
+                    id="password"
+                    v-model="formData.password"
+                    :required="!isEdit"
+                    autocomplete="new-password"
+                    class="block w-full px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                    :class="darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500'"
+                    placeholder="••••••••"
+                  />
+                  <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">编辑时留空表示不修改密码</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="webdav_default_folder" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+                    默认上传路径
+                  </label>
+                  <input
+                    type="text"
+                    id="webdav_default_folder"
+                    v-model="formData.default_folder"
+                    @blur="trimInput('default_folder')"
+                    class="block w-full px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                    :class="darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500'"
+                    placeholder="如：cloudpaste/"
+                  />
+                  <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">相对 endpoint 的子目录，不以 / 开头，末尾可不填斜杠</p>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">TLS 校验证书</label>
+                  <div class="flex items-center h-10 px-3 py-2 rounded-md border" :class="darkMode ? 'border-gray-600' : 'border-gray-300'">
+                    <input
+                      type="checkbox"
+                      id="tls_skip"
+                      v-model="formData.tls_insecure_skip_verify"
+                      class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      :class="darkMode ? 'bg-gray-700 border-gray-600' : ''"
+                    />
+                    <label for="tls_skip" class="ml-2 text-sm" :class="darkMode ? 'text-gray-200' : 'text-gray-700'"> 跳过自签证书校验 </label>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label for="storage_size" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'"> 存储容量限制 </label>
-              <div class="flex space-x-2">
-                <input
-                  type="number"
-                  id="storage_size"
-                  v-model="storageSize"
-                  min="0"
-                  step="0.01"
-                  class="block w-2/3 px-3 py-2 rounded-md text-sm transition-colors duration-200"
-                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500'"
-                  placeholder="例如：10"
-                />
-                <select
-                  v-model="storageUnit"
-                  class="block w-1/3 px-3 py-2 rounded-md text-sm transition-colors duration-200"
-                  :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900'"
-                >
-                  <option v-for="unit in storageUnits" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
-                </select>
-              </div>
-              <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
-                {{ formData.provider_type === "Cloudflare R2" ? "默认为10GB" : formData.provider_type === "Backblaze B2" ? "默认为10GB" : "默认为5GB" }}
-              </p>
+            <div v-else class="rounded-md border border-dashed p-3 text-xs" :class="darkMode ? 'border-gray-600 text-gray-300' : 'border-gray-300 text-gray-600'">
+              当前存储类型表单未定义，请选择已支持的类型。
             </div>
           </div>
 
@@ -671,13 +910,35 @@ const closeModal = () => {
             </div>
           </div>
 
+          <div class="space-y-4" v-if="isWebDavType">
+            <h3 class="text-sm font-medium border-b pb-2" :class="darkMode ? 'text-gray-200 border-gray-600' : 'text-gray-700 border-gray-200'">高级配置</h3>
+
+            <div>
+              <label for="webdav_custom_host" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'"> 自定义 HOST/外链域名 </label>
+              <input
+                type="text"
+                id="webdav_custom_host"
+                v-model="formData.custom_host"
+                @blur="formatUrl('custom_host')"
+                class="block w-full px-3 py-2 rounded-md text-sm transition-colors duration-200"
+                :class="[
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300 text-gray-900 placeholder-gray-500',
+                  formData.custom_host && !isValidUrl(formData.custom_host) ? 'border-red-500' : '',
+                ]"
+                placeholder="https://files.example.com"
+              />
+              <p v-if="formData.custom_host && !isValidUrl(formData.custom_host)" class="mt-1 text-xs text-red-500">请输入有效的URL格式，如 https://xxx.com</p>
+              <p v-else class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">可选：用于展示直链/代理外链，留空使用原端点。</p>
+            </div>
+          </div>
+
           <!-- 其他选项 -->
           <div class="space-y-4">
             <h3 class="text-sm font-medium border-b pb-2" :class="darkMode ? 'text-gray-200 border-gray-600' : 'text-gray-700 border-gray-200'">其他选项</h3>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <!-- 路径样式 -->
-              <div>
+              <!-- 路径样式：仅 S3 -->
+              <div v-if="isS3Type">
                 <label class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'"> 访问样式 </label>
                 <div class="flex items-center h-10 px-3 py-2 rounded-md border" :class="darkMode ? 'border-gray-600' : 'border-gray-300'">
                   <input

@@ -202,19 +202,13 @@ export function useFileOperations() {
       loading.value = true;
       error.value = null;
 
-      const presignedUrl = await fsService.getFileLink(item.path, expiresIn, forceDownload);
+      const url = await fsService.getFileLink(item.path, expiresIn, forceDownload);
 
-      const copySuccess = await copyToClipboard(presignedUrl);
-
-      if (copySuccess) {
-        return {
-          success: true,
-          message: t("mount.messages.linkCopiedSuccess"),
-          url: presignedUrl,
-        };
-      } else {
-        throw new Error(t("mount.messages.copyFailed"));
-      }
+      return {
+        success: true,
+        message: (await copyToClipboard(url)) ? t("mount.messages.linkCopiedSuccess") : t("mount.messages.copyFailed"),
+        url,
+      };
     } catch (err) {
       console.error("获取文件直链失败:", err);
       error.value = /** @type {any} */ (err)?.message;

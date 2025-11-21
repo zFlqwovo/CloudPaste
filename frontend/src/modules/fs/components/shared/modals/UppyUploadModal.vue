@@ -61,6 +61,7 @@
                 value="presigned"
                 v-model="uploadMethod"
                 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600 flex-shrink-0"
+                :disabled="!canUsePresigned"
                 @change="updateUploadMethod"
               />
               <span class="ml-2 text-sm" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">{{ t("mount.uppy.presignedUpload") }}</span>
@@ -83,6 +84,7 @@
                 value="multipart"
                 v-model="uploadMethod"
                 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600 flex-shrink-0"
+                :disabled="!canUseMultipart"
                 @change="updateUploadMethod"
               />
               <div class="ml-2 flex items-center flex-wrap gap-1">
@@ -295,6 +297,9 @@ const getUppyLocale = () => {
 // 响应式数据
 const uppyContainer = ref(null);
 const uploadMethod = ref("presigned");
+const canUsePresigned = ref(true);
+const canUseMultipart = ref(true);
+const currentDriverType = ref(null);
 const errorMessage = ref("");
 const isUploading = ref(false);
 const showAdvancedOptions = ref(false);
@@ -347,6 +352,24 @@ const { createFsUploadSession } = useShareUploadController();
 const driverStrategy = ref(STORAGE_STRATEGIES.PRESIGNED_SINGLE);
 const mountsCache = ref([]);
 const mountsLoading = ref(false);
+const enforceUploadMethodByDriver = (driver) => {
+  const fsCaps = driver?.capabilities?.fs || {};
+  const allowPresigned = fsCaps.presignedSingle === true;
+  const allowMultipart = fsCaps.multipart === true;
+  canUsePresigned.value = allowPresigned;
+  canUseMultipart.value = allowMultipart;
+  currentDriverType.value = driver?.config?.storage_type || driver?.type || null;
+
+  if (!allowPresigned && uploadMethod.value === "presigned") {
+    uploadMethod.value = allowMultipart ? "multipart" : "direct";
+  }
+  if (!allowMultipart && uploadMethod.value === "multipart") {
+    uploadMethod.value = allowPresigned ? "presigned" : "direct";
+  }
+  if (!allowPresigned && !allowMultipart) {
+    uploadMethod.value = "direct";
+  }
+};
 
 const normalizePath = (path) => {
   if (!path) return "/";
@@ -539,11 +562,11 @@ const configureServerResumePlugin = () => {
  */
 const configureUploadMethod = async () => {
   // 驱动策略解析
-  driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.S3_BACKEND_DIRECT;
-
   try {
     const storageConfigId = await ensureStorageConfigForCurrentPath();
     const driver = resolveDriverByConfigId(storageConfigId);
+    enforceUploadMethodByDriver(driver);
+    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.S3_BACKEND_DIRECT;
     if (
       driver?.fs?.applyFsUploader &&
       (driverStrategy.value === STORAGE_STRATEGIES.PRESIGNED_SINGLE ||
@@ -829,9 +852,15 @@ const startUpload = async () => {
   try {
     errorMessage.value = "";
     isUploading.value = true;
-    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.S3_BACKEND_DIRECT;
-
     const storageConfigId = await ensureStorageConfigForCurrentPath();
+    try {
+      const driver = resolveDriverByConfigId(storageConfigId);
+      enforceUploadMethodByDriver(driver);
+    } catch (e) {
+      console.warn("[Uppy] startUpload 驱动解析失败", e);
+    }
+
+    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.S3_BACKEND_DIRECT;
 
     disposeFsSession();
     fsUploadSession = createFsUploadSession({

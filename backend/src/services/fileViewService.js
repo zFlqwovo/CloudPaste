@@ -154,79 +154,72 @@ export class FileViewService {
         return new Response("文件存储信息不完整", { status: 404 });
       }
 
-      // 获取文件的MIME类型
-      const contentType = getEffectiveMimeType(result.file.mimetype, result.file.filename);
+      const fileRecord = result.file;
+      const useProxyFlag = fileRecord.use_proxy ?? 0;
 
-      // 通过 ObjectStore + StorageStrategy 生成直链
-      let presignedUrl = null;
+      // use_proxy = 1 时，走真正的本机代理，通过 ObjectStore 调用底层驱动的 downloadFile
+      if (useProxyFlag === 1) {
+        // 获取文件的MIME类型（用于覆盖/统一 Content-Type）
+        const contentType = getEffectiveMimeType(fileRecord.mimetype, fileRecord.filename);
+
+        // 处理 Range 请求（透传给底层驱动）
+        const rangeHeader = request.headers.get("Range");
+        if (rangeHeader) {
+          console.log(`🎬 分享下载 - 代理 Range 请求: ${rangeHeader}`);
+        }
+
+        // 通过 ObjectStore 封装的 storage-first 视图进行下载代理
+        const objectStore = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
+        const driverResponse = await objectStore.downloadByStoragePath(fileRecord.storage_config_id, fileRecord.storage_path, {
+          request,
+        });
+
+        // 基于文件记录重新计算 Content-Type / Content-Disposition，保持分享层一致性
+        const { contentType: finalContentType, contentDisposition } = getContentTypeAndDisposition(
+          fileRecord.filename,
+          fileRecord.mimetype,
+          { forceDownload }
+        );
+
+        const responseHeaders = new Headers(driverResponse.headers || {});
+        responseHeaders.set("Content-Type", finalContentType);
+        responseHeaders.set("Content-Disposition", contentDisposition);
+
+        // 设置CORS头部
+        responseHeaders.set("Access-Control-Allow-Origin", "*");
+        responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        responseHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type");
+        responseHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+
+        return new Response(driverResponse.body, {
+          status: driverResponse.status,
+          statusText: driverResponse.statusText,
+          headers: responseHeaders,
+        });
+      }
+
+      // use_proxy != 1 时，尝试走直链：custom_host 优先，其次 PRESIGNED；不再“代理直链”
+      let directUrl = null;
       try {
         const objectStore = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
-        const links = await objectStore.generateLinksByStoragePath(result.file.storage_config_id, result.file.storage_path, {
+        const links = await objectStore.generateLinksByStoragePath(fileRecord.storage_config_id, fileRecord.storage_path, {
           forceDownload,
         });
-        presignedUrl = links?.download?.url || null;
+        directUrl = links?.download?.url || links?.preview?.url || null;
       } catch (e) {
         console.error("生成存储直链失败:", e);
       }
 
-      if (!presignedUrl) {
+      if (!directUrl) {
         return new Response("当前存储不支持直链下载", { status: 501 });
       }
 
-      //处理Range请求
-      const rangeHeader = request.headers.get("Range");
-      const fileRequestHeaders = {};
+      const redirectHeaders = new Headers();
+      redirectHeaders.set("Location", directUrl);
 
-      // 如果有Range请求，转发给S3
-      if (rangeHeader) {
-        fileRequestHeaders["Range"] = rangeHeader;
-        console.log(`🎬 代理Range请求: ${rangeHeader}`);
-      }
-
-      // 代理请求到实际的文件URL
-      const fileRequest = new Request(presignedUrl, {
-        headers: fileRequestHeaders,
-      });
-
-      const fileResponse = await fetch(fileRequest);
-
-      if (!fileResponse.ok) {
-        console.error(`获取文件失败: ${fileResponse.status} ${fileResponse.statusText}`);
-        return new Response("获取文件失败", { status: fileResponse.status });
-      }
-
-      // 获取内容类型和处置方式
-      const { contentType: finalContentType, contentDisposition } = getContentTypeAndDisposition(result.file.filename, result.file.mimetype, { forceDownload: forceDownload });
-
-      // 创建响应头
-      const responseHeaders = new Headers();
-
-      // 设置内容类型
-      responseHeaders.set("Content-Type", finalContentType);
-
-      // 设置内容处置
-      responseHeaders.set("Content-Disposition", contentDisposition);
-
-      // 复制原始响应的其他相关头部
-      const headersToProxy = ["Content-Length", "Content-Range", "Accept-Ranges", "Last-Modified", "ETag", "Cache-Control"];
-      headersToProxy.forEach((header) => {
-        const value = fileResponse.headers.get(header);
-        if (value) {
-          responseHeaders.set(header, value);
-        }
-      });
-
-      // 设置CORS头部
-      responseHeaders.set("Access-Control-Allow-Origin", "*");
-      responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-      responseHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type");
-      responseHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
-
-      // 返回代理响应
-      return new Response(fileResponse.body, {
-        status: fileResponse.status,
-        statusText: fileResponse.statusText,
-        headers: responseHeaders,
+      return new Response(null, {
+        status: 302,
+        headers: redirectHeaders,
       });
     } catch (error) {
       console.error("代理文件下载出错:", error);

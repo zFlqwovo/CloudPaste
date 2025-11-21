@@ -10,7 +10,7 @@ import { shouldUseRandomSuffix, getFileNameAndExt, generateShortId } from "../..
 import { ValidationError, NotFoundError } from "../../http/errors.js";
 import { ApiStatus } from "../../constants/index.js";
 import { PathPolicy } from "../../services/share/PathPolicy.js";
-import { resolveStorageLinks } from "../utils/StorageStrategy.js";
+import { resolveStorageLinks } from "./ObjectLinkStrategy.js";
 
 export class ObjectStore {
   constructor(db, encryptionSecret, repositoryFactory) {
@@ -165,6 +165,31 @@ export class ObjectStore {
       download: links.download,
       proxyPolicy: links.proxyPolicy || null,
     };
+  }
+
+  /**
+   * 按存储路径进行真实文件下载代理
+   * - storage-first 视图下的“本机代理”能力
+   * - 封装 driver 初始化与 downloadFile 调用，供分享层复用
+   */
+  async downloadByStoragePath(storage_config_id, key, options = {}) {
+    const storageConfig = await this._getStorageConfig(storage_config_id);
+    if (!storageConfig.storage_type) {
+      throw new ValidationError("存储配置缺少 storage_type");
+    }
+    const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
+
+    if (typeof driver.downloadFile !== "function") {
+      throw new ValidationError("当前驱动不支持按存储路径下载");
+    }
+
+    const request = options.request || null;
+
+    return await driver.downloadFile(key, {
+      subPath: key,
+      db: this.db,
+      request,
+    });
   }
 
   // 删除存储对象（storage-first）

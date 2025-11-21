@@ -74,34 +74,56 @@ const storageTypeLabelMap = computed(() => ({
   UNKNOWN: t("admin.mount.form.storageTypes.UNKNOWN"),
 }));
 
-const storageTypeDisplay = computed(() => {
-  const type = formData.value.storage_type;
-  if (!type) {
-    return t("admin.mount.form.storageTypeHint");
+// 获取所有可用的存储类型（从配置列表中提取）
+const availableStorageTypes = computed(() => {
+  const types = [...new Set(storageConfigs.value.map((config) => config.storage_type).filter(Boolean))];
+  return types.map((type) => ({
+    value: type,
+    label: storageTypeLabelMap.value[type] || type,
+  }));
+});
+
+// 根据选择的存储类型筛选存储配置
+const filteredStorageConfigs = computed(() => {
+  if (!formData.value.storage_type) {
+    return storageConfigs.value;
   }
-  return storageTypeLabelMap.value[type] || type;
+  return storageConfigs.value.filter((config) => config.storage_type === formData.value.storage_type);
 });
 
 // 判断用户类型
 const isAdmin = computed(() => props.userType === "admin");
 const isApiKeyUser = computed(() => props.userType === "apikey");
 
-// 监听存储类型变化，根据类型重置相关字段
-const syncStorageTypeWithConfig = () => {
-  if (!formData.value.storage_config_id) {
-    formData.value.storage_type = "";
-    return;
+// 处理存储类型变化
+const handleStorageTypeChange = () => {
+  handleFieldChange("storage_type");
+
+  // 如果当前选择的配置不属于新类型，清空配置选择
+  if (formData.value.storage_config_id) {
+    const selectedConfig = storageConfigs.value.find((config) => config.id === formData.value.storage_config_id);
+    if (selectedConfig && selectedConfig.storage_type !== formData.value.storage_type) {
+      formData.value.storage_config_id = "";
+    }
   }
 
-  const selectedConfig = storageConfigs.value.find((config) => config.id === formData.value.storage_config_id);
-  if (selectedConfig) {
-    formData.value.storage_type = selectedConfig.storage_type || "";
+  if (formSubmitted.value) {
+    validateField("storage_config_id");
   }
 };
 
+// 监听存储配置变化，同步存储类型（兜底逻辑）
 const handleStorageConfigChange = () => {
   handleFieldChange("storage_config_id");
-  syncStorageTypeWithConfig();
+
+  // 同步存储类型（如果配置有效）
+  if (formData.value.storage_config_id) {
+    const selectedConfig = storageConfigs.value.find((config) => config.id === formData.value.storage_config_id);
+    if (selectedConfig && selectedConfig.storage_type) {
+      formData.value.storage_type = selectedConfig.storage_type;
+    }
+  }
+
   if (formSubmitted.value) {
     validateField("storage_type");
   }
@@ -352,11 +374,10 @@ watch(
       return;
     }
 
-    if (!formData.value.storage_config_id || !configs.some((config) => config.id === formData.value.storage_config_id)) {
-      formData.value.storage_config_id = configs[0].id;
+    // 仅验证当前选择的配置是否仍然存在，不自动选择
+    if (formData.value.storage_config_id && !configs.some((config) => config.id === formData.value.storage_config_id)) {
+      formData.value.storage_config_id = "";
     }
-
-    syncStorageTypeWithConfig();
   },
   { immediate: true }
 );
@@ -377,7 +398,6 @@ const initializeFormData = () => {
     }
   });
 
-  syncStorageTypeWithConfig();
 };
 
 // 重置表单数据为默认值
@@ -456,14 +476,20 @@ const resetFormData = () => {
             <label for="storage_type" class="block text-sm font-medium mb-1" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
               {{ t("admin.mount.form.storageType") }} <span class="text-red-500">*</span>
             </label>
-            <input
+            <select
               id="storage_type"
-              type="text"
-              :value="storageTypeDisplay"
-              disabled
-              class="block w-full px-3 py-1.5 sm:py-2 rounded-md text-sm transition-colors duration-200 cursor-not-allowed"
-              :class="darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-100 border-gray-300 text-gray-700'"
-            />
+              v-model="formData.storage_type"
+              @change="handleStorageTypeChange"
+              @blur="validateField('storage_type')"
+              class="block w-full px-3 py-1.5 sm:py-2 rounded-md text-sm transition-colors duration-200"
+              :class="[darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900', errors.storage_type ? 'border-red-500' : '']"
+              :disabled="loading || availableStorageTypes.length === 0"
+            >
+              <option value="">{{ t("admin.mount.form.selectStorageType") }}</option>
+              <option v-for="type in availableStorageTypes" :key="type.value" :value="type.value">
+                {{ type.label }}
+              </option>
+            </select>
             <p class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("admin.mount.form.storageTypeHint") }}</p>
             <p v-if="errors.storage_type" class="mt-1 text-sm text-red-500">{{ errors.storage_type }}</p>
           </div>
@@ -480,15 +506,16 @@ const resetFormData = () => {
               @blur="validateField('storage_config_id')"
               class="block w-full px-3 py-1.5 sm:py-2 rounded-md text-sm transition-colors duration-200"
               :class="[darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900', errors.storage_config_id ? 'border-red-500' : '']"
-              :disabled="loading"
+              :disabled="loading || !formData.storage_type || filteredStorageConfigs.length === 0"
             >
               <option value="">{{ t("admin.mount.form.selectStorageConfig") }}</option>
-              <option v-for="config in storageConfigs" :key="config.id" :value="config.id">
-                {{ config.name }} ({{ config.provider_type }})
+              <option v-for="config in filteredStorageConfigs" :key="config.id" :value="config.id">
+                {{ config.name }} ({{ config.provider_type || config.storage_type }})
               </option>
             </select>
             <p v-if="errors.storage_config_id" class="mt-1 text-sm text-red-500">{{ errors.storage_config_id }}</p>
-            <p v-if="storageConfigs.length === 0 && !loading" class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">{{ t("admin.mount.form.noStorageConfig") }}</p>
+            <p v-if="!formData.storage_type" class="mt-1 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">请先选择存储类型</p>
+            <p v-else-if="filteredStorageConfigs.length === 0 && !loading" class="mt-1 text-xs text-yellow-600 dark:text-yellow-400">该类型暂无可用的存储配置</p>
           </div>
 
           <!-- 挂载路径 -->

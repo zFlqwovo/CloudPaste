@@ -225,10 +225,6 @@ export async function findMountPointByPathForProxy(db, path, repositoryFactory =
 
     // 如果请求路径完全匹配挂载点或者是挂载点的子路径
     if (path === mountPath || path === mountPath + "/" || path.startsWith(mountPath + "/")) {
-      // 验证挂载点是否启用了web_proxy
-      if (!mount.web_proxy) {
-        continue; // 跳过未启用代理的挂载点
-      }
 
       const subPath = calculateSubPath(path, mountPath);
 
