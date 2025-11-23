@@ -6,7 +6,7 @@
 import { BaseDriver } from "../../interfaces/capabilities/BaseDriver.js";
 import { CAPABILITIES } from "../../interfaces/capabilities/index.js";
 import { ApiStatus } from "../../../constants/index.js";
-import { createS3Client } from "./utils/s3Utils.js";
+import { createS3Client, generateCustomHostDirectUrl } from "./utils/s3Utils.js";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath, isCompleteFilePath } from "./utils/S3PathUtils.js";
 import { updateMountLastUsed, findMountPointByPath } from "../../fs/utils/MountResolver.js";
@@ -32,6 +32,7 @@ export class S3StorageDriver extends BaseDriver {
     this.type = "S3";
     this.encryptionSecret = encryptionSecret;
     this.s3Client = null;
+    this.customHost = config.custom_host || null;
 
     // S3存储驱动支持所有能力
     this.capabilities = [
@@ -455,6 +456,33 @@ export class S3StorageDriver extends BaseDriver {
     } catch (error) {
       throw this._rethrow(error, "生成下载URL失败");
     }
+  }
+
+  /**
+   * 为 WebDAV use_proxy_url 策略生成代理 URL（基于 custom_host）
+   * @param {string} path - 挂载视图下的完整路径
+   * @param {Object} options - 选项参数
+   * @returns {Promise<{url: string, type: string}|null>}
+   */
+  async generateWebDavProxyUrl(path, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, subPath, db } = options;
+    const s3SubPath = normalizeS3SubPath(subPath, false);
+
+    if (db && mount?.id) {
+      await updateMountLastUsed(db, mount.id);
+    }
+
+    if (!this.customHost) {
+      return null;
+    }
+
+    const url = generateCustomHostDirectUrl(this.config, s3SubPath);
+    return {
+      url,
+      type: "proxy_url",
+    };
   }
 
   /**

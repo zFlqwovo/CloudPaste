@@ -78,9 +78,10 @@ export default {
       },
       webdavPolicyOptions: {
         "302_redirect": "302 Redirect",
+        use_proxy_url: "Custom HOST Redirect",
         native_proxy: "Native Proxy",
       },
-      webdavPolicyDescription: "Download/Preview for WebDAV",
+      webdavPolicyDescription: "Only applies to download/preview operations when the project is mounted as WebDAV.",
       cacheTtlPlaceholder: "Default 300 seconds",
       sortOrderPlaceholder: "0",
       save: "Save",

@@ -347,7 +347,7 @@ const ensureStorageConfigForCurrentPath = async () => {
     const { getStorageConfigs } = useAdminStorageConfigService();
     const resp = await getStorageConfigs();
     if (resp?.data) {
-      storageConfigsStore.setConfigs(resp.data);
+      storageConfigsStore.replaceConfigs(resp.data);
       if (storageConfigsStore.getConfigById(id)) return id;
     }
   } catch (e) {

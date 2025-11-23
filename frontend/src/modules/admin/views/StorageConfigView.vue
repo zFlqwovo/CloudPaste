@@ -4,6 +4,7 @@ import { useStorageConfigManagement } from "@/modules/admin/storage/useStorageCo
 import ConfigForm from "@/modules/admin/components/ConfigForm.vue";
 import CommonPagination from "@/components/common/CommonPagination.vue";
 import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
+import { getAdminStorageStrategy } from "@/modules/storage-core/schema/adminStorageSchemas.js";
 
 // 接收darkMode属性
 const props = defineProps({
@@ -52,11 +53,20 @@ const formatStorageTypeLabel = (type) => {
     return "未指定类型";
   }
   const map = {
-    S3: "S3 / 对象存储",
+    S3: "S3/对象存储",
     WEBDAV: "WebDAV",
     LOCAL: "本地存储",
   };
   return map[type] || type;
+};
+
+const getConfigSummaryRows = (config) => {
+  if (!config) return [];
+  const strategy = getAdminStorageStrategy(config.storage_type);
+  if (!strategy || typeof strategy.buildCardSummary !== "function") {
+    return [];
+  }
+  return strategy.buildCardSummary(config) || [];
 };
 
 const storageTypeOptions = computed(() =>
@@ -234,49 +244,22 @@ onMounted(() => {
 
               <div class="p-4">
                 <div :class="darkMode ? 'text-gray-300' : 'text-gray-600'">
-                  <!-- S3 配置字段 -->
-                  <div v-if="config.storage_type === 'S3'" class="grid grid-cols-1 gap-2 text-sm">
-                    <div class="flex justify-between">
-                      <span class="font-medium">存储桶:</span>
-                      <span>{{ config.bucket_name }}</span>
-                    </div>
-
-                    <div class="flex justify-between">
-                      <span class="font-medium">区域:</span>
-                      <span>{{ config.region || "自动" }}</span>
-                    </div>
-
-                    <div class="flex justify-between" v-if="config.default_folder">
-                      <span class="font-medium">默认文件夹:</span>
-                      <span>{{ config.default_folder || "根目录" }}</span>
-                    </div>
-
-                    <div class="flex justify-between" v-if="config.path_style !== undefined">
-                      <span class="font-medium">路径样式:</span>
-                      <span>{{ config.path_style ? "路径样式" : "虚拟主机样式" }}</span>
-                    </div>
-                  </div>
-
-                  <!-- WebDAV 配置字段 -->
-                  <div v-else-if="config.storage_type === 'WEBDAV'" class="grid grid-cols-1 gap-2 text-sm">
-                    <div class="flex justify-between">
-                      <span class="font-medium">端点地址:</span>
-                      <span class="truncate ml-2 max-w-[60%] text-right" :title="config.endpoint_url">{{ config.endpoint_url }}</span>
-                    </div>
-
-                    <div class="flex justify-between">
-                      <span class="font-medium">用户名:</span>
-                      <span>{{ config.username }}</span>
-                    </div>
-
-                    <div class="flex justify-between" v-if="config.default_folder">
-                      <span class="font-medium">默认目录:</span>
-                      <span>{{ config.default_folder || "/" }}</span>
-                    </div>
-
-                    <div class="flex justify-between" v-if="config.tls_insecure_skip_verify">
-                      <span class="font-medium">TLS验证:</span>
-                      <span class="text-yellow-600 dark:text-yellow-400">跳过证书校验</span>
+                  <!-- 类型特定字段：使用策略生成摘要 -->
+                  <div v-if="getConfigSummaryRows(config).length" class="grid grid-cols-1 gap-2 text-sm">
+                    <div
+                      v-for="row in getConfigSummaryRows(config)"
+                      :key="row.key"
+                      class="flex justify-between"
+                    >
+                      <span class="font-medium">{{ row.label }}:</span>
+                      <span
+                        v-if="row.key === 'endpoint_url'"
+                        class="truncate ml-2 max-w-[60%] text-right"
+                        :title="row.value"
+                      >
+                        {{ row.value }}
+                      </span>
+                      <span v-else>{{ row.value }}</span>
                     </div>
                   </div>
 

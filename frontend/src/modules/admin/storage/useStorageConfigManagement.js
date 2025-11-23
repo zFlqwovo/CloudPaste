@@ -48,16 +48,25 @@ export function useStorageConfigManagement() {
   });
 
   const filteredConfigs = computed(() => {
-    if (storageTypeFilter.value === "all") {
-      return storageConfigs.value;
-    }
-    return storageConfigs.value.filter((config) => normalizeStorageTypeValue(config.storage_type) === storageTypeFilter.value);
+    const filtered = storageTypeFilter.value === "all"
+      ? storageConfigs.value
+      : storageConfigs.value.filter((config) => normalizeStorageTypeValue(config.storage_type) === storageTypeFilter.value);
+
+    // 前端分页：基于筛选结果切片
+    const start = (base.pagination.page - 1) * base.pagination.limit;
+    const end = start + base.pagination.limit;
+    return filtered.slice(start, end);
   });
 
   watch(availableStorageTypes, (types) => {
     if (storageTypeFilter.value !== "all" && !types.includes(storageTypeFilter.value)) {
       storageTypeFilter.value = "all";
     }
+  });
+
+  // 筛选条件变化时重置到第一页
+  watch(storageTypeFilter, () => {
+    base.resetPagination();
   });
 
   // 测试详情模态框状态
@@ -87,25 +96,33 @@ export function useStorageConfigManagement() {
   // 重新初始化分页状态
   base.pagination.limit = getDefaultPageSize();
 
+  // 筛选后的总数（用于分页）
+  const filteredTotal = computed(() => {
+    const filtered = storageTypeFilter.value === "all"
+      ? storageConfigs.value
+      : storageConfigs.value.filter((config) => normalizeStorageTypeValue(config.storage_type) === storageTypeFilter.value);
+    return filtered.length;
+  });
+
+  // 监听筛选结果变化，更新分页
+  watch([filteredTotal, () => base.pagination.limit], () => {
+    base.updatePagination({ total: filteredTotal.value }, "page");
+  });
+
   /**
    * 加载存储配置列表
    */
   const loadStorageConfigs = async () => {
     return await base.withLoading(async () => {
       try {
-        const { items, pagination } = await getStorageConfigs({
-          page: base.pagination.page,
-          limit: base.pagination.limit,
-        });
-
+        const { items } = await getStorageConfigs();
         storageConfigs.value = items;
-        base.updatePagination({ total: pagination.total }, "page");
+        base.updatePagination({ total: filteredTotal.value }, "page");
         base.updateLastRefreshTime();
         console.log(`存储配置列表加载完成，共 ${items.length} 条`);
       } catch (error) {
         console.error("加载存储配置列表失败:", error);
         storageConfigs.value = [];
-        // withLoading 会统一处理错误消息，这里只负责状态
         throw error;
       }
     });
@@ -116,15 +133,13 @@ export function useStorageConfigManagement() {
    */
   const handlePageChange = (page) => {
     base.handlePaginationChange(page, "page");
-    loadStorageConfigs();
   };
 
   /**
-   * 处理每页数量变化 - 使用标准方法
+   * 处理每页数量变化
    */
   const handleLimitChange = (newLimit) => {
     base.changePageSize(newLimit);
-    loadStorageConfigs();
   };
 
   /**

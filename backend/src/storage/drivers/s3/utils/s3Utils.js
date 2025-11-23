@@ -216,7 +216,7 @@ async function generateUploadUrl(s3Config, storagePath, mimetype, encryptionSecr
  * @param {string} storagePath - S3存储路径
  * @returns {string} 自定义域名直链URL
  */
-function generateCustomHostDirectUrl(s3Config, storagePath) {
+export function generateCustomHostDirectUrl(s3Config, storagePath) {
   const normalizedPath = storagePath.startsWith("/") ? storagePath.slice(1) : storagePath;
   const customHost = s3Config.custom_host.endsWith("/") ? s3Config.custom_host.slice(0, -1) : s3Config.custom_host;
 

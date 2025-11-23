@@ -571,7 +571,7 @@ export class WebDavStorageDriver extends BaseDriver {
     const subPath = this._extractSubPath(path, mount);
     const davPath = this._buildDavPath(subPath, false);
 
-    const customHostUrl = this._buildCustomHostUrl(mount, subPath || path);
+    const customHostUrl = this._buildCustomHostUrl(subPath || path);
 
     // 代理路径 = 挂载路径 + 子路径（确保以 / 开头）
     const proxyPath = `${mount?.mount_path || ""}${subPath.startsWith("/") ? subPath : `/${subPath}`}`;
@@ -615,6 +615,33 @@ export class WebDavStorageDriver extends BaseDriver {
     };
   }
 
+  /**
+   * 为 WebDAV use_proxy_url 策略生成代理 URL（基于 custom_host）
+   * @param {string} path - 挂载视图下的完整路径
+   * @param {Object} options - 选项参数
+   * @returns {Promise<{url: string, type: string}|null>}
+   */
+  async generateWebDavProxyUrl(path, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, subPath, db } = options;
+    const relativePath = subPath || path;
+
+    if (db && mount?.id) {
+      await updateMountLastUsed(db, mount.id);
+    }
+
+    const url = this._buildCustomHostUrl(relativePath);
+    if (!url) {
+      return null;
+    }
+
+    return {
+      url,
+      type: "proxy_url",
+    };
+  }
+
   supportsProxyMode(mount) {
     // WebDAV 默认可以走代理
     return true;
@@ -628,7 +655,9 @@ export class WebDavStorageDriver extends BaseDriver {
   }
 
   /**
-   * 构建 WebDAV 路径，附加 default_folder
+   * 构建 WebDAV 路径
+   * - 仅基于挂载视图下的 subPath
+   * - 远端根目录由 endpoint_url 本身的路径决定
    */
   _buildDavPath(subPath, ensureDir = false) {
     let raw = subPath || "";
@@ -636,16 +665,25 @@ export class WebDavStorageDriver extends BaseDriver {
       raw = decodeURI(raw);
     } catch {}
     const cleaned = this._normalize(raw);
-    const base = this._normalize(this.defaultFolder || "");
-    let full = "";
-    if (base) full = base;
-    if (cleaned) full = full ? `${base}/${cleaned}` : cleaned;
-    if (!full.startsWith("/")) {
+    let full = cleaned;
+
+    if (full && !full.startsWith("/")) {
       full = `/${full}`;
     }
-    if (ensureDir && !full.endsWith("/")) {
-      full += "/";
+
+    if (ensureDir) {
+      if (!full) {
+        full = "/";
+      }
+      if (!full.endsWith("/")) {
+        full += "/";
+      }
     }
+
+    if (!full) {
+      return "/";
+    }
+
     return full;
   }
 
@@ -858,12 +896,17 @@ export class WebDavStorageDriver extends BaseDriver {
     }
   }
 
-  _buildCustomHostUrl(mount, path) {
-    const host = mount?.custom_host;
-    if (!host) return null;
-    const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
+  _buildCustomHostUrl(path) {
+    if (!this.customHost) return null;
+
+    const cleanHost = this.customHost.endsWith("/") ? this.customHost.slice(0, -1) : this.customHost;
     const sub = this._normalize(path || "");
     const relative = sub.startsWith("/") ? sub.slice(1) : sub;
+
+    if (!relative) {
+      return cleanHost;
+    }
+
     return `${cleanHost}/${relative}`;
   }
 

@@ -1,7 +1,6 @@
 /**
  * 挂载点解析工具
  * 提供通用的挂载点查找和路径解析功能
- * 从webdavUtils.js迁移而来
  */
 
 import { DbTables } from "../../../constants/index.js";

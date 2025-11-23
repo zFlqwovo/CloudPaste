@@ -3,6 +3,50 @@ import { ensureRepositoryFactory } from "../utils/repositories.js";
 import { StorageFactory } from "../storage/factory/StorageFactory.js";
 import { ApiStatus } from "../constants/index.js";
 import { AppError, ValidationError, NotFoundError, DriverError } from "../http/errors.js";
+
+/**
+ * 计算存储配置在 WebDAV 渠道下支持的策略列表
+ * 返回值用于前端根据能力渲染可选的 webdav_policy
+ * @param {object} cfg
+ * @returns {string[]} webdav_supported_policies
+ */
+function computeWebDavSupportedPolicies(cfg) {
+  const policies = [];
+  const type = cfg?.storage_type;
+  const hasCustomHost = !!cfg?.custom_host;
+
+  switch (type) {
+    case "S3": {
+      // S3 驱动实现了 generateDownloadUrl，支持存储直链重定向
+      policies.push("302_redirect");
+      // 配置了 custom_host 时支持 use_proxy_url（下游自定义 HOST/CDN）
+      if (hasCustomHost) {
+        policies.push("use_proxy_url");
+      }
+      // 永远支持 native_proxy（由 WebDAV 层本地代理到底层 S3）
+      policies.push("native_proxy");
+      break;
+    }
+    case "WEBDAV": {
+      // WebDAV 驱动当前不实现 generateDownloadUrl，因此不提供 302_redirect
+      // 仅在配置了 custom_host 时支持 use_proxy_url
+      if (hasCustomHost) {
+        policies.push("use_proxy_url");
+      }
+      // 永远支持 native_proxy（由 WebDAV 层本地代理到底层 WebDAV 服务器）
+      policies.push("native_proxy");
+      break;
+    }
+    default: {
+      // 其他类型：兜底只声明 native_proxy
+      policies.push("native_proxy");
+      break;
+    }
+  }
+
+  //去重
+  return Array.from(new Set(policies));
+}
 import { encryptValue, buildSecretView } from "../utils/crypto.js";
 import { generateStorageConfigId } from "../utils/common.js";
 
@@ -11,16 +55,34 @@ export async function getStorageConfigsByAdmin(db, adminId, options = {}, reposi
   const factory = ensureRepositoryFactory(db, repositoryFactory);
   const repo = factory.getStorageConfigRepository();
   if (options.page !== undefined || options.limit !== undefined) {
-    return await repo.findByAdminWithPagination(adminId, options);
+    const result = await repo.findByAdminWithPagination(adminId, options);
+    const configs = Array.isArray(result.configs) ? result.configs : [];
+    const enhanced = configs.map((cfg) => ({
+      ...cfg,
+      webdav_supported_policies: computeWebDavSupportedPolicies(cfg),
+    }));
+    return { ...result, configs: enhanced, total: result.total ?? enhanced.length };
   }
   const configs = await repo.findByAdmin(adminId);
-  return { configs, total: configs.length };
+  const enhanced = Array.isArray(configs)
+    ? configs.map((cfg) => ({
+        ...cfg,
+        webdav_supported_policies: computeWebDavSupportedPolicies(cfg),
+      }))
+    : [];
+  return { configs: enhanced, total: enhanced.length };
 }
 
 export async function getPublicStorageConfigs(db, repositoryFactory = null) {
   const factory = ensureRepositoryFactory(db, repositoryFactory);
   const repo = factory.getStorageConfigRepository();
-  return await repo.findPublic();
+  const configs = await repo.findPublic();
+  return Array.isArray(configs)
+    ? configs.map((cfg) => ({
+        ...cfg,
+        webdav_supported_policies: computeWebDavSupportedPolicies(cfg),
+      }))
+    : configs;
 }
 
 export async function getStorageConfigByIdForAdmin(db, id, adminId, repositoryFactory = null) {

@@ -91,6 +91,25 @@ const filteredStorageConfigs = computed(() => {
   return storageConfigs.value.filter((config) => config.storage_type === formData.value.storage_type);
 });
 
+// 当前选中的存储配置
+const selectedStorageConfig = computed(() => {
+  if (!formData.value.storage_config_id) return null;
+  return storageConfigs.value.find((config) => config.id === formData.value.storage_config_id) || null;
+});
+
+// 根据存储配置上报的能力动态计算可用的 WebDAV 策略选项
+const availableWebdavPolicies = computed(() => {
+  const cfg = selectedStorageConfig.value;
+  const policies = Array.isArray(cfg?.webdav_supported_policies) ? cfg.webdav_supported_policies : null;
+
+  if (policies && policies.length > 0) {
+    return policies;
+  }
+
+  // 未选择配置或后端未声明能力时的兜底：
+  return ["native_proxy"];
+});
+
 // 判断用户类型
 const isAdmin = computed(() => props.userType === "admin");
 const isApiKeyUser = computed(() => props.userType === "apikey");
@@ -382,6 +401,17 @@ watch(
   { immediate: true }
 );
 
+// 当存储类型或存储配置变化时，确保 WebDAV 策略始终是可用选项之一
+watch(
+  () => [formData.value.storage_type, formData.value.storage_config_id],
+  () => {
+    const allowed = availableWebdavPolicies.value;
+    if (!allowed.includes(formData.value.webdav_policy)) {
+      formData.value.webdav_policy = allowed[0] || "native_proxy";
+    }
+  }
+);
+
 // 初始化表单数据的函数
 const initializeFormData = () => {
   if (!props.mount) return;
@@ -670,8 +700,13 @@ const resetFormData = () => {
               class="block w-full px-3 py-1.5 sm:py-2 rounded-md text-sm transition-colors duration-200"
               :class="[darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-gray-900']"
             >
-              <option value="302_redirect">{{ t("admin.mount.form.webdavPolicyOptions.302_redirect") }}</option>
-              <option value="native_proxy">{{ t("admin.mount.form.webdavPolicyOptions.native_proxy") }}</option>
+              <option
+                v-for="policy in availableWebdavPolicies"
+                :key="policy"
+                :value="policy"
+              >
+                {{ t(`admin.mount.form.webdavPolicyOptions.${policy}`) }}
+              </option>
             </select>
             <p class="mt-0.5 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
               {{ t("admin.mount.form.webdavPolicyDescription") }}

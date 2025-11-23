@@ -1,6 +1,13 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import { useAdminStorageConfigService } from "@/modules/admin/services/storageConfigService.js";
+import {
+  STORAGE_TYPES,
+  STORAGE_UNITS,
+  STORAGE_TYPE_OPTIONS,
+  S3_PROVIDER_TYPES,
+  getAdminStorageStrategy,
+} from "@/modules/storage-core/schema/adminStorageSchemas.js";
 
 // 接收属性
 const props = defineProps({
@@ -22,94 +29,16 @@ const props = defineProps({
 const emit = defineEmits(["close", "success"]);
 
 // 表单数据
-const formData = ref({
-  name: "",
-  storage_type: "S3",
-  provider_type: "Cloudflare R2",
-  endpoint_url: "",
-  bucket_name: "",
-  region: "",
-  access_key_id: "",
-  secret_access_key: "",
-  path_style: false,
-  default_folder: "",
-  is_public: false,
-  total_storage_bytes: null,
-  custom_host: "",
-  signature_expires_in: 3600,
-  // WebDAV
-  username: "",
-  password: "",
-  tls_insecure_skip_verify: false,
-});
-
-// 提供商列表
-const providerTypes = [
-  { value: "Cloudflare R2", label: "Cloudflare R2" },
-  { value: "Backblaze B2", label: "Backblaze B2" },
-  { value: "AWS S3", label: "AWS S3" },
-  { value: "Aliyun OSS", label: "阿里云OSS" },
-  { value: "Other", label: "其他S3兼容服务" },
-];
-
-const storageTypes = [
-  { value: "S3", label: "S3 / 对象存储" },
-  { value: "WEBDAV", label: "WebDAV" },
-];
-
-// 存储容量单位列表
-const storageUnits = [
-  { value: 1, label: "B" },
-  { value: 1024, label: "KB" },
-  { value: 1024 * 1024, label: "MB" },
-  { value: 1024 * 1024 * 1024, label: "GB" },
-  { value: 1024 * 1024 * 1024 * 1024, label: "TB" },
-];
+const currentStorageType = ref(STORAGE_TYPES.S3);
+const formData = ref(getAdminStorageStrategy(STORAGE_TYPES.S3).createDefaultFormState());
 
 // 存储容量相关变量
 const storageSize = ref("");
-const storageUnit = ref(1024 * 1024 * 1024); // 默认单位为GB
+const storageUnit = ref(1024 * 1024 * 1024);
+const storageUnits = STORAGE_UNITS;
 
-// 获取默认存储容量（根据提供商类型）
-const getDefaultStorageByProvider = (provider) => {
-  switch (provider) {
-    case "Cloudflare R2":
-      return 10 * 1024 * 1024 * 1024; // 10GB
-    case "Backblaze B2":
-      return 10 * 1024 * 1024 * 1024; // 10GB
-    case "Aliyun OSS":
-      return 5 * 1024 * 1024 * 1024; // 5GB
-    default:
-      return 5 * 1024 * 1024 * 1024; // 5GB
-  }
-};
-
-// 转换存储字节为可读格式并设置相应的值
-const setStorageSizeFromBytes = (bytes) => {
-  if (!bytes || bytes <= 0) {
-    storageSize.value = "";
-    return;
-  }
-
-  // 找到合适的单位
-  let unitIndex = 0;
-  while (bytes >= 1024 && unitIndex < storageUnits.length - 1) {
-    bytes /= 1024;
-    unitIndex++;
-  }
-
-  storageSize.value = bytes.toFixed(2);
-  storageUnit.value = storageUnits[unitIndex].value;
-};
-
-// 计算存储容量字节数
-const calculateStorageBytes = () => {
-  if (!storageSize.value || isNaN(storageSize.value) || storageSize.value <= 0) {
-    formData.value.total_storage_bytes = null;
-    return;
-  }
-  formData.value.total_storage_bytes = Math.floor(parseFloat(storageSize.value) * storageUnit.value);
-};
+const storageTypes = STORAGE_TYPE_OPTIONS;
+const providerTypes = S3_PROVIDER_TYPES;
 
 // 表单状态
 const loading = ref(false);
@@ -176,8 +105,8 @@ const toggleWebDavPasswordReveal = async () => {
 };
 
 // 计算表单标题
-const isS3Type = computed(() => formData.value.storage_type === "S3");
-const isWebDavType = computed(() => formData.value.storage_type === "WEBDAV");
+const isS3Type = computed(() => formData.value.storage_type === STORAGE_TYPES.S3);
+const isWebDavType = computed(() => formData.value.storage_type === STORAGE_TYPES.WEBDAV);
 
 const formTitle = computed(() => {
   return props.isEdit ? "编辑存储配置" : "添加存储配置";
@@ -339,66 +268,30 @@ watch(() => formData.value.provider_type, updateEndpoint);
 watch(
   () => props.config,
   () => {
-    if (props.config) {
-      formData.value.storage_type = props.config.storage_type || "S3";
-      formData.value.name = props.config.name;
+    const config = props.config;
+    if (config) {
+      const type = config.storage_type || STORAGE_TYPES.S3;
+      currentStorageType.value = type;
+      const strategy = getAdminStorageStrategy(type);
+      formData.value = strategy.createDefaultFormState();
+      strategy.hydrateFormFromConfig(formData.value, config);
 
-      if (formData.value.storage_type === "S3") {
-        formData.value.provider_type = props.config.provider_type || formData.value.provider_type;
-        formData.value.endpoint_url = props.config.endpoint_url || "";
-        formData.value.bucket_name = props.config.bucket_name || "";
-        formData.value.region = props.config.region || "";
-        formData.value.default_folder = props.config.default_folder || "";
-        formData.value.path_style = props.config.path_style === 1 || props.config.path_style === true;
-        formData.value.custom_host = props.config.custom_host || "";
-        formData.value.signature_expires_in = props.config.signature_expires_in || 3600;
-        formData.value.access_key_id = "";
-        formData.value.secret_access_key = "";
-      } else if (formData.value.storage_type === "WEBDAV") {
-        formData.value.endpoint_url = props.config.endpoint_url || "";
-        formData.value.username = props.config.username || "";
-        formData.value.password = "";
-        formData.value.default_folder = props.config.default_folder || "";
-        formData.value.tls_insecure_skip_verify = props.config.tls_insecure_skip_verify === 1 || props.config.tls_insecure_skip_verify === true;
-        formData.value.custom_host = props.config.custom_host || "";
-        formData.value.access_key_id = "";
-        formData.value.secret_access_key = "";
-        formData.value.provider_type = "";
-        formData.value.bucket_name = "";
-        formData.value.region = "";
-        formData.value.path_style = false;
-        formData.value.signature_expires_in = null;
-      }
-
-      formData.value.is_public = props.config.is_public === 1 || props.config.is_public === true;
-
-      if (props.config.total_storage_bytes) {
-        setStorageSizeFromBytes(props.config.total_storage_bytes);
-      } else {
-        setStorageSizeFromBytes(getDefaultStorageByProvider(props.config.provider_type || "Cloudflare R2"));
-      }
+      const sizeState = { storageSize: "", storageUnit: storageUnit.value };
+      strategy.setStorageSizeFromBytes(formData.value.total_storage_bytes, sizeState);
+      storageSize.value = sizeState.storageSize;
+      storageUnit.value = sizeState.storageUnit;
     } else {
-      formData.value = {
-        name: "",
-        storage_type: "S3",
-        provider_type: "Cloudflare R2",
-        endpoint_url: "",
-        bucket_name: "",
-        region: "",
-        access_key_id: "",
-        secret_access_key: "",
-        path_style: false,
-        default_folder: "",
-        is_public: false,
-        total_storage_bytes: getDefaultStorageByProvider("Cloudflare R2"),
-        custom_host: "",
-        signature_expires_in: 3600,
-        username: "",
-        password: "",
-        tls_insecure_skip_verify: false,
-      };
-      updateEndpoint();
-      setStorageSizeFromBytes(formData.value.total_storage_bytes);
+      const type = STORAGE_TYPES.S3;
+      currentStorageType.value = type;
+      const strategy = getAdminStorageStrategy(type);
+      formData.value = strategy.createDefaultFormState();
+      formData.value.total_storage_bytes = strategy.getDefaultStorageByProvider(
+        formData.value.provider_type || "Cloudflare R2"
+      );
+      const sizeState = { storageSize: "", storageUnit: storageUnit.value };
+      strategy.setStorageSizeFromBytes(formData.value.total_storage_bytes, sizeState);
+      storageSize.value = sizeState.storageSize;
+      storageUnit.value = sizeState.storageUnit;
     }
   },
   { immediate: true }
@@ -409,9 +302,13 @@ watch(
   () => formData.value.provider_type,
   (newProvider) => {
     if (!formData.value.total_storage_bytes) {
-      const defaultBytes = getDefaultStorageByProvider(newProvider);
+      const strategy = getAdminStorageStrategy(STORAGE_TYPES.S3);
+      const defaultBytes = strategy.getDefaultStorageByProvider(newProvider);
       formData.value.total_storage_bytes = defaultBytes;
-      setStorageSizeFromBytes(defaultBytes);
+      const sizeState = { storageSize: "", storageUnit: storageUnit.value };
+      strategy.setStorageSizeFromBytes(defaultBytes, sizeState);
+      storageSize.value = sizeState.storageSize;
+      storageUnit.value = sizeState.storageUnit;
     }
   }
 );
@@ -439,13 +336,19 @@ watch(
 
 // 监听存储大小和单位的变化
 watch([storageSize, storageUnit], () => {
-  calculateStorageBytes();
+  const strategy = getAdminStorageStrategy(formData.value.storage_type);
+  formData.value.total_storage_bytes = strategy.calculateStorageBytes({
+    storageSize: storageSize.value,
+    storageUnit: storageUnit.value,
+  });
 });
 
 // 提交表单
 const submitForm = async () => {
-  if (!formValid.value) {
-    error.value = "请填写所有必填字段";
+  const strategy = getAdminStorageStrategy(formData.value.storage_type);
+  const { valid, message } = strategy.validate(formData.value, props.isEdit);
+  if (!valid) {
+    error.value = message || "请填写所有必填字段";
     return;
   }
 
@@ -453,18 +356,16 @@ const submitForm = async () => {
   error.value = "";
   success.value = "";
 
-  // 确保存储容量字段已更新
-  calculateStorageBytes();
-
   try {
     let savedConfig;
+    const stateForPayload = {
+      ...formData.value,
+      storageSize: storageSize.value,
+      storageUnit: storageUnit.value,
+    };
     if (props.isEdit && props.config?.id) {
-      // 更新现有配置
-      // 创建一个新对象，避免修改原始表单数据
-      const updateData = { ...buildPayload() };
+      const updateData = { ...strategy.buildPayload(stateForPayload) };
 
-      // 如果是编辑模式，且密钥字段为空，则从更新数据中移除这些字段
-      // 这样后端将保留原有的密钥值
       if (!updateData.access_key_id || updateData.access_key_id.trim() === "") {
         delete updateData.access_key_id;
       }
@@ -479,8 +380,7 @@ const submitForm = async () => {
 
       savedConfig = await updateStorageConfig(props.config.id, updateData);
     } else {
-      // 创建新配置
-      savedConfig = await createStorageConfig(buildPayload());
+      savedConfig = await createStorageConfig(strategy.buildPayload(stateForPayload));
     }
 
     success.value = props.isEdit ? "存储配置更新成功！" : "存储配置创建成功！";
