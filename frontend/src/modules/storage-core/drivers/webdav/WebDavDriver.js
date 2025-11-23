@@ -93,8 +93,19 @@ export class WebDavDriver {
         "max_views",
         "use_proxy",
         "original_filename",
+        "upload_id",
       ],
       headers,
+    });
+
+    // 在上传前同步用户修改的文件名
+    uppy.on("upload", () => {
+      const files = uppy.getFiles();
+      files.forEach((file) => {
+        if (file.meta?.name && file.meta.name !== file.name) {
+          uppy.setFileState(file.id, { name: file.meta.name });
+        }
+      });
     });
 
     // 监听 upload-success，从响应中提取分享记录并透传给上层
@@ -149,8 +160,18 @@ export class WebDavDriver {
       formData: true,
       fieldName: "file",
       limit: 3,
-      allowedMetaFields: ["path", "use_multipart"],
+      allowedMetaFields: ["path", "use_multipart", "upload_id"],
       headers,
+    });
+
+    // 在上传前同步用户修改的文件名
+    uppy.on("upload", () => {
+      const files = uppy.getFiles();
+      files.forEach((file) => {
+        if (file.meta?.name && file.meta.name !== file.name) {
+          uppy.setFileState(file.id, { name: file.meta.name });
+        }
+      });
     });
 
     return {

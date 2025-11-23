@@ -230,6 +230,7 @@ export class FileShareService {
       bodyStream,
       size: normalizedSize,
       contentType: mimeType,
+      uploadId: options.uploadId || null,
     });
 
     const { shouldUseRandomSuffix } = await import("../utils/common.js");
@@ -298,6 +299,7 @@ export class FileShareService {
       file,
       size: normalizedSize,
       contentType: mimeType,
+      uploadId: options.uploadId || null,
     });
 
     const { shouldUseRandomSuffix } = await import("../utils/common.js");

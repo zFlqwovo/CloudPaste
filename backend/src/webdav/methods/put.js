@@ -130,15 +130,15 @@ export async function handlePut(c, path, userId, userType, db) {
     if (isEmptyFile) {
       console.log(`WebDAV PUT - 确认为空文件，使用FileSystem直接上传`);
 
-      // 创建一个空的File对象
-      const emptyFile = new File([""], filename, { type: contentType });
-
-      // 使用FileSystem上传空文件
-      const result = await fileSystem.uploadFile(path, emptyFile, userId, userType, {
-        useMultipart: false,
+      // 使用 FileSystem 流式上传一个空文件
+      const emptyBody = new Uint8Array(0);
+      const result = await fileSystem.uploadFile(path, emptyBody, userId, userType, {
+        filename,
+        contentType,
+        contentLength: 0,
       });
 
-      console.log(`WebDAV PUT - 空文件上传成功`);
+      console.log(`WebDAV PUT - 空文件上传成功，ETag: ${result.etag}`);
 
       return new Response(null, {
         status: 201, // Created
@@ -168,11 +168,10 @@ export async function handlePut(c, path, userId, userType, db) {
       try {
         // 使用FileSystem抽象层的uploadStream方法
         const startTime = Date.now();
-        const result = await fileSystem.uploadStream(path, processedStream, userId, userType, {
-          filename: filename,
-          contentType: contentType,
+        const result = await fileSystem.uploadFile(path, processedStream, userId, userType, {
+          filename,
+          contentType,
           contentLength: declaredContentLength,
-          useMultipart: false, // direct模式使用直接上传
         });
         const duration = Date.now() - startTime;
 
@@ -200,11 +199,10 @@ export async function handlePut(c, path, userId, userType, db) {
       try {
         // 使用FileSystem抽象层的uploadStream方法
         const startTime = Date.now();
-        const result = await fileSystem.uploadStream(path, processedStream, userId, userType, {
-          filename: filename,
-          contentType: contentType,
+        const result = await fileSystem.uploadFile(path, processedStream, userId, userType, {
+          filename,
+          contentType,
           contentLength: declaredContentLength,
-          useMultipart: true, // multipart模式使用分片上传
         });
         const duration = Date.now() - startTime;
 

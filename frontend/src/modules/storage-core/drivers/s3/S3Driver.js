@@ -91,7 +91,9 @@ export class S3Driver {
       const headers = buildAuthHeadersForRequest({});
 
       // 统一注入 path / use_multipart 到所有文件的 meta
-      try { uppy.setMeta({ path: path || "/", use_multipart: "false" }); } catch {}
+      try {
+        uppy.setMeta({ path: path || "/", use_multipart: "false" });
+      } catch {}
 
       uppy.use(XHRUpload, {
         id: "S3BackendDirect",
@@ -100,10 +102,21 @@ export class S3Driver {
         formData: true,
         fieldName: "file",
         limit: 3,
-        allowedMetaFields: ["path", "use_multipart"],
+        allowedMetaFields: ["path", "use_multipart", "upload_id"],
         headers,
         // 保持 Uppy 默认响应解析；后端完成最终 commit
       });
+
+      // 在上传前同步用户修改的文件名
+      uppy.on("upload", () => {
+        const files = uppy.getFiles();
+        files.forEach((file) => {
+          if (file.meta?.name && file.meta.name !== file.name) {
+            uppy.setFileState(file.id, { name: file.meta.name });
+          }
+        });
+      });
+
       return {
         adapter: null,
         mode: STORAGE_STRATEGIES.S3_BACKEND_DIRECT,
@@ -148,7 +161,7 @@ export class S3Driver {
 
         const presign = await api.file.getUploadPresignedUrl({
           storage_config_id: merged.storage_config_id,
-          filename: meta.filename || file.name,
+          filename: meta.name || file.name,
           mimetype: file.type || "application/octet-stream",
           path: merged.path,
           size: file.size,
@@ -165,7 +178,7 @@ export class S3Driver {
           uppy.setFileMeta(file.id, {
             key: data.key,
             storage_config_id: data.storage_config_id || merged.storage_config_id,
-            filename: data.filename || meta.filename || file.name,
+            filename: data.filename || meta.name || file.name,
             path: merged.path,
             slug: merged.slug,
             password: basePayload.password || meta.password || null,
@@ -191,7 +204,7 @@ export class S3Driver {
         const commitRes = await api.file.completeFileUpload({
           key: meta.key,
           storage_config_id: meta.storage_config_id,
-          filename: meta.filename || file.name,
+          filename: meta.name || file.name,
           size: file.size,
           etag: undefined, // ETag 可能因 CORS 不可用，后端兼容
           slug: meta.slug,
@@ -273,8 +286,19 @@ export class S3Driver {
         "max_views",
         "use_proxy",
         "original_filename",
+        "upload_id",
       ],
       headers,
+    });
+
+    // 在上传前同步用户修改的文件名
+    uppy.on("upload", () => {
+      const files = uppy.getFiles();
+      files.forEach((file) => {
+        if (file.meta?.name && file.meta.name !== file.name) {
+          uppy.setFileState(file.id, { name: file.meta.name });
+        }
+      });
     });
 
     const onSuccess = (file, response) => {
@@ -330,7 +354,7 @@ export class S3Driver {
         };
         const presign = await api.file.getUploadPresignedUrl({
           storage_config_id: merged.storage_config_id,
-          filename: meta.filename || file.name,
+          filename: meta.name || file.name,
           mimetype: file.type || "application/octet-stream",
           path: merged.path,
           size: file.size,
@@ -340,7 +364,7 @@ export class S3Driver {
         const uploadUrl = presignData.uploadUrl || presignData.upload_url;
         const resolvedKey = presignData.key;
         const resolvedStorageConfigId = presignData.storage_config_id || merged.storage_config_id;
-        const resolvedFilename = presignData.filename || meta.filename || file.name;
+        const resolvedFilename = presignData.filename || meta.name || file.name;
         if (!uploadUrl || !resolvedKey || !resolvedStorageConfigId) {
           throw new Error("URL上传预签名缺少必要的 key 或上传地址");
         }
@@ -369,7 +393,7 @@ export class S3Driver {
         const commitRes = await api.file.completeFileUpload({
           key: meta.key,
           storage_config_id: meta.storage_config_id,
-          filename: meta.filename || file.name,
+          filename: meta.name || file.name,
           size: file.size,
           etag: undefined,
           path: meta.path,

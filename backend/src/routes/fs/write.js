@@ -53,7 +53,7 @@ export const registerWriteRoutes = (router, helpers) => {
     const formData = c.get("formData");
     const file = formData.get("file");
     const path = formData.get("path");
-    const useMultipart = formData.get("use_multipart") === "true";
+    const uploadId = formData.get("upload_id") || null;
 
     if (!file || !path) {
       throw new ValidationError("请提供文件和路径");
@@ -61,11 +61,15 @@ export const registerWriteRoutes = (router, helpers) => {
 
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
-    const result = await fileSystem.uploadFile(path, file, userIdOrInfo, userType, { useMultipart });
 
-    if (result.useMultipart) {
-      return jsonOk(c, result, "需要使用分片上传");
-    }
+    // 统一走 FileSystem.uploadFile 入口，内部根据类型决定是否流式
+    const streamOrFile = typeof file.stream === "function" ? file.stream() : file;
+    const result = await fileSystem.uploadFile(path, /** @type {any} */ (streamOrFile), userIdOrInfo, userType, {
+      filename: file.name,
+      contentType: file.type,
+      contentLength: typeof file.size === "number" ? file.size : 0,
+      uploadId: uploadId || undefined,
+    });
 
     return jsonOk(c, result, "文件上传成功");
   });

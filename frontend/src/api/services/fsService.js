@@ -87,18 +87,16 @@ export async function createDirectory(path) {
 }
 
 /**
- * 上传文件
+ * 上传文件（通过 /fs/upload，后端根据存储驱动自适应选择流式/非流式实现）
  * @param {string} path 目标路径
  * @param {File} file 文件对象
- * @param {boolean} useMultipart 是否使用服务器分片上传，默认为true
  * @param {Function} onXhrCreated XHR创建后的回调，用于保存引用以便取消请求
  * @returns {Promise<Object>} 上传结果响应对象
  */
-export async function uploadFile(path, file, useMultipart = true, onXhrCreated) {
+export async function uploadFile(path, file, onXhrCreated) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("path", path);
-  formData.append("use_multipart", useMultipart.toString());
 
   return post(`/fs/upload`, formData, { onXhrCreated });
 }

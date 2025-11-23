@@ -43,6 +43,7 @@ router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
   const declaredLength = declaredLengthHeader ? parseInt(declaredLengthHeader, 10) : 0;
 
   const storageConfigId = c.req.query("storage_config_id") || null;
+  const uploadId = c.req.query("upload_id") || null;
 
   const shareParams = {
     storage_config_id: storageConfigId,
@@ -68,7 +69,7 @@ router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
     declaredLength,
     userIdOrInfo,
     userType,
-    shareParams
+    { ...shareParams, uploadId: uploadId || null }
   );
 
   return jsonOk(c, result, "文件上传成功");
@@ -95,6 +96,7 @@ router.post("/api/share/upload", requireFilesCreate, parseFormData, async (c) =>
   const maxViews = Number(formData.get("max_views") || 0);
   const useProxyRaw = formData.get("use_proxy");
   const originalFilenameRaw = formData.get("original_filename");
+  const uploadId = formData.get("upload_id") || null;
 
   const principalInfo = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
   const { type: userType, userId, apiKeyInfo } = principalInfo;
@@ -115,6 +117,7 @@ router.post("/api/share/upload", requireFilesCreate, parseFormData, async (c) =>
     originalFilename: originalFilenameRaw === "true",
     contentType: file.type || undefined,
     request: c.req.raw,
+    uploadId: uploadId || null,
   };
 
   const result = await shareService.uploadFileViaObjectStoreAndShare(

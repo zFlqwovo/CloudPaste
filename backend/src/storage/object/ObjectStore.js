@@ -99,40 +99,31 @@ export class ObjectStore {
     };
   }
 
-  async uploadDirect({ storage_config_id, directory, filename, bodyStream, size, contentType }) {
+  async uploadDirect({ storage_config_id, directory, filename, bodyStream, size, contentType, uploadId = null }) {
     const storageConfig = await this._getStorageConfig(storage_config_id);
     if (!storageConfig.storage_type) {
       throw new ValidationError("存储配置缺少 storage_type");
     }
-    // upload-direct 接口主要面向 S3 等具备良好直传能力的驱动
-    if (storageConfig.storage_type !== "S3") {
-      throw new ValidationError("upload-direct 仅支持 S3 类型存储");
-    }
     const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
 
-    const key = await this._composeKeyWithStrategy(storageConfig, directory, filename);
-    if (typeof driver.uploadStream !== "function" && typeof driver.uploadFile !== "function") {
-      throw new ValidationError("当前存储驱动不支持流式直传");
+    // 仅允许具备写入能力且支持文件上传的驱动使用 upload-direct
+    if (typeof driver.hasCapability === "function" && !driver.hasCapability(CAPABILITIES.WRITER)) {
+      throw new ValidationError("当前存储驱动不具备写入能力，无法使用 upload-direct 接口");
+    }
+    if (typeof driver.uploadFile !== "function") {
+      throw new ValidationError("当前存储驱动不支持文件直传");
     }
 
-    let result;
-    // 优先走流式上传接口，其次退回到基于 File 的上传
-    if (typeof driver.uploadStream === "function") {
-      result = await driver.uploadStream(key, /** @type {any} */ (bodyStream), {
-        subPath: key,
-        db: this.db,
-        filename,
-        contentType,
-        contentLength: size,
-        useMultipart: false,
-      });
-    } else {
-      result = await driver.uploadFile(key, /** @type {any} */ (bodyStream), {
-        subPath: key,
-        db: this.db,
-        useMultipart: false,
-      });
-    }
+    const key = await this._composeKeyWithStrategy(storageConfig, directory, filename);
+
+    const result = await driver.uploadFile(key, /** @type {any} */ (bodyStream), {
+      subPath: key,
+      db: this.db,
+      filename,
+      contentType,
+      contentLength: size,
+      uploadId: uploadId || undefined,
+    });
 
     // 触发与存储配置相关的缓存失效（清理URL缓存，联动关联挂载目录缓存）
     try {
@@ -159,25 +150,46 @@ export class ObjectStore {
    * @param {number} params.size
    * @param {string|null} params.contentType
    */
-  async uploadFileForShare({ storage_config_id, directory, filename, file, size, contentType }) {
+  async uploadFileForShare({ storage_config_id, directory, filename, file, size, contentType, uploadId = null }) {
     const storageConfig = await this._getStorageConfig(storage_config_id);
     if (!storageConfig.storage_type) {
       throw new ValidationError("存储配置缺少 storage_type");
     }
     const driver = await StorageFactory.createDriver(storageConfig.storage_type, storageConfig, this.encryptionSecret);
 
-    if (typeof driver.uploadFile !== "function") {
-      throw new ValidationError("当前存储驱动不支持文件上传");
-    }
     if (typeof driver.hasCapability === "function" && !driver.hasCapability(CAPABILITIES.WRITER)) {
       throw new ValidationError("当前存储驱动不具备写入能力");
     }
+    if (typeof driver.uploadFile !== "function") {
+      throw new ValidationError("当前存储驱动不支持文件上传");
+    }
 
     const key = await this._composeKeyWithStrategy(storageConfig, directory, filename);
-    const result = await driver.uploadFile(key, /** @type {any} */ (file), {
+
+    // 优先使用流式上传：在 Worker 环境下 File/Blob 通常提供 stream()，可得到 ReadableStream。
+    // 为保持兼容性，仅在成功拿到 Web ReadableStream 且具备 getReader() 时才切换到流式路径。
+    /** @type {any} */
+    let fileOrStream = file;
+    try {
+      const maybeHasStream = file && typeof file.stream === "function";
+      if (maybeHasStream) {
+        const candidate = file.stream();
+        if (candidate && typeof candidate.getReader === "function") {
+          fileOrStream = candidate;
+        }
+      }
+    } catch {
+      // 若 stream() 不可用或抛错，则回退为原始 file 非流式上传
+      fileOrStream = file;
+    }
+
+    const result = await driver.uploadFile(key, fileOrStream, {
       subPath: key,
       db: this.db,
-      useMultipart: false,
+      filename,
+      contentType: contentType || undefined,
+      contentLength: size,
+      uploadId: uploadId || undefined,
     });
 
     try {

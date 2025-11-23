@@ -62,6 +62,11 @@ export async function fetchUrlContent(options) {
     console.log(`尝试直接获取URL: ${options.url}`);
     return await fetchFromUrl(options.url, options.onProgress, options.setXhr, "directDownload");
   } catch (error) {
+    // 用户主动取消下载时，直接抛出错误，不尝试代理重试
+    if (error.message === "下载已取消") {
+      throw error;
+    }
+
     console.warn(`直接获取URL内容失败: ${error.message}`);
 
     // 检查是否是CORS错误或其他网络错误，如果是则尝试使用代理
@@ -100,8 +105,8 @@ function fetchFromUrl(url, onProgress, setXhr, phaseType) {
     // 进度事件
     xhr.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
-        // 下载过程占总进度的49%，保留1%给最终确认步骤
-        const progress = Math.round((event.loaded / event.total) * 49);
+        // 下载进度从 0% 到 100%
+        const progress = Math.round((event.loaded / event.total) * 100);
         onProgress(progress, event.loaded, event.total, "downloading", phaseType);
       }
     };

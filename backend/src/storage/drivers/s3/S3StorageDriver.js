@@ -222,66 +222,39 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
-   * 上传文件
-   * @param {string} path - 目标路径
-   * @param {File} file - 文件对象
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 上传结果
+   * 统一上传入口（文件 / 流）
+   * - 外部只调用此方法，内部根据数据类型选择流式或非流式实现
    */
-  async uploadFile(path, file, options = {}) {
+  async uploadFile(path, fileOrStream, options = {}) {
     this._ensureInitialized();
 
-    const { mount, subPath, db, userIdOrInfo, userType, useMultipart = true } = options;
+    const isNodeStream = fileOrStream && (typeof fileOrStream.pipe === "function" || fileOrStream.readable);
+    const isWebStream = fileOrStream && typeof fileOrStream.getReader === "function";
 
-    // 规范化S3子路径
-    const s3SubPath = normalizeS3SubPath(subPath, false);
-
-    try {
-      if (useMultipart) {
-        // 使用分片上传
-        return await this.uploadOps.initializeFrontendMultipartUpload(s3SubPath, {
-          fileName: file.name,
-          fileSize: file.size,
-          mount,
-          db,
-          userIdOrInfo,
-          userType,
-        });
-      } else {
-        // 使用直接上传
-        return await this.uploadOps.uploadFile(s3SubPath, file, {
-          mount,
-          db,
-          userIdOrInfo,
-          userType,
-        });
-      }
-    } catch (error) {
-      throw this._rethrow(error, "上传文件失败");
+    // 有 Stream 能力时优先走流式上传（支持大文件 / 分片）
+    if (isNodeStream || isWebStream) {
+      return await this.uploadStream(path, fileOrStream, options);
     }
+
+    // 其它情况按“非流式”一次性上传处理
+    return await this.uploadNonStream(path, fileOrStream, options);
   }
 
   /**
-   * 上传流式数据
-   * @param {string} path - 目标路径
-   * @param {ReadableStream} stream - 数据流
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 上传结果
+   * 内部流式上传实现
    */
   async uploadStream(path, stream, options = {}) {
     this._ensureInitialized();
 
-    const { mount, subPath, db, userIdOrInfo, userType, filename, contentType, contentLength, useMultipart = false } = options;
+    const { mount, subPath, db, userIdOrInfo, userType, filename, contentType, contentLength, uploadId } = options;
 
-    // 规范化S3子路径
     const s3SubPath = normalizeS3SubPath(subPath, false);
-
-    // 构建完整的S3 key
     const s3Key = this._normalizeFilePath(s3SubPath, path, filename);
 
+    // 统一交由 S3UploadOperations.uploadStream 使用 Upload 处理流式上传，
+    // 包含自动的单请求/多分片选择和进度回调
     try {
-      // 委托给上传操作模块
-      return await this.uploadOps.uploadStream(s3Key, stream, {
+      return await this.uploadOps.uploadStream(s3Key, /** @type {any} */ (stream), {
         mount,
         db,
         userIdOrInfo,
@@ -289,7 +262,7 @@ export class S3StorageDriver extends BaseDriver {
         filename,
         contentType,
         contentLength,
-        useMultipart,
+        uploadId,
       });
     } catch (error) {
       throw this._rethrow(error, "流式上传失败");
@@ -297,24 +270,28 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
-   * 在当前挂载点中搜索文件
-   * @param {string} query - 搜索关键字
-   * @param {Object} options - 搜索选项
-   * @param {Object} options.mount - 挂载点对象
-   * @param {string|null} options.searchPath - 搜索路径范围（可选）
-   * @param {number} options.maxResults - 最大结果数量
-   * @param {D1Database} options.db - 数据库实例
-   * @returns {Promise<Array<Object>>} 搜索结果
+   * 内部非流式上传实现（一次性读入内存）
    */
-  async search(query, options = {}) {
+  async uploadNonStream(path, fileOrData, options = {}) {
     this._ensureInitialized();
-    const { mount, searchPath = null, maxResults = 1000, db } = options;
-    return await this.searchOps.searchInMount(query, {
-      mount,
-      searchPath,
-      maxResults,
-      db,
-    });
+
+    const { mount, subPath, db, userIdOrInfo, userType, filename, contentType } = options;
+
+    const s3SubPath = normalizeS3SubPath(subPath, false);
+    const s3Key = this._normalizeFilePath(s3SubPath, path, filename);
+
+    try {
+      return await this.uploadOps.uploadNonStream(s3Key, /** @type {any} */ (fileOrData), {
+        mount,
+        db,
+        userIdOrInfo,
+        userType,
+        filename,
+        contentType,
+      });
+    } catch (error) {
+      throw this._rethrow(error, "直接上传失败");
+    }
   }
 
   /**
@@ -880,37 +857,6 @@ export class S3StorageDriver extends BaseDriver {
 
     // 构建最终路径
     return fullPrefix + fileName;
-  }
-
-  /**
-   * 中止后端分片上传
-   * @param {string} path - 目标路径
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 中止结果
-   */
-  async abortBackendMultipartUpload(path, options = {}) {
-    this._ensureInitialized();
-
-    const { mount, subPath, db, uploadId, s3Key } = options;
-
-    // 如果提供了s3Key，直接使用，否则重新计算
-    const s3SubPath = s3Key || this._normalizeFilePath(subPath, path);
-
-    // 委托给后端分片操作模块
-    const result = await this.backendMultipartOps.abortBackendMultipartUpload(s3SubPath, {
-      uploadId,
-    });
-
-    // 更新挂载点的最后使用时间
-    if (db && mount.id) {
-      try {
-        await updateMountLastUsed(db, mount.id);
-      } catch (updateError) {
-        console.warn(`更新挂载点最后使用时间失败: ${updateError.message}`);
-      }
-    }
-
-    return result;
   }
 
   /**
