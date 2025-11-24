@@ -87,7 +87,7 @@ export async function createDirectory(path) {
 }
 
 /**
- * 上传文件（通过 /fs/upload，后端根据存储驱动自适应选择流式/非流式实现）
+ * 上传文件（通过 /fs/upload，后端根据存储驱动自适应选择流式/表单实现）
  * @param {string} path 目标路径
  * @param {File} file 文件对象
  * @param {Function} onXhrCreated XHR创建后的回调，用于保存引用以便取消请求

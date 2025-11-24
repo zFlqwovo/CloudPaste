@@ -73,8 +73,9 @@ export function useShareUploadController() {
 
   /**
    * 创建基于 /share/upload 的直传分享会话（多存储通用）。
+   * shareMode: 'stream' | 'form' | 'multipart'（前端内部使用）
    */
-  const createDirectShareSession = ({ payload, events, uppyOptions, uppy } = {}) => {
+  const createDirectShareSession = ({ payload, events, uppyOptions, uppy, shareMode } = {}) => {
     disposeShareSession();
 
     const session = uploaderClient.createDirectShareUploadSession({
@@ -82,6 +83,7 @@ export function useShareUploadController() {
       events,
       uppyOptions,
       uppy,
+      shareMode,
     });
 
     activeShareSession.value = session;
@@ -109,6 +111,7 @@ export function useShareUploadController() {
 
   /**
    * 创建基于 /share/upload 的 URL 直传分享会话（与文件直传共享同一底层实现）。
+   * URL 上传仅使用流式模式，shareMode 固定为 'stream'。
    */
   const createUrlDirectSession = ({ payload, events, uppyOptions, uppy } = {}) => {
     disposeUrlSession();
@@ -118,6 +121,7 @@ export function useShareUploadController() {
       events,
       uppyOptions,
       uppy,
+      shareMode: "stream",
     });
 
     activeUrlSession.value = session;
@@ -164,8 +168,8 @@ export function useShareUploadController() {
   /**
    * 基于 /share/upload 的直传分享上传（S3/WebDAV 等多存储通用）。
    */
-  const startDirectShareUpload = ({ files = [], payload, buildMeta, events, uppyOptions, uppy } = {}) => {
-    const session = createDirectShareSession({ payload, events, uppyOptions, uppy });
+  const startDirectShareUpload = ({ files = [], payload, buildMeta, events, uppyOptions, uppy, shareMode } = {}) => {
+    const session = createDirectShareSession({ payload, events, uppyOptions, uppy, shareMode });
     const ids = Array.isArray(files) && files.length ? session.addFiles(files, buildMeta) : [];
     return { session, ids };
   };

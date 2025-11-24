@@ -210,7 +210,7 @@ export class WebDavStorageDriver extends BaseDriver {
 
   /**
    * 统一上传入口（文件 / 流）
-   * - 外部统一调用此方法，内部根据数据类型选择流式或非流式实现
+   * - 外部统一调用此方法，内部根据数据类型选择流式或表单实现
    */
   async uploadFile(path, fileOrStream, options = {}) {
     this._ensureInitialized();
@@ -221,8 +221,8 @@ export class WebDavStorageDriver extends BaseDriver {
       return await this.uploadStream(path, fileOrStream, options);
     }
 
-    // 其它场景统一视为“非流式”上传（读取到 Buffer 再写入）
-    return await this.uploadNonStream(path, fileOrStream, options);
+    // 其它场景统一视为“表单/一次性上传”（读取到 Buffer 再写入）
+    return await this.uploadForm(path, fileOrStream, options);
   }
 
   /**
@@ -327,9 +327,9 @@ export class WebDavStorageDriver extends BaseDriver {
   }
 
   /**
-   * 内部非流式上传实现（Buffer / Uint8Array / ArrayBuffer / File / Blob / string 等）
+   * 内部表单上传实现（一次性缓冲，适用于 Buffer / Uint8Array / ArrayBuffer / File / Blob / string 等）
    */
-  async uploadNonStream(path, fileOrData, options = {}) {
+  async uploadForm(path, fileOrData, options = {}) {
     this._ensureInitialized();
     const davPath = this._resolveTargetDavPath(options.subPath, path, fileOrData, options);
     const { body, length, contentType } = await this._normalizeBody(fileOrData, options);
@@ -349,7 +349,7 @@ export class WebDavStorageDriver extends BaseDriver {
             const total = progress?.total ?? length ?? 0;
             if (!total || loaded <= 0) return;
             const percentage = ((loaded / total) * 100).toFixed(1);
-            console.log(`WebDAV 非流直传进度: ${loaded}/${total} (${percentage}%) -> ${davPath}`);
+            console.log(`WebDAV 表单直传进度: ${loaded}/${total} (${percentage}%) -> ${davPath}`);
 
             // 同步更新通用上传进度存储，與流式上传保持一致
             try {
@@ -365,12 +365,12 @@ export class WebDavStorageDriver extends BaseDriver {
           }
         },
       });
-      console.log(`WebDAV 非流直传成功: ${davPath}`);
+      console.log(`WebDAV 表单直传成功: ${davPath}`);
       try {
         completeUploadProgress(progressId);
       } catch {}
 
-      return { success: true, storagePath: davPath, message: "WEBDAV_NON_STREAM_UPLOAD" };
+      return { success: true, storagePath: davPath, message: "WEBDAV_FORM_UPLOAD" };
     } catch (error) {
       throw this._wrapError(error, "上传文件失败", this._statusFromError(error));
     }

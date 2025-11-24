@@ -224,7 +224,7 @@ export class S3StorageDriver extends BaseDriver {
 
   /**
    * 统一上传入口（文件 / 流）
-   * - 外部只调用此方法，内部根据数据类型选择流式或非流式实现
+   * - 外部只调用此方法，内部根据数据类型选择流式或表单实现
    */
   async uploadFile(path, fileOrStream, options = {}) {
     this._ensureInitialized();
@@ -232,13 +232,13 @@ export class S3StorageDriver extends BaseDriver {
     const isNodeStream = fileOrStream && (typeof fileOrStream.pipe === "function" || fileOrStream.readable);
     const isWebStream = fileOrStream && typeof fileOrStream.getReader === "function";
 
-    // 有 Stream 能力时优先走流式上传（支持大文件 / 分片）
+    // 有 Stream 能力时优先走“流式上传”路径
     if (isNodeStream || isWebStream) {
       return await this.uploadStream(path, fileOrStream, options);
     }
 
-    // 其它情况按“非流式”一次性上传处理
-    return await this.uploadNonStream(path, fileOrStream, options);
+    // 其它情况按“表单上传”（一次性完整缓冲后上传）处理
+    return await this.uploadForm(path, fileOrStream, options);
   }
 
   /**
@@ -271,9 +271,9 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
-   * 内部非流式上传实现（一次性读入内存）
+   * 内部表单上传实现（一次性读入内存）
    */
-  async uploadNonStream(path, fileOrData, options = {}) {
+  async uploadForm(path, fileOrData, options = {}) {
     this._ensureInitialized();
 
     const { mount, subPath, db, userIdOrInfo, userType, filename, contentType } = options;
@@ -282,7 +282,7 @@ export class S3StorageDriver extends BaseDriver {
     const s3Key = this._normalizeFilePath(s3SubPath, path, filename);
 
     try {
-      return await this.uploadOps.uploadNonStream(s3Key, /** @type {any} */ (fileOrData), {
+      return await this.uploadOps.uploadForm(s3Key, /** @type {any} */ (fileOrData), {
         mount,
         db,
         userIdOrInfo,
@@ -291,7 +291,7 @@ export class S3StorageDriver extends BaseDriver {
         contentType,
       });
     } catch (error) {
-      throw this._rethrow(error, "直接上传失败");
+      throw this._rethrow(error, "表单上传失败");
     }
   }
 

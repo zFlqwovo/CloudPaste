@@ -141,7 +141,7 @@ export class ObjectStore {
   }
 
   /**
-   * 基于 File/Blob 的统一上传（用于分享上传，多存储通用）
+   * 基于 File/Blob 的统一上传（用于分享上传，多存储通用，默认按“表单上传”语义处理）
    * @param {Object} params
    * @param {string} params.storage_config_id
    * @param {string|null} params.directory
@@ -166,24 +166,8 @@ export class ObjectStore {
 
     const key = await this._composeKeyWithStrategy(storageConfig, directory, filename);
 
-    // 优先使用流式上传：在 Worker 环境下 File/Blob 通常提供 stream()，可得到 ReadableStream。
-    // 为保持兼容性，仅在成功拿到 Web ReadableStream 且具备 getReader() 时才切换到流式路径。
-    /** @type {any} */
-    let fileOrStream = file;
-    try {
-      const maybeHasStream = file && typeof file.stream === "function";
-      if (maybeHasStream) {
-        const candidate = file.stream();
-        if (candidate && typeof candidate.getReader === "function") {
-          fileOrStream = candidate;
-        }
-      }
-    } catch {
-      // 若 stream() 不可用或抛错，则回退为原始 file 非流式上传
-      fileOrStream = file;
-    }
-
-    const result = await driver.uploadFile(key, fileOrStream, {
+    // 分享上传通过 /share/upload 走表单(multipart)通道，这里保持 File/Blob 语义，交由驱动走表单上传路径
+    const result = await driver.uploadFile(key, file, {
       subPath: key,
       db: this.db,
       filename,

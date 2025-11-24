@@ -73,7 +73,7 @@ export class StorageDriver {
    * 统一上传入口（文件 / 流）
    * - 面向所有需要写入二进制内容的场景（FS 写入、直传、分享上传等）
    * - fileOrStream 可以是 Web 流、Node 流、Buffer、Uint8Array、ArrayBuffer、File、Blob、字符串等
-   * - 驱动应在内部自行选择合适的上传策略（流式 / 非流式）
+   * - 驱动应在内部自行选择合适的上传策略（流式 / 表单/缓冲）
    *
    * @param {string} path - 目标路径或对象键（存储内部视角）
    * @param {ReadableStream|Uint8Array|ArrayBuffer|Buffer|File|Blob|string} fileOrStream - 数据源

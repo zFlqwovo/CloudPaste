@@ -272,13 +272,10 @@ const enforceUploadMethodByDriver = (driver) => {
   currentDriverType.value = driver?.config?.storage_type || driver?.type || null;
 
   if (!allowPresigned && uploadMethod.value === "presigned") {
-    uploadMethod.value = allowMultipart ? "multipart" : "direct";
+    uploadMethod.value = allowMultipart ? "multipart" : "stream";
   }
   if (!allowMultipart && uploadMethod.value === "multipart") {
-    uploadMethod.value = allowPresigned ? "presigned" : "direct";
-  }
-  if (!allowPresigned && !allowMultipart) {
-    uploadMethod.value = "direct";
+    uploadMethod.value = allowPresigned ? "presigned" : "stream";
   }
 };
 
@@ -369,10 +366,16 @@ const uploadModes = computed(() => {
       disabled: !canUsePresigned.value,
     },
     {
-      value: "direct",
-      label: t("mount.uppy.directUpload"),
-      modeLabel: t("mount.uppy.directMode"),
-      tooltip: t("mount.uppy.directModeTooltip"),
+      value: "stream",
+      label: "流式上传",
+      modeLabel: "流式模式",
+      tooltip: "通过后端流式中转上传",
+    },
+    {
+      value: "form",
+      label: "表单上传",
+      modeLabel: "表单模式",
+      tooltip: "使用表单(multipart/form-data)上传",
     },
     {
       value: "multipart",
@@ -385,7 +388,6 @@ const uploadModes = computed(() => {
   ];
 });
 
-// 後端進度修正（僅 direct FS 模式）
 const {
   ensureUploadIdForFile,
   resetBackendProgressTracking,
@@ -393,7 +395,7 @@ const {
   startBackendProgressPolling,
 } = useUppyBackendProgress({
   uppy: uppyInstance,
-  isDirectMode: () => uploadMethod.value === "direct",
+  isDirectMode: () => uploadMethod.value === "stream",
 });
 
 // 计算属性
@@ -463,7 +465,8 @@ const getServerResumeConfig = () => ({
 });
 
 const strategyMap = {
-  direct: STORAGE_STRATEGIES.S3_BACKEND_DIRECT,
+  stream: STORAGE_STRATEGIES.BACKEND_STREAM, // 流式直传：PUT /fs/upload
+  form: STORAGE_STRATEGIES.BACKEND_FORM,     // 表单上传：POST /fs/upload
   presigned: STORAGE_STRATEGIES.PRESIGNED_SINGLE,
   multipart: STORAGE_STRATEGIES.PRESIGNED_MULTIPART,
 };
@@ -476,12 +479,13 @@ const configureUploadMethod = async () => {
     const storageConfigId = await ensureStorageConfigForCurrentPath();
     const driver = resolveDriverByConfigId(storageConfigId);
     enforceUploadMethodByDriver(driver);
-    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.S3_BACKEND_DIRECT;
+    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.BACKEND_STREAM;
     if (
       driver?.fs?.applyFsUploader &&
       (driverStrategy.value === STORAGE_STRATEGIES.PRESIGNED_SINGLE ||
         driverStrategy.value === STORAGE_STRATEGIES.PRESIGNED_MULTIPART ||
-        driverStrategy.value === STORAGE_STRATEGIES.S3_BACKEND_DIRECT)
+        driverStrategy.value === STORAGE_STRATEGIES.BACKEND_STREAM ||
+        driverStrategy.value === STORAGE_STRATEGIES.BACKEND_FORM)
     ) {
       disposeFsAdapterHandle();
       const handle = driver.fs.applyFsUploader(uppyInstance.value, { strategy: driverStrategy.value, path: props.currentPath });
@@ -694,7 +698,7 @@ const startUpload = async () => {
       console.warn("[Uppy] startUpload 驱动解析失败", e);
     }
 
-    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.S3_BACKEND_DIRECT;
+    driverStrategy.value = strategyMap[uploadMethod.value] || STORAGE_STRATEGIES.BACKEND_STREAM;
 
     disposeFsSession();
     resetBackendProgressTracking();
@@ -723,7 +727,7 @@ const startUpload = async () => {
       },
     });
 
-    if (uploadMethod.value === "direct") {
+    if (uploadMethod.value === "stream") {
       try {
         uppyInstance.value.getFiles().forEach((file) => ensureUploadIdForFile(file));
       } catch {}

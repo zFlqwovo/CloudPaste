@@ -130,13 +130,13 @@ export class S3UploadOperations {
   }
 
   /**
-   * 非流式上传（一次性读取全部数据）
+   * 表单上传（一次性读取全部数据）
    * @param {string} s3SubPath - S3子路径
    * @param {File|Blob|Uint8Array|ArrayBuffer|Buffer|string} data - 完整数据源
    * @param {Object} options - 选项参数
    * @returns {Promise<Object>} 上传结果
    */
-  async uploadNonStream(s3SubPath, data, options = {}) {
+  async uploadForm(s3SubPath, data, options = {}) {
     const { mount, db, filename, contentType } = options;
 
     return handleFsError(
@@ -176,7 +176,7 @@ export class S3UploadOperations {
           body = typeof Buffer !== "undefined" ? Buffer.from(data) : new TextEncoder().encode(data);
           size = body.length ?? body.byteLength ?? 0;
         } else {
-          throw new ValidationError("不支持的非流式上传数据类型");
+          throw new ValidationError("不支持的表单上传数据类型");
         }
 
         const putParams = {
@@ -200,18 +200,18 @@ export class S3UploadOperations {
 
         const s3Url = buildS3Url(this.config, finalS3Path);
 
-        console.log(`S3 非流直传成功: ${finalS3Path}`);
+        console.log(`S3 表单上传成功: ${finalS3Path}`);
         return {
           success: true,
-          message: "S3_NON_STREAM_DIRECT",
+          message: "S3_FORM_UPLOAD",
           storagePath: finalS3Path,
           publicUrl: s3Url,
           etag: result.ETag ? result.ETag.replace(/\"/g, "") : null,
           contentType: effectiveContentType,
         };
       },
-      "直接上传",
-      "直接上传失败"
+      "表单上传",
+      "表单上传失败"
     );
   }
 

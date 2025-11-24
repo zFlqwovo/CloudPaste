@@ -331,7 +331,7 @@ useUppyPaste({
 
 // 响应式数据
 const uppyContainerRef = ref(null);
-const uploadMode = ref("presign");
+const uploadMode = ref("presigned");
 const canUsePresignMode = ref(true);
 const errorMessage = ref("");
 const isUploading = ref(false);
@@ -376,18 +376,25 @@ const currentStorageConfig = computed(() => {
 const uploadModes = computed(() => {
   const modes = [
     {
-      value: 'presign',
-      label: t('file.uploadModes.presign'),
-      modeLabel: t('file.uploadModes.presignMode'),
-      tooltip: t('file.uploadModes.presignTooltip'),
+      value: "presigned",
+      label: t("file.uploadModes.presigned"),
+      modeLabel: t("file.uploadModes.presignedMode"),
+      tooltip: t("file.uploadModes.presignedTooltip"),
       disabled: !canUsePresignMode.value || isUploading.value,
-      disabledHint: !canUsePresignMode.value ? t('file.uploadModes.presignOnly') : '',
+      disabledHint: !canUsePresignMode.value ? t("file.uploadModes.presignedOnly") : "",
     },
     {
-      value: 'direct',
-      label: t('file.uploadModes.direct'),
-      modeLabel: t('file.uploadModes.directMode'),
-      tooltip: t('file.uploadModes.directTooltip'),
+      value: "stream",
+      label: "流式上传",
+      modeLabel: "流式模式",
+      tooltip: "通过后端流式中转上传",
+      disabled: isUploading.value,
+    },
+    {
+      value: "form",
+      label: "表单上传",
+      modeLabel: "表单模式",
+      tooltip: "使用表单(multipart/form-data)上传",
       disabled: isUploading.value,
     },
   ];
@@ -413,8 +420,8 @@ watch(currentStorageConfig, (config) => {
   }
 
   // 如果当前模式不可用，自动切换
-  if (!canUsePresignMode.value && uploadMode.value === "presign") {
-    uploadMode.value = "direct";
+  if (!canUsePresignMode.value && uploadMode.value === "presigned") {
+    uploadMode.value = "stream";
   }
 });
 
@@ -437,7 +444,7 @@ const {
   startBackendProgressPolling,
 } = useUppyBackendProgress({
   uppy: uppyInstance,
-  isDirectMode: () => uploadMode.value === "direct",
+  isDirectMode: () => uploadMode.value === "stream",
 });
 
 // 加载最大上传大小
@@ -551,8 +558,8 @@ const formatStorageOptionLabel = (config) => {
  * 存储配置变更处理
  */
 const onStorageConfigChange = () => {
-  if (!canUsePresignMode.value && uploadMode.value === "presign") {
-    uploadMode.value = "direct";
+  if (!canUsePresignMode.value && uploadMode.value === "presigned") {
+    uploadMode.value = "stream";
   }
 };
 
@@ -694,15 +701,87 @@ const startUpload = async () => {
 
     const basePayload = buildPayloadForFile(formData);
 
-    // 根据uploadMode选择上传方式
-    const sessionCreator = uploadMode.value === "presign" && canUsePresignMode.value
-      ? createShareSession
-      : createDirectShareSession;
+    let session;
+    if (uploadMode.value === "presigned" && canUsePresignMode.value) {
+      // 预签名模式：沿用现有单请求直传 + commit 流程
+      session = createShareSession({
+        payload: {
+          ...basePayload,
+        },
+        uppy: uppyInstance.value,
+        events: {
+          onProgress: (progress) => {
+            if (progress) {
+              updateBrowserProgressState(progress);
+            }
+          },
+          onError: ({ file, error }) => {
+            console.error("[UppyShareUploader] 上传错误:", file?.name, error);
+            errorMessage.value = error?.message || t("file.messages.uploadFailed");
+          },
+          onComplete: (result) => {
+            console.log("[UppyShareUploader] 上传完成:", result);
+            const failedDescriptors = (result?.failed || []).map((item) =>
+              buildErrorDescriptor(item?.error || new Error(t("file.messages.uploadFailed")))
+            );
+            const uploadResults = result?.successful || [];
+            pendingShareItems.value = uploadResults;
+            const normalizedShareResults = extractShareResults(uploadResults);
+            const summary = summarizeUploadResults({
+              errors: failedDescriptors,
+              uploadResults,
+              totalFiles: uppyInstance.value.getFiles().length,
+            });
 
-    const session = sessionCreator({
-      payload: basePayload,
-      uppy: uppyInstance.value,
-      events: {
+            if (normalizedShareResults.length) {
+              emit("share-results", normalizedShareResults);
+              resetShareCaches();
+            } else if (pendingShareItems.value.length) {
+              console.debug("[UppyShareUploader] waiting for share-record events", pendingShareItems.value.map((item) => item.id));
+            }
+
+            flushPendingShareResults();
+
+            if (summary) {
+              if (summary.kind === "error") {
+                errorMessage.value = summary.message;
+                emit("upload-error", new Error(summary.message));
+              } else if (summary.kind === "success") {
+                emit("upload-success", uploadResults);
+                emit("refresh-files");
+                formData.slug = "";
+                formData.remark = "";
+                formData.password = "";
+
+                // 清理成功的文件
+                setTimeout(() => {
+                  if (uppyInstance.value) {
+                    uppyInstance.value.clear();
+                  }
+                }, 3000);
+              }
+            }
+
+            disposeShareSession();
+          },
+          onShareRecord: ({ file, shareRecord }) => {
+            console.debug("[UppyShareUploader] share-record event", file?.id, shareRecord);
+            if (file?.id && shareRecord) {
+              shareRecordMap.set(file.id, shareRecord);
+            }
+            flushPendingShareResults();
+          },
+        },
+      });
+    } else {
+      // 直传分享模式：根据 uploadMode 决定流式 / 表单
+      session = createDirectShareSession({
+        payload: {
+          ...basePayload,
+        },
+        shareMode: uploadMode.value,
+        uppy: uppyInstance.value,
+        events: {
         onProgress: (progress) => {
           if (progress) {
             updateBrowserProgressState(progress);
@@ -764,10 +843,10 @@ const startUpload = async () => {
           }
           flushPendingShareResults();
         },
-      },
-    });
+      }});
+    }
 
-    if (uploadMode.value === "direct") {
+    if (uploadMode.value === "stream") {
       try {
         uppyInstance.value.getFiles().forEach((file) => ensureUploadIdForFile(file));
       } catch {}

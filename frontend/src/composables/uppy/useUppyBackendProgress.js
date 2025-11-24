@@ -1,21 +1,21 @@
 /**
- * useUppyBackendProgress - 基于後端進度的 Uppy 進度修正 Composable
+ * useUppyBackendProgress - 基于后端进度的 Uppy 进度修正 Composable
  *
- * 封裝以下通用能力：
- * - 為每個 Uppy 文件生成並維護 upload_id（寫入 file.meta.upload_id）
- * - 跨前端/後端融合進度：結合瀏覽器上報與 /api/upload/progress 返回值
- * - 直接更新 Uppy 文件狀態，驅動 Dashboard 進度條刷新
+ * 封装以下通用能力：
+ * - 为每个 Uppy 文件生成并维护 upload_id（写入 file.meta.upload_id）
+ * - 跨前端/后端融合进度：结合浏览器上报与 /api/upload/progress 返回值
+ * - 直接更新 Uppy 文件状态，驱动 Dashboard 进度条刷新
  *
- * 調用方需要提供：
+ * 调用方需要提供：
  * - uppy: Ref<Uppy | null>
- * - isDirectMode: () => boolean，用於判斷當前是否啟用直傳模式
+ * - isDirectMode: () => boolean，用于判断当前是否启用直传模式
  */
 import { getUploadProgress } from "@/api/services/systemService.js";
 
 export function useUppyBackendProgress(options) {
   const { uppy, isDirectMode } = options;
 
-  // 後端進度狀態與輪詢定時器
+  // 后端进度状态与轮询定时器
   const backendProgressState = new Map();
   const backendProgressTimers = new Map();
 
@@ -27,7 +27,7 @@ export function useUppyBackendProgress(options) {
   };
 
   /**
-   * 確保文件擁有 upload_id，並回傳最終的 upload_id
+   * 确保文件拥有 upload_id，并回传最终的 upload_id
    */
   const ensureUploadIdForFile = (file) => {
     if (!uppy?.value || !file?.id) return null;
@@ -42,13 +42,13 @@ export function useUppyBackendProgress(options) {
         upload_id: uploadId,
       });
     } catch (error) {
-      console.warn("[useUppyBackendProgress] 設置 upload_id 失敗", error);
+      console.warn("[useUppyBackendProgress] 设置 upload_id 失败", error);
     }
     return uploadId;
   };
 
   /**
-   * 重置後端進度相關狀態
+   * 重置后端进度相关状态
    */
   const resetBackendProgressTracking = () => {
     backendProgressTimers.forEach((timer) => clearInterval(timer));
@@ -57,7 +57,8 @@ export function useUppyBackendProgress(options) {
   };
 
   /**
-   * 更新瀏覽器本地的進度快照，用於與後端進度融合
+   * 更新浏览器本地的进度快照，用于与后端进度融合
+   * 后端尚未记录任何进度时（例如返回「未找到上传进度记录」的默认结构），不视为有效的远端进度，保持 hasRemote=false，持续抑制本地进度条。
    */
   const updateBrowserProgressState = ({ file, fileId, bytesUploaded, bytesTotal }) => {
     if (!fileId) return;
@@ -66,13 +67,12 @@ export function useUppyBackendProgress(options) {
     const next = {
       ...prev,
       file: file || prev.file,
-      browserBytesUploaded:
-        typeof bytesUploaded === "number" ? bytesUploaded : prev.browserBytesUploaded || 0,
-      browserBytesTotal:
-        typeof bytesTotal === "number" ? bytesTotal : prev.browserBytesTotal || file?.size || 0,
+      browserBytesUploaded: typeof bytesUploaded === "number" ? bytesUploaded : prev.browserBytesUploaded || 0,
+      browserBytesTotal: typeof bytesTotal === "number" ? bytesTotal : prev.browserBytesTotal || file?.size || 0,
       remoteBytesLoaded: prev.remoteBytesLoaded || 0,
       remoteBytesTotal: prev.remoteBytesTotal || 0,
       currentBytes: prev.currentBytes || 0,
+      hasRemote: prev.hasRemote || false,
     };
 
     if (next.browserBytesUploaded > (next.currentBytes || 0)) {
@@ -80,11 +80,34 @@ export function useUppyBackendProgress(options) {
     }
 
     backendProgressState.set(id, next);
+
+    // 仅在直传模式且尚未取得任何后端进度时，覆写 Uppy 的本地进度，避免进度条先到 100%
+    if (uppy?.value && isDirectMode?.() && !next.hasRemote) {
+      try {
+        const currentFile = file || uppy.value.getFile(id);
+        if (currentFile) {
+          const prevProgress = currentFile.progress || {};
+          const total = next.browserBytesTotal || currentFile.size || 0;
+          uppy.value.setFileState(currentFile.id, {
+            progress: {
+              ...prevProgress,
+              bytesUploaded: 0,
+              bytesTotal: total,
+              percentage: 0,
+              uploadStarted: prevProgress.uploadStarted || Date.now(),
+              uploadComplete: false,
+            },
+          });
+        }
+      } catch (error) {
+        console.warn("[useUppyBackendProgress] 抑制本地上传进度失败", error);
+      }
+    }
   };
 
   /**
-   * 啟動後端進度輪詢並修正 Uppy 進度
-   * 僅在 isDirectMode() 為 true 時工作
+   * 启动后端进度轮询并修正 Uppy 进度
+   * 仅在 isDirectMode() 为 true 时工作
    */
   const startBackendProgressPolling = () => {
     if (!uppy?.value || !isDirectMode?.()) return;
@@ -102,6 +125,29 @@ export function useUppyBackendProgress(options) {
           const resp = await getUploadProgress(uploadId);
           const payload = resp?.data;
           if (!payload) return;
+
+          // 後端尚未記錄任何進度時（例如返回「未找到上传进度记录」的默認結構），
+          // 不視為有效的遠端進度，保持 hasRemote=false，持續抑制本地進度條。
+          const noRemoteRecord =
+            (payload.total == null || typeof payload.total !== "number") &&
+            !payload.completed &&
+            (!payload.loaded || payload.loaded === 0) &&
+            !payload.path &&
+            !payload.storageType;
+          if (noRemoteRecord) {
+            const prev = backendProgressState.get(fileId) || {};
+            backendProgressState.set(fileId, {
+              ...prev,
+              file,
+              remoteBytesLoaded: 0,
+              remoteBytesTotal: 0,
+              browserBytesTotal: prev.browserBytesTotal || file.size || 0,
+              browserBytesUploaded: prev.browserBytesUploaded || 0,
+              currentBytes: prev.currentBytes || 0,
+              hasRemote: false,
+            });
+            return;
+          }
 
           const totalFromServer = typeof payload.total === "number" ? payload.total : null;
           const loadedFromServer = typeof payload.loaded === "number" ? payload.loaded : 0;
@@ -135,7 +181,7 @@ export function useUppyBackendProgress(options) {
             });
             uppy.value.emit("upload-progress", file, { bytesUploaded, bytesTotal });
           } catch (error) {
-            console.warn("[useUppyBackendProgress] 注入後端上傳進度失敗", error);
+            console.warn("[useUppyBackendProgress] 注入后端上传进度失败", error);
           }
 
           backendProgressState.set(fileId, {
@@ -146,6 +192,7 @@ export function useUppyBackendProgress(options) {
             browserBytesTotal: bytesTotal,
             browserBytesUploaded: prev.browserBytesUploaded || 0,
             currentBytes: bytesUploaded,
+            hasRemote: true,
           });
 
           if (completed || (bytesTotal && loadedFromServer >= bytesTotal)) {
@@ -154,7 +201,7 @@ export function useUppyBackendProgress(options) {
             backendProgressTimers.delete(fileId);
           }
         } catch (error) {
-          console.warn("[useUppyBackendProgress] 查詢後端上傳進度失敗", error);
+          console.warn("[useUppyBackendProgress] 查询后端上传进度失败", error);
         }
       };
 

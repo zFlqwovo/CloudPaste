@@ -75,6 +75,73 @@ router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
   return jsonOk(c, result, "文件上传成功");
 });
 
+// 流式分享上传：通过 PUT /api/share/upload 使用原始 body 直传
+router.put("/api/share/upload", requireFilesCreate, async (c) => {
+  const db = c.env.DB;
+  const encryptionSecret = getEncryptionSecret(c);
+  const repositoryFactory = useRepositories(c);
+
+  const principalInfo = resolvePrincipal(c, { allowedTypes: [UserType.ADMIN, UserType.API_KEY] });
+  const { type: userType, userId, apiKeyInfo } = principalInfo;
+  const userIdOrInfo = userType === UserType.ADMIN ? userId : apiKeyInfo;
+
+  const bodyStream = c.req.raw?.body;
+  if (!bodyStream) {
+    throw new ValidationError("请求体为空");
+  }
+
+  const declaredLengthHeader = c.req.header("content-length");
+  const declaredLength = declaredLengthHeader ? parseInt(declaredLengthHeader, 10) : 0;
+
+  const filenameHeader = c.req.header("x-share-filename");
+  if (!filenameHeader) {
+    throw new ValidationError("缺少 x-share-filename 头部");
+  }
+
+  let options = {};
+  const optionsHeader = c.req.header("x-share-options");
+  if (optionsHeader) {
+    try {
+      const decoded = Buffer.from(optionsHeader, "base64").toString("utf8");
+      options = JSON.parse(decoded) || {};
+    } catch {
+      options = {};
+    }
+  }
+
+  const storageConfigId = options.storage_config_id || null;
+  const uploadId = options.upload_id || null;
+
+  const shareParams = {
+    storage_config_id: storageConfigId,
+    path: options.path || null,
+    slug: options.slug || null,
+    remark: options.remark || "",
+    password: options.password || null,
+    expiresIn: Number(options.expires_in || 0),
+    maxViews: Number(options.max_views || 0),
+    override: false,
+    useProxy: options.use_proxy !== undefined ? !!options.use_proxy : undefined,
+    originalFilename: !!options.original_filename,
+    contentType: c.req.header("content-type") || undefined,
+    request: c.req.raw,
+    uploadId: uploadId || null,
+  };
+
+  const shareService = new FileShareService(db, encryptionSecret, repositoryFactory);
+
+  const result = await shareService.uploadDirectToStorageAndShare(
+    filenameHeader,
+    bodyStream,
+    declaredLength,
+    userIdOrInfo,
+    userType,
+    shareParams
+  );
+
+  return jsonOk(c, result, "文件上传成功");
+});
+
 // 通用分享上传：通过 ObjectStore + File，多存储通用
 router.post("/api/share/upload", requireFilesCreate, parseFormData, async (c) => {
   const db = c.env.DB;

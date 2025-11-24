@@ -190,7 +190,7 @@ export function useUploaderClient() {
     });
   };
 
-  const createDirectShareUploadSession = ({ payload, events, uppyOptions, uppy } = {}) => {
+  const createDirectShareUploadSession = ({ payload, events, uppyOptions, uppy, shareMode } = {}) => {
     return createDriverSession({
       payload,
       storageConfigId: payload?.storage_config_id,
@@ -205,6 +205,7 @@ export function useUploaderClient() {
         impl(uppyInstance, {
           payload: payloadRef,
           onShareRecord: lifecycleEvents.onShareRecord,
+          shareMode,
         });
       },
     });

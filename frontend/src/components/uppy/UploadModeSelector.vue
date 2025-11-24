@@ -126,12 +126,12 @@ const currentModeClass = computed(() => {
   // 支持自定义样式类
   if (mode.badgeClass) return mode.badgeClass;
 
-  // 默认样式：presign绿色，direct蓝色，其他琥珀色
-  if (mode.value === 'presign' || mode.value === 'presigned') {
+  // 默认样式：presigned 绿色，stream/form 蓝色，其它（如 multipart）琥珀色
+  if (mode.value === 'presigned') {
     return props.darkMode
       ? 'bg-green-900/30 text-green-300'
       : 'bg-green-100 text-green-700';
-  } else if (mode.value === 'direct') {
+  } else if (mode.value === 'stream' || mode.value === 'form') {
     return props.darkMode
       ? 'bg-blue-900/30 text-blue-300'
       : 'bg-blue-100 text-blue-700';

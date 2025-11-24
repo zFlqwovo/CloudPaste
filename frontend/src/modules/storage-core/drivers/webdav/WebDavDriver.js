@@ -14,11 +14,14 @@ export class WebDavDriver {
     this.config = config;
     this.capabilities = createCapabilities({
       share: {
-        direct: true,
+        backendStream: true,
+        backendForm: true,
+        presigned: false,
         url: false,
       },
       fs: {
-        backendDirect: true,
+        backendStream: true,
+        backendForm: true,
         presignedSingle: false,
         multipart: false,
       },
@@ -47,9 +50,10 @@ export class WebDavDriver {
   /**
    * WebDAV 分享上传：通过 Uppy + XHRUpload 调用后端 /api/share/upload
    * - 与 FS/Share 其他驱动保持一致：统一走 Uppy 管线
+   * - shareMode: 'stream' | 'form'（前端内部使用）
    * - 后端负责写入存储并创建分享记录，响应中返回 share 记录
    */
-  applyShareUploader(uppy, { payload, onShareRecord } = {}) {
+  applyShareUploader(uppy, { payload, onShareRecord, shareMode } = {}) {
     if (!uppy) {
       throw new Error("applyShareUploader 需要提供 Uppy 实例");
     }
@@ -71,32 +75,72 @@ export class WebDavDriver {
       original_filename: payload?.original_filename,
     };
 
-    const headers = buildAuthHeadersForRequest({});
+    const authHeaders = buildAuthHeadersForRequest({});
     try {
       uppy.setMeta(baseMeta);
     } catch {}
 
-    uppy.use(XHRUpload, {
-      id: "WebDavShareUpload",
-      endpoint: getFullApiUrl("/share/upload"),
-      method: "POST",
-      formData: true,
-      fieldName: "file",
-      limit: 3,
-      allowedMetaFields: [
-        "storage_config_id",
-        "path",
-        "slug",
-        "remark",
-        "password",
-        "expires_in",
-        "max_views",
-        "use_proxy",
-        "original_filename",
-        "upload_id",
-      ],
-      headers,
-    });
+    const mode = (shareMode || "stream").toLowerCase();
+
+    if (mode === "stream") {
+      // 流式分享：PUT /share/upload + 原始 body，参数通过头部传递
+      uppy.use(XHRUpload, {
+        id: "WebDavShareUploadStream",
+        endpoint: getFullApiUrl("/share/upload"),
+        method: "PUT",
+        formData: false,
+        limit: 3,
+        headers: (file) => {
+          const meta = file.meta || {};
+          const options = {
+            storage_config_id: meta.storage_config_id,
+            path: meta.path,
+            slug: meta.slug,
+            remark: meta.remark,
+            password: meta.password,
+            expires_in: meta.expires_in,
+            max_views: meta.max_views,
+            use_proxy: meta.use_proxy,
+            original_filename: meta.original_filename,
+            upload_id: meta.upload_id,
+          };
+          let encoded = "";
+          try {
+            encoded = btoa(JSON.stringify(options));
+          } catch {
+            encoded = "";
+          }
+          return {
+            ...authHeaders,
+            "x-share-filename": meta.name || file.name,
+            ...(encoded ? { "x-share-options": encoded } : {}),
+          };
+        },
+      });
+    } else {
+      // 表单分享：POST /share/upload multipart/form-data
+      uppy.use(XHRUpload, {
+        id: "WebDavShareUpload",
+        endpoint: getFullApiUrl("/share/upload"),
+        method: "POST",
+        formData: true,
+        fieldName: "file",
+        limit: 3,
+        allowedMetaFields: [
+          "storage_config_id",
+          "path",
+          "slug",
+          "remark",
+          "password",
+          "expires_in",
+          "max_views",
+          "use_proxy",
+          "original_filename",
+          "upload_id",
+        ],
+        headers: authHeaders,
+      });
+    }
 
     // 在上传前同步用户修改的文件名
     uppy.on("upload", () => {
@@ -141,9 +185,11 @@ export class WebDavDriver {
   }
 
   /**
-   * WebDAV 仅支持后端直传：通过 /fs/upload 由后端完成 PUT
+   * WebDAV FS 上传：
+   * - 流式模式：通过 PUT /fs/upload 使用原始 body 直传（推荐）
+   * - 表单模式：通过 POST /fs/upload multipart/form-data（兼容模式）
    */
-  applyFsUploader(uppy, { path } = {}) {
+  applyFsUploader(uppy, { strategy, path } = {}) {
     if (!uppy) {
       throw new Error("applyFsUploader 需要提供 Uppy 实例");
     }
@@ -153,16 +199,50 @@ export class WebDavDriver {
       uppy.setMeta({ path: path || "/", use_multipart: "false" });
     } catch {}
 
-    uppy.use(XHRUpload, {
-      id: "WebDavBackendDirect",
-      endpoint: getFullApiUrl("/fs/upload"),
-      method: "POST",
-      formData: true,
-      fieldName: "file",
-      limit: 3,
-      allowedMetaFields: ["path", "use_multipart", "upload_id"],
-      headers,
-    });
+    // 表单模式：保留现有 multipart/form-data 行为
+    if (strategy === STORAGE_STRATEGIES.BACKEND_FORM) {
+      uppy.use(XHRUpload, {
+        id: "WebDavBackendForm",
+        endpoint: getFullApiUrl("/fs/upload"),
+        method: "POST",
+        formData: true,
+        fieldName: "file",
+        limit: 3,
+        allowedMetaFields: ["path", "use_multipart", "upload_id"],
+        headers,
+      });
+    } else {
+      // 流式模式：使用 PUT + 原始 body，参数通过 query/header 传递
+      uppy.use(XHRUpload, {
+        id: "WebDavBackendStream",
+        endpoint: (file) => {
+          const meta = file.meta || {};
+          const basePath = meta.path || path || "/";
+          const uploadId = meta.upload_id;
+          const params = new URLSearchParams();
+          params.set("path", basePath);
+          if (uploadId) {
+            params.set("upload_id", uploadId);
+          }
+          return `${getFullApiUrl("/fs/upload")}?${params.toString()}`;
+        },
+        method: "PUT",
+        formData: false,
+        limit: 3,
+        headers: (file) => {
+          const meta = file.meta || {};
+          const uploadOptions = {
+            overwrite: !!meta.overwrite,
+            originalFilename: !!meta.original_filename,
+          };
+          return {
+            ...headers,
+            "x-fs-filename": meta.name || file.name,
+            "x-fs-options": btoa(JSON.stringify(uploadOptions)),
+          };
+        },
+      });
+    }
 
     // 在上传前同步用户修改的文件名
     uppy.on("upload", () => {
@@ -176,7 +256,7 @@ export class WebDavDriver {
 
     return {
       adapter: null,
-      mode: STORAGE_STRATEGIES.S3_BACKEND_DIRECT,
+      mode: strategy || null,
     };
   }
 }
