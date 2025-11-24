@@ -333,6 +333,7 @@ export class WebDavStorageDriver extends BaseDriver {
     this._ensureInitialized();
     const davPath = this._resolveTargetDavPath(options.subPath, path, fileOrData, options);
     const { body, length, contentType } = await this._normalizeBody(fileOrData, options);
+    const progressId = options.uploadId || davPath;
 
     try {
       await this._ensureParentDirectories(davPath);
@@ -349,12 +350,26 @@ export class WebDavStorageDriver extends BaseDriver {
             if (!total || loaded <= 0) return;
             const percentage = ((loaded / total) * 100).toFixed(1);
             console.log(`WebDAV 非流直传进度: ${loaded}/${total} (${percentage}%) -> ${davPath}`);
+
+            // 同步更新通用上传进度存储，與流式上传保持一致
+            try {
+              updateUploadProgress(progressId, {
+                loaded,
+                total,
+                path: davPath,
+                storageType: "WEBDAV",
+              });
+            } catch {}
           } catch {
             // 进度日志失败时静默忽略，避免影响上传主流程
           }
         },
       });
       console.log(`WebDAV 非流直传成功: ${davPath}`);
+      try {
+        completeUploadProgress(progressId);
+      } catch {}
+
       return { success: true, storagePath: davPath, message: "WEBDAV_NON_STREAM_UPLOAD" };
     } catch (error) {
       throw this._wrapError(error, "上传文件失败", this._statusFromError(error));

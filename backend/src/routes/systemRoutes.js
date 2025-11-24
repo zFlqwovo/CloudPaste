@@ -37,6 +37,20 @@ systemRoutes.get("/api/upload/progress", async (c) => {
 
   const progress = getUploadProgress(id);
 
+  // 简单记录每次进度查询的结果，便于线上排查上传进度问题
+  try {
+    console.log("[UploadProgress] /api/upload/progress", {
+      id,
+      found: !!progress,
+      loaded: progress?.loaded ?? 0,
+      total: progress?.total ?? null,
+      completed: progress?.completed ?? false,
+      path: progress?.path ?? null,
+      storageType: progress?.storageType ?? null,
+      updatedAt: progress?.updatedAt ?? null,
+    });
+  } catch {}
+
   if (!progress) {
     // 未找到记录时也返回成功，由前端自行决定如何处理
     return jsonOk(
