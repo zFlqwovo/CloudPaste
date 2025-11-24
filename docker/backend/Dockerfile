@@ -50,10 +50,8 @@ COPY backend/ ./
 RUN mkdir -p /data
 
 # 设置环境变量
-# ERROR: 0,  WARN: 1,  INFO: 2,  DEBUG: 3,
 ENV NODE_ENV=production
 ENV LOG_LEVEL=3
-ENV RUNTIME_ENV=docker
 ENV DATA_DIR=/data
 ENV PORT=8787
 # 注意：这个密钥应该在运行时通过环境变量传入，这里只是设置默认值
@@ -63,4 +61,4 @@ ENV ENCRYPTION_SECRET=PLEASE_CHANGE_THIS_IN_PRODUCTION
 EXPOSE 8787
 
 # 启动命令
-CMD ["node", "--expose-gc", "server.js"]
+CMD ["node", "--expose-gc", "unified-entry.js"]

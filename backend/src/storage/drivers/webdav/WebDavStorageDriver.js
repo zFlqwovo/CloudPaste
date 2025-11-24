@@ -15,6 +15,7 @@ import { createClient } from "webdav";
 import { Buffer } from "buffer";
 import https from "https";
 import { updateUploadProgress, completeUploadProgress } from "../../utils/UploadProgressTracker.js";
+import { isNodeJSEnvironment } from "../../../utils/environmentUtils.js";
 
 export class WebDavStorageDriver extends BaseDriver {
   constructor(config, encryptionSecret) {
@@ -311,11 +312,18 @@ export class WebDavStorageDriver extends BaseDriver {
 
     try {
       await this._ensureParentDirectories(davPath);
-      const resp = await fetch(url, {
+      /** @type {RequestInit} */
+      const init = {
         method: "PUT",
         headers,
         body,
-      });
+      };
+      // Node.js 原生 fetch 在使用可读流作为 body 时必须显式设置 duplex
+      if (isNodeJSEnvironment() && body != null) {
+        // @ts-ignore
+        init.duplex = "half";
+      }
+      const resp = await fetch(url, init);
       if (!resp.ok && resp.status !== 201 && resp.status !== 204) {
         throw this._wrapError(new Error(`HTTP ${resp.status}`), "上传文件失败", resp.status);
       }
@@ -333,7 +341,6 @@ export class WebDavStorageDriver extends BaseDriver {
     this._ensureInitialized();
     const davPath = this._resolveTargetDavPath(options.subPath, path, fileOrData, options);
     const { body, length, contentType } = await this._normalizeBody(fileOrData, options);
-    const progressId = options.uploadId || davPath;
 
     try {
       await this._ensureParentDirectories(davPath);
@@ -341,34 +348,8 @@ export class WebDavStorageDriver extends BaseDriver {
         overwrite: true,
         contentLength: length,
         contentType,
-        // 尝试利用 webdav 客户端在浏览器/axios 环境下提供的上传进度回调
-        // 在 Node/Workers 环境可能不会触发，但即便如此也不会影响正常上传
-        onUploadProgress: (progress) => {
-          try {
-            const loaded = progress?.loaded ?? 0;
-            const total = progress?.total ?? length ?? 0;
-            if (!total || loaded <= 0) return;
-            const percentage = ((loaded / total) * 100).toFixed(1);
-            console.log(`WebDAV 表单直传进度: ${loaded}/${total} (${percentage}%) -> ${davPath}`);
-
-            // 同步更新通用上传进度存储，與流式上传保持一致
-            try {
-              updateUploadProgress(progressId, {
-                loaded,
-                total,
-                path: davPath,
-                storageType: "WEBDAV",
-              });
-            } catch {}
-          } catch {
-            // 进度日志失败时静默忽略，避免影响上传主流程
-          }
-        },
       });
       console.log(`WebDAV 表单直传成功: ${davPath}`);
-      try {
-        completeUploadProgress(progressId);
-      } catch {}
 
       return { success: true, storagePath: davPath, message: "WEBDAV_FORM_UPLOAD" };
     } catch (error) {

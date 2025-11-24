@@ -12,7 +12,7 @@ import { updateMountLastUsed } from "../../../fs/utils/MountResolver.js";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
-import { getEnvironmentOptimizedUploadConfig, convertStreamForAWSCompatibility } from "../../../../utils/environmentUtils.js";
+import { getEnvironmentOptimizedUploadConfig, isNodeJSEnvironment } from "../../../../utils/environmentUtils.js";
 import { updateUploadProgress } from "../../../utils/UploadProgressTracker.js";
 
 export class S3UploadOperations {
@@ -55,17 +55,36 @@ export class S3UploadOperations {
         let etag;
         const progressId = options.uploadId || finalS3Path;
 
-        // 2. 统一使用 Upload（lib-storage），内部自动选择单请求 / 多分片
+        // 2. 构造适配当前环境的 Body，并统一使用 Upload（lib-storage）
         const { Upload } = await import("@aws-sdk/lib-storage");
         const uploadConfig = getEnvironmentOptimizedUploadConfig();
-        console.log(`S3 流式分片 - 环境: ${uploadConfig.environment}, 分片: ${uploadConfig.partSize / 1024 / 1024}MB, 并发: ${uploadConfig.queueSize}`);
+        console.log(
+          `S3 流式分片 - 环境: ${uploadConfig.environment}, 分片: ${uploadConfig.partSize / 1024 / 1024}MB, 并发: ${uploadConfig.queueSize}`
+        );
+
+        /** @type {any} */
+        let bodyForUpload = stream;
+
+        // 在 Node.js/Docker 环境中，如果收到的是 Web ReadableStream，
+        // 使用 Readable.fromWeb 转换为 Node.js Readable 流式。
+        if (isNodeJSEnvironment() && stream && typeof stream.getReader === "function") {
+          try {
+            const { Readable } = await import("stream");
+            if (typeof Readable.fromWeb === "function") {
+              bodyForUpload = Readable.fromWeb(stream);
+            }
+          } catch (e) {
+            console.warn("S3 流式上传: Readable.fromWeb 转换失败，回退为原始流:", e?.message || e);
+            bodyForUpload = stream;
+          }
+        }
 
         const upload = new Upload({
           client: this.s3Client,
           params: {
             Bucket: this.config.bucket_name,
             Key: finalS3Path,
-            Body: stream,
+            Body: bodyForUpload,
             ContentType: contentType,
           },
           queueSize: uploadConfig.queueSize,
