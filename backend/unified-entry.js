@@ -48,17 +48,17 @@ export default {
     } catch (error) {
       console.error("处理请求时发生错误:", error);
       return new Response(
-          JSON.stringify({
-            code: ApiStatus.INTERNAL_ERROR,
-            message: "服务器内部错误",
-            error: error.message,
-            success: false,
-            data: null,
-          }),
-          {
-            status: ApiStatus.INTERNAL_ERROR,
-            headers: { "Content-Type": "application/json" },
-          }
+        JSON.stringify({
+          code: ApiStatus.INTERNAL_ERROR,
+          message: "服务器内部错误",
+          error: error.message,
+          success: false,
+          data: null,
+        }),
+        {
+          status: ApiStatus.INTERNAL_ERROR,
+          headers: { "Content-Type": "application/json" },
+        }
       );
     }
   },
@@ -100,16 +100,16 @@ if (!isCloudflareWorkers) {
 
     // 使用 @hono/node-server 启动 Node 服务器
     serve(
-        {
-          fetch: (request) => app.fetch(request, bindings),
-          port,
-          // 保持默认的 overrideGlobalObjects/autoCleanupIncoming 配置
-        },
-        (info) => {
-          console.log(`CloudPaste 后端服务运行在 http://0.0.0.0:${info.port}`);
-          // 启动 Docker/Node 环境内存监控（包括容器内存检测）
-          startMemoryMonitoring();
-        }
+      {
+        fetch: (request) => app.fetch(request, bindings),
+        port,
+        // 保持默认的 overrideGlobalObjects/autoCleanupIncoming 配置
+      },
+      (info) => {
+        console.log(`CloudPaste 后端服务运行在 http://0.0.0.0:${info.port}`);
+        // 启动 Docker/Node 环境内存监控（包括容器内存检测）
+        startMemoryMonitoring();
+      }
     );
   };
 
@@ -168,7 +168,7 @@ function startMemoryMonitoring(interval = 1200000) {
 
     if (containerMem) {
       memoryInfo.container = `${Math.round(containerMem.usage / 1024 / 1024)} MB / ${Math.round(
-          containerMem.limit / 1024 / 1024
+        containerMem.limit / 1024 / 1024
       )} MB`;
       memoryInfo.containerUsage = `${Math.round((containerMem.usage / containerMem.limit) * 100)}%`;
     }
@@ -183,9 +183,9 @@ function startMemoryMonitoring(interval = 1200000) {
     } else {
       // 非容器环境回退到进程内存判断
       shouldGC =
-          mem.heapUsed / mem.heapTotal > 0.85 ||
-          mem.external > 50 * 1024 * 1024 ||
-          (mem.arrayBuffers && mem.arrayBuffers > 50 * 1024 * 1024);
+        mem.heapUsed / mem.heapTotal > 0.85 ||
+        mem.external > 50 * 1024 * 1024 ||
+        (mem.arrayBuffers && mem.arrayBuffers > 50 * 1024 * 1024);
     }
 
     if (global.gc && shouldGC) {

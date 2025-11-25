@@ -206,8 +206,8 @@ export class S3StorageDriver extends BaseDriver {
     // 规范化S3子路径
     const s3SubPath = normalizeS3SubPath(subPath, false);
 
-    // 更新挂载点的最后使用时间
-    if (db && mount.id) {
+    // 更新挂载点的最后使用时间（仅在有挂载点上下文时）
+    if (db && mount && mount.id) {
       await updateMountLastUsed(db, mount.id);
     }
 

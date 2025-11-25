@@ -1025,8 +1025,10 @@ export class S3BatchOperations {
         // 更新父目录的修改时间
         await updateParentDirectoriesModifiedTime(this.s3Client, s3Config.bucket_name, fullOldS3Path, rootPrefix);
 
-        // 更新挂载点的最后使用时间
-        await updateMountLastUsed(db, mount.id);
+        // 更新挂载点的最后使用时间（仅在有挂载点上下文时）
+        if (db && mount && mount.id) {
+          await updateMountLastUsed(db, mount.id);
+        }
 
 
         return {

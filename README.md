@@ -128,10 +128,10 @@ Before starting deployment, please ensure you have prepared the following:
 - [ ] If using R2: Activate **Cloudflare R2** service and create a bucket (requires payment method)
 - [ ] If using Vercel: Register for a [Vercel](https://vercel.com) account
 - [ ] Configuration information for other S3 storage services:
-   - `S3_ACCESS_KEY_ID`
-   - `S3_SECRET_ACCESS_KEY`
-   - `S3_BUCKET_NAME`
-   - `S3_ENDPOINT`
+    - `S3_ACCESS_KEY_ID`
+    - `S3_SECRET_ACCESS_KEY`
+    - `S3_BUCKET_NAME`
+    - `S3_ENDPOINT`
 
 **The following tutorial may be outdated. For specific details, refer to: [Cloudpaste Online Deployment Documentation](https://doc.cloudpaste.qzz.io)**
 
@@ -141,81 +141,260 @@ Before starting deployment, please ensure you have prepared the following:
 ### 📑 Table of Contents
 
 - [Action Automated Deployment](#Action-Automated-Deployment)
-   - [Backend Automated Deployment](#Backend-Automated-Deployment)
-   - [Frontend Automated Deployment](#Frontend-Automated-Deployment)
+    - [Deployment Architecture Selection](#Deployment-Architecture-Selection)
+    - [Configure GitHub Repository](#Configure-GitHub-Repository)
+    - [Unified Deployment Tutorial (Recommended)](#Unified-Deployment-Tutorial-Recommended)
+    - [Separated Deployment Tutorial](#Separated-Deployment-Tutorial)
 - [Manual Deployment](#Manual-Deployment)
-   - [Backend Manual Deployment](#Backend-Manual-Deployment)
-   - [Frontend Manual Deployment](#Frontend-Manual-Deployment)
+    - [Unified Manual Deployment (Recommended)](#Unified-Manual-Deployment-Recommended)
+    - [Separated Manual Deployment](#Separated-Manual-Deployment)
 - [ClawCloud CloudPaste Deployment Tutorial](#ClawCloud-CloudPaste-Deployment-Tutorial)
 
 ---
 
 ## Action Automated Deployment
 
-Using GitHub Actions enables automatic deployment of the application after code is pushed.
+Using GitHub Actions enables automatic deployment of your application after code is pushed. CloudPaste offers two deployment architectures for you to choose from.
+
+### Deployment Architecture Selection
+
+#### 🔄 Unified Deployment (Recommended)
+
+**Frontend and backend deployed on the same Cloudflare Worker**
+
+✨ **Advantages:**
+- **Same Origin** - No CORS issues, simpler configuration
+- **Lower Cost** - Navigation requests are free, saving 60%+ costs compared to separated deployment
+- **Simpler Deployment** - Deploy frontend and backend in one go, no need to manage multiple services
+- **Better Performance** - Frontend and backend on the same Worker, faster response time
+
+#### 🔀 Separated Deployment
+
+**Backend deployed to Cloudflare Workers, frontend deployed to Cloudflare Pages**
+
+✨ **Advantages:**
+-  **Flexible Management** - Independent deployment, no mutual interference
+- **Team Collaboration** - Frontend and backend can be maintained by different teams
+- **Scalability** - Frontend can easily switch to other platforms (e.g., Vercel)
+
+---
 
 ### Configure GitHub Repository
 
-1. Fork or clone the repository [https://github.com/ling-drag0n/CloudPaste](https://github.com/ling-drag0n/CloudPaste)
-2. Go to your GitHub repository settings
-3. Navigate to Settings → Secrets and variables → Actions → New Repository secrets
-4. Add the following Secrets:
+#### 1️⃣ Fork or Clone Repository
 
-| Secret Name             | Required | Purpose                                                                                  |
-| ----------------------- | -------- | ---------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`  | ✅       | Cloudflare API token (requires Workers, D1, and Pages permissions)                       |
-| `CLOUDFLARE_ACCOUNT_ID` | ✅       | Cloudflare account ID                                                                    |
-| `ENCRYPTION_SECRET`     | ❌       | Key for encrypting sensitive data (if not provided, one will be automatically generated) |
+Visit and Fork the repository: [https://github.com/ling-drag0n/CloudPaste](https://github.com/ling-drag0n/CloudPaste)
 
-#### Obtain Cloudflare API Token
+#### 2️⃣ Configure GitHub Secrets
 
-1. Visit [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens)
-2. Create a new API token
-3. Select the "Edit Cloudflare Workers" template, and add D1 database edit permission
+Go to your GitHub repository settings: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
-   ![D1](./images/D1.png)
+Add the following Secrets:
 
-### Backend Automated Deployment
+| Secret Name             | Required | Purpose                                                                               |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | ✅       | Cloudflare API token (requires Workers, D1, and Pages permissions)                                      |
+| `CLOUDFLARE_ACCOUNT_ID` | ✅       | Cloudflare account ID                                                                                   |
+| `ENCRYPTION_SECRET`     | ❌       | Key for encrypting sensitive data (will be auto-generated if not provided)                              |
+| `ACTIONS_VAR_TOKEN`     | ✅       | GitHub Token for deployment control panel (required only when using the control panel, otherwise skip) |
 
-Fork the repository, fill in the secrets, and then run the workflow!!!
-Deployment is automatically triggered whenever files in the `backend` directory are changed and pushed to the `main` or `master` branch. The workflow proceeds as follows:
+#### 3️⃣ Obtain Cloudflare API Token
 
-1. **Automatically create D1 database** (if it doesn't exist)
-2. **Initialize database with schema.sql** (create tables and initial data)
-3. **Set ENCRYPTION_SECRET environment variable** (obtained from GitHub Secrets or automatically generated)
-4. Automatically deploy Worker to Cloudflare
-5. It is recommended to set up a custom domain to replace the original Cloudflare domain (otherwise it may not be accessible in certain regions)
+**Get API Token:**
 
-**<span style="color:red">⚠️ Remember your backend domain name</span>**
+1. Visit [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+2. Click **Create Token**
+3. Select **Edit Cloudflare Workers** template
+4. **Add additional permissions**:
+    - Account → **D1** → **Edit**
+    - Account → **Cloudflare Pages** → **Edit** (if using separated deployment)
+5. Click **Continue to summary** → **Create Token**
+6. **Copy the Token** and save it to GitHub Secrets
 
-### Frontend Automated Deployment
+![D1 Permission](./images/D1.png)
 
-#### Cloudflare Pages (Recommended)
+**Get Account ID:**
 
-Fork the repository, fill in the secrets, and then run the workflow.
-Deployment is automatically triggered whenever files in the `frontend` directory are changed and pushed to the `main` or `master` branch. After deployment, you need to set environment variables in the Cloudflare Pages control panel:
+1. Visit [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. Find **Account ID** in the right sidebar
+3. Click to copy and save to GitHub Secrets
+
+#### 4️⃣ (Optional) Configure Deployment Control Panel
+
+If you want to use the visual control panel to manage auto-deployment switches, you need additional configuration:
+
+**Create GitHub Personal Access Token:**
+
+1. Visit [GitHub Token Settings](https://github.com/settings/tokens)
+2. Click **Generate new token** → **Generate new token (classic)**
+3. Set Token name (e.g., `CloudPaste Deployment Control`)
+4. Select permissions:
+    - ✅ **repo** (Full repository access)
+    - ✅ **workflow** (Workflow permissions)
+5. Click **Generate token**
+6. Copy the Token and save as Secret `ACTIONS_VAR_TOKEN`
+
+**Using the Control Panel:**
+
+1. Go to repository **Actions** tab
+2. In the left workflow list, click **🎛️ Deployment Control Panel**
+3. Click **Run workflow** → **Run workflow** on the right
+4. In the popup, select the deployment method to enable/disable
+5. Click **Run workflow** to apply configuration
+
+---
+
+### 🔄 Unified Deployment Tutorial (Recommended)
+
+#### Deployment Steps
+
+1️⃣ **Configure GitHub Secrets** (refer to the configuration section above)
+
+2️⃣ **Trigger Deployment Workflow**
+
+Method 1: Manual Trigger (recommended for first deployment)
+
+- Go to repository **Actions** tab
+- Click **Deploy SPA CF Workers[一体化部署]** on the left
+- Click **Run workflow** on the right → select `main` branch → **Run workflow**
+
+Method 2: Auto Trigger
+
+- Use the deployment control panel to enable **SPA Unified Auto Deploy**
+- After that, deployment will be triggered automatically when pushing code to `frontend/` or `backend/` directory to `main` branch
+
+3️⃣ **Wait for Deployment to Complete**
+
+The deployment process takes about 3-5 minutes. The workflow will automatically complete the following steps:
+
+- ✅ Build frontend static assets
+- ✅ Install backend dependencies
+- ✅ Create/verify D1 database
+- ✅ Initialize database schema
+- ✅ Set encryption secret
+- ✅ Deploy to Cloudflare Workers
+
+4️⃣ **Get Deployment URL**
+
+After successful deployment, you will see output similar to this in the Actions log:
+
+```
+Published cloudpaste-spa (X.XX sec)
+  https://cloudpaste-spa.your-account.workers.dev
+```
+
+Your CloudPaste has been successfully deployed! Visit the URL above to use it.
+
+#### Deployment Complete
+
+**Visit your application:** `https://cloudpaste-spa.your-account.workers.dev`
+
+**Post-deployment Configuration:**
+
+1. The database will be automatically initialized on first visit
+2. Log in with the default admin account:
+    - Username: `admin`
+    - Password: `admin123`
+3. **⚠️ Important: Change the default admin password immediately!**
+4. Configure your S3-compatible storage service in the admin panel
+5. (Optional) Bind a custom domain in Cloudflare Dashboard
+
+**Advantages Recap:**
+- ✅ Same origin for frontend and backend, no CORS issues
+- ✅ Navigation requests are free, reducing costs by 60%+
+- ✅ Deploy in one go, simple management
+
+---
+
+### 🔀 Separated Deployment Tutorial
+
+If you choose separated deployment, follow these steps:
+
+#### Backend Deployment
+
+1️⃣ **Configure GitHub Secrets** (refer to the configuration section above)
+
+2️⃣ **Trigger Backend Deployment**
+
+Method 1: Manual Trigger
+
+- Go to repository **Actions** tab
+- Click **Deploy Backend CF Workers[Worker后端分离部署]** on the left
+- Click **Run workflow** → **Run workflow**
+
+Method 2: Auto Trigger
+
+- Use the deployment control panel to enable **Backend Separated Auto Deploy**
+- Deployment will be triggered automatically when pushing `backend/` directory code
+
+3️⃣ **Wait for Deployment to Complete**
+
+The workflow will automatically complete:
+
+- ✅ Create/verify D1 database
+- ✅ Initialize database schema
+- ✅ Set encryption secret
+- ✅ Deploy Worker to Cloudflare
+
+4️⃣ **Record Backend URL**
+
+After successful deployment, note down your backend Worker URL:
+`https://cloudpaste-backend.your-account.workers.dev`
+
+**<span style="color:red">⚠️ Important: Remember your backend domain, you'll need it for frontend deployment!</span>**
+
+#### Frontend Deployment
+
+##### Cloudflare Pages
+
+1️⃣ **Trigger Frontend Deployment**
+
+Method 1: Manual Trigger
+
+- Go to repository **Actions** tab
+- Click **Deploy Frontend CF Pages[Pages前端分离部署]** on the left
+- Click **Run workflow** → **Run workflow**
+
+Method 2: Auto Trigger
+
+- Use the deployment control panel to enable **Frontend Separated Auto Deploy**
+- Deployment will be triggered automatically when pushing `frontend/` directory code
+
+2️⃣ **Configure Environment Variables**
+
+**Required step: After frontend deployment, you must manually configure the backend address!**
 
 1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Navigate to Pages → Your project (e.g., "cloudpaste-frontend")
-3. Click "Settings" → "Environment variables"
+2. Navigate to **Pages** → **cloudpaste-frontend**
+3. Click **Settings** → **Environment variables**
 4. Add environment variable:
+    - **Name**: `VITE_BACKEND_URL`
+    - **Value**: Your backend Worker URL (e.g., `https://cloudpaste-backend.your-account.workers.dev`)
+    - **Note**: No trailing `/`, custom domain recommended
 
-   - Name: `VITE_BACKEND_URL`
-   - Value: Your backend Worker URL (e.g., `https://cloudpaste-backend.your-username.workers.dev`) without trailing "/". It is recommended to use a custom worker backend domain.
+**<span style="color:red">⚠️ Must fill in the complete backend domain, format: https://xxxx.com</span>**
 
-   - **<span style="color:red">Make sure to enter the complete backend domain name in "https://xxxx.com" format</span>**
+3️⃣ **Redeploy Frontend**
 
-5. Important step: Then run the frontend workflow again to complete loading the backend domain!!!
+**Important: After configuring environment variables, you must run the frontend workflow again!**
 
-   ![test-1](./images/test-1.png)
+- Return to GitHub Actions
+- Manually trigger **Deploy Frontend CF Pages** workflow again
+- This is necessary to load the backend domain configuration
 
-**<span style="color:red">Please follow the steps strictly, otherwise the backend domain loading will fail</span>**
+![Frontend Redeploy](./images/test-1.png)
 
-#### Vercel
+4️⃣ **Access Application**
 
-For Vercel, it's recommended to deploy as follows:
+Frontend deployment URL: `https://cloudpaste-frontend.pages.dev`
 
-1. Import your GitHub project after forking
+**<span style="color:red">⚠️ Please strictly follow the steps, otherwise backend domain loading will fail!</span>**
+
+##### Vercel (Alternative)
+
+Vercel deployment steps:
+
+1. Import GitHub project in Vercel after forking
 2. Configure deployment parameters:
 
 ```
@@ -225,16 +404,109 @@ Output Directory: dist
 Install Command: npm install
 ```
 
-3. Configure the environment variables below: Enter: VITE_BACKEND_URL and your backend domain
-4. Click the "Deploy" button to deploy
+3. Configure environment variables:
+    - Name: `VITE_BACKEND_URL`
+    - Value: Your backend Worker URL
+4. Click **Deploy** button to deploy
 
-☝️ **Choose one of the above methods**
+**☝️ Choose either Cloudflare Pages or Vercel**
+
+**<span style="color:red">⚠️ Security Notice: Please change the default admin password immediately after system initialization (username: admin, password: admin123).</span>**
 
 ---
 
 ## Manual Deployment
 
-### Backend Manual Deployment
+CloudPaste supports two manual deployment methods: unified deployment (recommended) and separated deployment.
+
+### 🔄 Unified Manual Deployment (Recommended)
+
+Unified deployment deploys both frontend and backend to the same Cloudflare Worker, offering simpler configuration and lower costs.
+
+#### Step 1: Clone Repository
+
+```bash
+git clone https://github.com/ling-drag0n/CloudPaste.git
+cd CloudPaste
+```
+
+#### Step 2: Build Frontend
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+**Verify build output:** Ensure `frontend/dist` directory exists and contains `index.html`
+
+#### Step 3: Configure Backend
+
+```bash
+cd backend
+npm install
+npx wrangler login
+```
+
+#### Step 4: Create D1 Database
+
+```bash
+npx wrangler d1 create cloudpaste-db
+```
+
+Note the `database_id` from the output (e.g., `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+
+#### Step 5: Initialize Database
+
+```bash
+npx wrangler d1 execute cloudpaste-db --file=./schema.sql
+```
+
+#### Step 6: Configure wrangler.spa.toml
+
+Edit `backend/wrangler.spa.toml` file and modify the database ID:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "cloudpaste-db"
+database_id = "YOUR_DATABASE_ID"  # Replace with ID from Step 4
+```
+
+#### Step 7: Deploy to Cloudflare Workers
+
+```bash
+npx wrangler deploy --config wrangler.spa.toml
+```
+
+After successful deployment, you'll see your application URL:
+
+```
+Published cloudpaste-spa (X.XX sec)
+  https://cloudpaste-spa.your-account.workers.dev
+```
+
+#### Deployment Complete!
+
+**Visit your application:** Open the URL above to use CloudPaste
+
+**Post-deployment Configuration:**
+1. The database will be automatically initialized on first visit
+2. Log in with the default admin account (username: `admin`, password: `admin123`)
+3. **⚠️ Change the default admin password immediately!**
+4. Configure S3-compatible storage service in the admin panel
+5. (Optional) Bind a custom domain in Cloudflare Dashboard
+
+**<span style="color:red">⚠️ Security Notice: Please change the default admin password immediately after system initialization.</span>**
+
+---
+
+### 🔀 Separated Manual Deployment
+
+If you need to deploy and manage frontend and backend independently, you can choose the separated deployment method.
+
+#### Backend Manual Deployment
 
 1. Clone the repository
 
@@ -287,9 +559,9 @@ cd CloudPaste/backend
    https://cloudpaste-backend.your-username.workers.dev
    ```
 
-**<span style="color:red">⚠️ Security reminder: Please change the default administrator password immediately after system initialization (Username: admin, Password: admin123).</span>**
+**<span style="color:red">⚠️ Important: Remember your backend domain, you'll need it for frontend deployment!</span>**
 
-### Frontend Manual Deployment
+#### Frontend Manual Deployment
 
 #### Cloudflare Pages
 
@@ -327,12 +599,12 @@ cd CloudPaste/backend
 
    **Method 2**: Via Cloudflare Dashboard
 
-   1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-   2. Select "Pages"
-   3. Click "Create a project" → "Direct Upload"
-   4. Upload files from the `dist` directory
-   5. Set project name (e.g., "cloudpaste-frontend")
-   6. Click "Save and Deploy"
+    1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+    2. Select "Pages"
+    3. Click "Create a project" → "Direct Upload"
+    4. Upload files from the `dist` directory
+    5. Set project name (e.g., "cloudpaste-frontend")
+    6. Click "Save and Deploy"
 
 #### Vercel
 
@@ -399,8 +671,8 @@ Then the frontend, as shown in the figure (for reference only):
 ### 📑 Table of Contents
 
 - [Docker Command Line Deployment](#Docker-Command-Line-Deployment)
-   - [Backend Docker Deployment](#Backend-Docker-Deployment)
-   - [Frontend Docker Deployment](#Frontend-Docker-Deployment)
+    - [Backend Docker Deployment](#Backend-Docker-Deployment)
+    - [Frontend Docker Deployment](#Frontend-Docker-Deployment)
 - [Docker Compose One-Click Deployment](#Docker-Compose-One-Click-Deployment)
 
 ---
@@ -425,7 +697,6 @@ CloudPaste backend can be quickly deployed using the official Docker image.
      -v $(pwd)/sql_data:/data \
      -e ENCRYPTION_SECRET=your-encryption-key \
      -e NODE_ENV=production \
-     -e RUNTIME_ENV=docker \
      dragon730/cloudpaste-backend:latest
    ```
 
@@ -477,36 +748,35 @@ Using Docker Compose allows you to deploy both frontend and backend services wit
 version: "3.8"
 
 services:
-   frontend:
-      image: dragon730/cloudpaste-frontend:latest
-      environment:
-         - BACKEND_URL=https://xxx.com # Fill in the backend service address
-      ports:
-         - "8080:80" #"127.0.0.1:8080:80"
-      depends_on:
-         - backend # Depends on backend service
-      networks:
-         - cloudpaste-network
-      restart: unless-stopped
+  frontend:
+    image: dragon730/cloudpaste-frontend:latest
+    environment:
+      - BACKEND_URL=https://xxx.com # Fill in the backend service address
+    ports:
+      - "8080:80" #"127.0.0.1:8080:80"
+    depends_on:
+      - backend # Depends on backend service
+    networks:
+      - cloudpaste-network
+    restart: unless-stopped
 
-   backend:
-      image: dragon730/cloudpaste-backend:latest
-      environment:
-         - NODE_ENV=production
-         - RUNTIME_ENV=docker
-         - PORT=8787
-         - ENCRYPTION_SECRET=custom-key # Please modify this to your own security key
-      volumes:
-         - ./sql_data:/data # Data persistence
-      ports:
-         - "8787:8787" #"127.0.0.1:8787:8787"
-      networks:
-         - cloudpaste-network
-      restart: unless-stopped
+  backend:
+    image: dragon730/cloudpaste-backend:latest
+    environment:
+      - NODE_ENV=production
+      - PORT=8787
+      - ENCRYPTION_SECRET=custom-key # Please modify this to your own security key
+    volumes:
+      - ./sql_data:/data # Data persistence
+    ports:
+      - "8787:8787" #"127.0.0.1:8787:8787"
+    networks:
+      - cloudpaste-network
+    restart: unless-stopped
 
 networks:
-   cloudpaste-network:
-      driver: bridge
+  cloudpaste-network:
+    driver: bridge
 ```
 
 2. Start the services
@@ -621,13 +891,13 @@ server {
 
 ```json
 [
-   {
-      "AllowedOrigins": ["http://localhost:3000", "https://replace-with-your-frontend-domain"],
-      "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
-      "AllowedHeaders": ["*"],
-      "ExposeHeaders": ["ETag"],
-      "MaxAgeSeconds": 3600
-   }
+  {
+    "AllowedOrigins": ["http://localhost:3000", "https://replace-with-your-frontend-domain"],
+    "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
 ]
 ```
 
@@ -761,27 +1031,27 @@ Replace <bucketName> with your bucket name. For allowedOrigins in the cross-orig
 
 5. **Configure MinIO in CloudPaste**
 
-   - Log in to CloudPaste admin panel
-   - Go to "S3 Storage Settings" → "Add Storage Configuration"
-   - Select "Other S3-compatible service" as provider
-   - Enter details:
-      - Name: Custom name
-      - Endpoint URL: MinIO service URL (e.g., `https://minio.example.com`)
-      - Bucket Name: Pre-created bucket
-      - Access Key ID: Your Access Key
-      - Secret Key: Your Secret Key
-      - Region: Leave empty
-      - Path-Style Access: MUST ENABLE!
-   - Click "Test Connection" to verify
-   - Save settings
+    - Log in to CloudPaste admin panel
+    - Go to "S3 Storage Settings" → "Add Storage Configuration"
+    - Select "Other S3-compatible service" as provider
+    - Enter details:
+        - Name: Custom name
+        - Endpoint URL: MinIO service URL (e.g., `https://minio.example.com`)
+        - Bucket Name: Pre-created bucket
+        - Access Key ID: Your Access Key
+        - Secret Key: Your Secret Key
+        - Region: Leave empty
+        - Path-Style Access: MUST ENABLE!
+    - Click "Test Connection" to verify
+    - Save settings
 
 6. **Troubleshooting**
 
-   - **Note**: If using Cloudflare's CDN, you may need to add `proxy_set_header Accept-Encoding "identity"`, and there are caching issues to consider. It is recommended to use only DNS resolution.
-   - **403 Error**: Ensure reverse proxy includes `proxy_cache off` & `proxy_buffering off`
-   - **Preview Issues**: Verify `MINIO_SERVER_URL` & `MINIO_BROWSER_REDIRECT_URL` are correctly set
-   - **Upload Failures**: Check CORS settings; allowed origins must include frontend domain
-   - **Console Unreachable**: Verify WebSocket config, especially `Connection "upgrade"`
+    - **Note**: If using Cloudflare's CDN, you may need to add `proxy_set_header Accept-Encoding "identity"`, and there are caching issues to consider. It is recommended to use only DNS resolution.
+    - **403 Error**: Ensure reverse proxy includes `proxy_cache off` & `proxy_buffering off`
+    - **Preview Issues**: Verify `MINIO_SERVER_URL` & `MINIO_BROWSER_REDIRECT_URL` are correctly set
+    - **Upload Failures**: Check CORS settings; allowed origins must include frontend domain
+    - **Console Unreachable**: Verify WebSocket config, especially `Connection "upgrade"`
 
 ## More S3-related configurations to come......
 
@@ -798,10 +1068,10 @@ CloudPaste provides simple WebDAV protocol support, allowing you to mount storag
 
 - **WebDAV Base URL**: `https://your-backend-domain/dav`
 - **Supported Authentication Methods**:
-   - Basic Authentication (username+password)
+    - Basic Authentication (username+password)
 - **Supported Permission Types**:
-   - Administrator accounts - Full operation permissions
-   - API keys - Requires enabled mount permission (mount_permission)
+    - Administrator accounts - Full operation permissions
+    - API keys - Requires enabled mount permission (mount_permission)
 
 ### Permission Configuration
 
@@ -820,8 +1090,8 @@ For a more secure access method, it is recommended to create a dedicated API key
 2. Navigate to "API Key Management"
 3. Create a new API key, **ensure "Mount Permission" is enabled**
 4. Usage method:
-   - **Username**: API key value
-   - **Password**: The same API key value as the username
+    - **Username**: API key value
+    - **Password**: The same API key value as the username
 
 ### NGINX Reverse Proxy Configuration
 
@@ -861,20 +1131,20 @@ location /dav {
 
 1. **Connection Problems**:
 
-   - Confirm the WebDAV URL format is correct
-   - Verify that authentication credentials are valid
-   - Check if the API key has mount permission
+    - Confirm the WebDAV URL format is correct
+    - Verify that authentication credentials are valid
+    - Check if the API key has mount permission
 
 2. **Permission Errors**:
 
-   - Confirm the account has the required permissions
-   - Administrator accounts should have full permissions
-   - API keys need to have mount permission specifically enabled
+    - Confirm the account has the required permissions
+    - Administrator accounts should have full permissions
+    - API keys need to have mount permission specifically enabled
 
 3. **⚠️⚠️ WebDAV Upload Issues**:
 
-   - The upload size for webdav deployed by Workers may be limited by CF's CDN restrictions to around 100MB, resulting in a 413 error.
-   - For Docker deployments, just pay attention to the nginx proxy configuration, any upload mode is acceptable
+    - The upload size for webdav deployed by Workers may be limited by CF's CDN restrictions to around 100MB, resulting in a 413 error.
+    - For Docker deployments, just pay attention to the nginx proxy configuration, any upload mode is acceptable
 
 </details>
 
@@ -932,8 +1202,8 @@ location /dav {
 
 4. **Configure environment variables**
 
-   - In the `backend` directory, create a `wrangler.toml` file to set development environment variables
-   - In the `frontend` directory, configure the `.env.development` file to set frontend environment variables
+    - In the `backend` directory, create a `wrangler.toml` file to set development environment variables
+    - In the `frontend` directory, configure the `.env.development` file to set frontend environment variables
 
 5. **Start development servers**
 
@@ -1093,9 +1363,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
   <a href="https://afdian.com/a/drag0n"><img width="200" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt=""></a>
 
-   - **Sponsors**: A huge thank you to the following sponsors for their support of this project!!
+    - **Sponsors**: A huge thank you to the following sponsors for their support of this project!!
 
-     [![Sponsors](https://afdian.730888.xyz/image)](https://afdian.com/a/drag0n)
+      [![Sponsors](https://afdian.730888.xyz/image)](https://afdian.com/a/drag0n)
 
 - **Contributors**: Thanks to the following contributors for their selfless contributions to this project!
 
