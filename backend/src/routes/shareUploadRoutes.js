@@ -93,9 +93,17 @@ router.put("/api/share/upload", requireFilesCreate, async (c) => {
   const declaredLengthHeader = c.req.header("content-length");
   const declaredLength = declaredLengthHeader ? parseInt(declaredLengthHeader, 10) : 0;
 
-  const filenameHeader = c.req.header("x-share-filename");
-  if (!filenameHeader) {
+  const filenameHeaderRaw = c.req.header("x-share-filename");
+  if (!filenameHeaderRaw) {
     throw new ValidationError("缺少 x-share-filename 头部");
+  }
+
+  let filenameHeader = filenameHeaderRaw;
+  try {
+    filenameHeader = decodeURIComponent(filenameHeaderRaw);
+  } catch {
+    // 解码失败时回退到原始值，避免影响兼容性
+    filenameHeader = filenameHeaderRaw;
   }
 
   let options = {};

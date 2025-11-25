@@ -385,16 +385,16 @@ const uploadModes = computed(() => {
     },
     {
       value: "stream",
-      label: "流式上传",
-      modeLabel: "流式模式",
-      tooltip: "通过后端流式中转上传",
+      label: t("file.uploadModes.stream"),
+      modeLabel: t("file.uploadModes.streamMode"),
+      tooltip: t("file.uploadModes.streamTooltip"),
       disabled: isUploading.value,
     },
     {
       value: "form",
-      label: "表单上传",
-      modeLabel: "表单模式",
-      tooltip: "使用表单(multipart/form-data)上传",
+      label: t("file.uploadModes.form"),
+      modeLabel: t("file.uploadModes.formMode"),
+      tooltip: t("file.uploadModes.formTooltip"),
       disabled: isUploading.value,
     },
   ];
