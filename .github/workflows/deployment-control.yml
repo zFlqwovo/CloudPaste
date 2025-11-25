@@ -1,4 +1,4 @@
-name:  🎛️部署控制面板[⭐Click ME] / Deployment Control Panel
+name: 🎛️ 部署控制面板[⭐Click ME] / Deployment Control Panel
 
 on:
   workflow_dispatch:
@@ -138,6 +138,22 @@ jobs:
             fi
           done
 
+          # 触发 SPA 一体化部署工作流（根据当前开关状态由目标工作流自行决定是否执行）
+          DISPATCH_CODE=$(curl -sS -o /tmp/spa_dispatch.json -w "%{http_code}" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.ACTIONS_VAR_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/actions/workflows/deploy-spa-cloudflare.yml/dispatches" \
+            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"from_panel\":\"true\"}}")
+
+          if [ "$DISPATCH_CODE" -ge 200 ] && [ "$DISPATCH_CODE" -lt 300 ]; then
+            echo "🚀 已触发 SPA 一体化部署工作流（将按当前 SPA_DEPLOY 开关决定是否真正部署）"
+          else
+            echo "⚠️ 触发 SPA 一体化部署工作流失败，HTTP 状态码: $DISPATCH_CODE"
+            cat /tmp/spa_dispatch.json || true
+          fi
+
       - name: ⚙️ 更新后端分离部署配置
         if: github.event.inputs.backend_deploy != '📊 查看当前状态'
         run: |
@@ -195,6 +211,22 @@ jobs:
             fi
           done
 
+          # 触发后端分离部署工作流（根据当前开关状态由目标工作流自行决定是否执行）
+          DISPATCH_CODE=$(curl -sS -o /tmp/backend_dispatch.json -w "%{http_code}" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.ACTIONS_VAR_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/actions/workflows/deploy-backend-cloudflare.yml/dispatches" \
+            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"from_panel\":\"true\"}}")
+
+          if [ "$DISPATCH_CODE" -ge 200 ] && [ "$DISPATCH_CODE" -lt 300 ]; then
+            echo "🚀 已触发后端分离部署工作流（将按当前 BACKEND_DEPLOY 开关决定是否真正部署）"
+          else
+            echo "⚠️ 触发后端分离部署工作流失败，HTTP 状态码: $DISPATCH_CODE"
+            cat /tmp/backend_dispatch.json || true
+          fi
+
       - name: 🎨 更新前端分离部署配置
         if: github.event.inputs.frontend_deploy != '📊 查看当前状态'
         run: |
@@ -251,6 +283,22 @@ jobs:
               exit 1
             fi
           done
+
+          # 触发前端分离部署工作流（根据当前开关状态由目标工作流自行决定是否执行）
+          DISPATCH_CODE=$(curl -sS -o /tmp/frontend_dispatch.json -w "%{http_code}" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.ACTIONS_VAR_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/actions/workflows/deploy-frontend-cloudflare.yml/dispatches" \
+            -d "{\"ref\":\"${{ github.ref_name }}\",\"inputs\":{\"from_panel\":\"true\"}}")
+
+          if [ "$DISPATCH_CODE" -ge 200 ] && [ "$DISPATCH_CODE" -lt 300 ]; then
+            echo "🚀 已触发前端分离部署工作流（将按当前 FRONTEND_DEPLOY 开关决定是否真正部署）"
+          else
+            echo "⚠️ 触发前端分离部署工作流失败，HTTP 状态码: $DISPATCH_CODE"
+            cat /tmp/frontend_dispatch.json || true
+          fi
 
       - name: 📊 显示更新后的状态
         run: |

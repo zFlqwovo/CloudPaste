@@ -6,6 +6,11 @@ on:
     paths:
       - "backend/**"
   workflow_dispatch:
+    inputs:
+      from_panel:
+        description: "是否由部署控制面板触发 / triggered from deployment control panel"
+        required: false
+        default: "false"
   repository_dispatch:
     types: [deploy-button]
 
@@ -21,14 +26,20 @@ jobs:
       - name: 🔍 检查部署配置
         id: check
         run: |
-          # 手动触发或外部触发时，总是部署
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+          # 手动触发时（workflow_dispatch / repository_dispatch），总是部署，忽略自动部署开关
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-            echo "✅ 手动触发，允许部署"
+            echo "✅ 手动触发（repository_dispatch），忽略开关，允许部署"
             exit 0
           fi
 
-          # 自动触发时，读取仓库级 Actions 变量
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.from_panel }}" != "true" ]]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ 手动触发（workflow_dispatch），忽略开关，允许部署"
+            exit 0
+          fi
+
+          # 自动触发（push 或控制面板触发）根据仓库级变量决定是否部署
           BACKEND_ENABLED="${{ vars.BACKEND_DEPLOY }}"
           [ -z "$BACKEND_ENABLED" ] && BACKEND_ENABLED="false"
 
