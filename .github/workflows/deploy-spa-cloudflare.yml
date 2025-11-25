@@ -43,6 +43,7 @@ jobs:
 
           # 自动触发（push 或控制面板触发）根据仓库级变量决定是否部署
           SPA_ENABLED="${{ vars.SPA_DEPLOY }}"
+          # 默认行为：如果仓库变量未设置，视为默认关闭，得去控制面板开启
           [ -z "$SPA_ENABLED" ] && SPA_ENABLED="false"
 
           if [ "$SPA_ENABLED" = "true" ]; then

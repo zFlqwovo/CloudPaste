@@ -41,7 +41,8 @@ jobs:
 
           # 自动触发（push 或控制面板触发）根据仓库级变量决定是否部署
           BACKEND_ENABLED="${{ vars.BACKEND_DEPLOY }}"
-          [ -z "$BACKEND_ENABLED" ] && BACKEND_ENABLED="false"
+          # 默认行为：如果仓库变量未设置，视为已开启自动部署（向下兼容旧逻辑）
+          [ -z "$BACKEND_ENABLED" ] && BACKEND_ENABLED="true"
 
           if [ "$BACKEND_ENABLED" = "true" ]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
