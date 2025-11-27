@@ -19,9 +19,7 @@ export function useFilePreviewExtensions(
   handleKeyDown,
   emit,
   authenticatedPreviewUrl,
-  previewTimeoutId,
-  microsoftOfficePreviewUrl,
-  googleDocsPreviewUrl
+  previewTimeoutId
 ) {
   const { t } = useI18n();
 
@@ -221,12 +219,6 @@ export function useFilePreviewExtensions(
     if (previewTimeoutId && previewTimeoutId.value) {
       clearTimeout(previewTimeoutId.value);
       previewTimeoutId.value = null;
-    }
-    if (microsoftOfficePreviewUrl) {
-      microsoftOfficePreviewUrl.value = "";
-    }
-    if (googleDocsPreviewUrl) {
-      googleDocsPreviewUrl.value = "";
     }
 
     console.log("文件预览扩展功能清理完成");

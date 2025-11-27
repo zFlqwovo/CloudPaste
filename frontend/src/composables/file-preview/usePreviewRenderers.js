@@ -20,22 +20,12 @@ export function usePreviewRenderers(file, emit, darkMode) {
   const officePreviewError = ref("");
   const officePreviewTimedOut = ref(false);
   const previewTimeoutId = ref(null);
-  const microsoftOfficePreviewUrl = ref("");
-  const googleDocsPreviewUrl = ref("");
-  const useGoogleDocsPreview = ref(false);
 
   // 全屏状态
   const isOfficeFullscreen = ref(false);
 
   // DOM 引用
   const officePreviewRef = ref(null);
-
-  // Office预览配置
-  const officePreviewConfig = ref({
-    defaultService: "microsoft",
-    enableAutoFailover: true,
-    loadTimeout: 60000,
-  });
 
   // ===== 计算属性 =====
 
@@ -65,19 +55,6 @@ export function usePreviewRenderers(file, emit, darkMode) {
   const isPdfFile = computed(() => {
     return file.value?.type === FileType.DOCUMENT;
   });
-  // Office 子类型判断 - 统一使用mimetype字段
-  const isWordDoc = computed(() => {
-    const mimeType = file.value?.mimetype;
-    return mimeType?.includes("wordprocessingml") || mimeType === "application/msword";
-  });
-  const isExcel = computed(() => {
-    const mimeType = file.value?.mimetype;
-    return mimeType?.includes("spreadsheetml") || mimeType === "application/vnd.ms-excel";
-  });
-  const isPowerPoint = computed(() => {
-    const mimeType = file.value?.mimetype;
-    return mimeType?.includes("presentationml") || mimeType === "application/vnd.ms-powerpoint";
-  });
 
   /**
    * 预览URL - 基于 Link JSON 中的 rawUrl
@@ -96,15 +73,6 @@ export function usePreviewRenderers(file, emit, darkMode) {
   });
 
   /**
-   * 当前Office预览URL
-   */
-  const currentOfficePreviewUrl = computed(() => {
-    return useGoogleDocsPreview.value ? googleDocsPreviewUrl.value : microsoftOfficePreviewUrl.value;
-  });
-
-  // ===== 文本内容加载已移除 =====
-
-  /**
    * 获取认证预览URL（保留方法以兼容可能的工具场景）
    * FS 视图下默认直接使用 rawUrl，正常预览不再依赖 Blob 模式
    */
@@ -120,83 +88,17 @@ export function usePreviewRenderers(file, emit, darkMode) {
   // ===== Office预览处理 =====
 
   /**
-   * 获取Office文件的直接URL
-   * 仅在后端提供 officeSourceUrl（直链能力）时支持
-   */
-  const getOfficeDirectUrlForPreview = async () => {
-    try {
-      if (file.value?.officeSourceUrl) {
-        console.log("Office预览使用文件信息中的 officeSourceUrl:", file.value.officeSourceUrl);
-        return file.value.officeSourceUrl;
-      }
-
-      console.warn("当前文件没有 officeSourceUrl，视为不支持 Office 在线预览");
-      throw new Error("当前挂载不支持 Office 在线预览，请下载文件后在本地查看。");
-    } catch (error) {
-      console.error("获取Office预览URL失败:", error);
-      throw error;
-    }
-  };
-
-  /**
    * 更新Office预览URLs
+   * FS 视图下不再在前端生成 Office 直链，只保留加载/错误状态占位
    */
   const updateOfficePreviewUrls = async () => {
-    if (!file.value) return;
-
-    officePreviewLoading.value = true;
+    officePreviewLoading.value = false;
     officePreviewError.value = "";
     officePreviewTimedOut.value = false;
-
-    try {
-      // 获取直接预签名URL
-      const directUrl = await getOfficeDirectUrlForPreview();
-
-      if (directUrl) {
-        // 使用统一的预览服务
-        const { getOfficePreviewUrl } = await import("../../api/services/fileViewService");
-        const previewUrls = await getOfficePreviewUrl({ directUrl }, { returnAll: true });
-
-        // 设置预览URL
-        microsoftOfficePreviewUrl.value = previewUrls.microsoft;
-        googleDocsPreviewUrl.value = previewUrls.google;
-
-        console.log("Office预览URL生成成功", {
-          microsoft: microsoftOfficePreviewUrl.value.substring(0, 100) + "...",
-          google: googleDocsPreviewUrl.value.substring(0, 100) + "...",
-        });
-
-        officePreviewLoading.value = false;
-
-        // 启动预览加载超时计时器
-        startPreviewLoadTimeout();
-      } else {
-        throw new Error("获取到的预签名URL无效");
-      }
-    } catch (error) {
-      console.error("更新Office预览URLs失败:", error);
-      officePreviewError.value = error.message || "生成预览URL失败";
-      officePreviewLoading.value = false;
-    }
   };
 
   /**
-   * 启动预览加载超时计时器
-   */
-  const startPreviewLoadTimeout = () => {
-    clearPreviewLoadTimeout();
-
-    previewTimeoutId.value = setTimeout(() => {
-      if (officePreviewLoading.value) {
-        officePreviewTimedOut.value = true;
-        officePreviewLoading.value = false;
-        console.log("Office预览加载超时");
-      }
-    }, officePreviewConfig.value.loadTimeout);
-  };
-
-  /**
-   * 清除预览加载超时计时器
+   * 清除预览加载超时计时器（占位实现）
    */
   const clearPreviewLoadTimeout = () => {
     if (previewTimeoutId.value) {
@@ -295,27 +197,7 @@ export function usePreviewRenderers(file, emit, darkMode) {
       console.log("检测到Esc键，全屏状态将由浏览器处理");
     }
   };
-
-  // ===== 编辑功能 =====
-
-  // ===== 编辑模式已移除 =====
-
-  // ===== Office预览服务切换 =====
-
-  /**
-   * 切换Office预览服务
-   */
-  const toggleOfficePreviewService = () => {
-    useGoogleDocsPreview.value = !useGoogleDocsPreview.value;
-
-    // 重置错误和超时状态
-    officePreviewError.value = "";
-    officePreviewTimedOut.value = false;
-
-    // 启动新的预览加载超时计时器
-    startPreviewLoadTimeout();
-  };
-
+  
   // ===== 事件处理 =====
 
   /**
@@ -375,8 +257,6 @@ export function usePreviewRenderers(file, emit, darkMode) {
     officePreviewLoading.value = false;
     officePreviewError.value = "";
     officePreviewTimedOut.value = false;
-    microsoftOfficePreviewUrl.value = "";
-    googleDocsPreviewUrl.value = "";
     isOfficeFullscreen.value = false;
     clearPreviewLoadTimeout();
 
@@ -415,8 +295,6 @@ export function usePreviewRenderers(file, emit, darkMode) {
       authenticatedPreviewUrl.value = null;
 
       // 重置Office预览状态
-      microsoftOfficePreviewUrl.value = "";
-      googleDocsPreviewUrl.value = "";
       officePreviewLoading.value = false;
       officePreviewError.value = "";
       officePreviewTimedOut.value = false;
@@ -509,10 +387,6 @@ export function usePreviewRenderers(file, emit, darkMode) {
       previewTimeoutId.value = null;
     }
 
-    // 清理其他资源
-    microsoftOfficePreviewUrl.value = "";
-    googleDocsPreviewUrl.value = "";
-
     console.log("文件预览组件已卸载");
   });
 
@@ -527,11 +401,7 @@ export function usePreviewRenderers(file, emit, darkMode) {
     officePreviewError,
     officePreviewTimedOut,
     previewTimeoutId,
-    microsoftOfficePreviewUrl,
-    googleDocsPreviewUrl,
-    useGoogleDocsPreview,
     isOfficeFullscreen,
-    officePreviewConfig,
 
     // 保留的计算属性
     fileTypeInfo,
@@ -541,21 +411,14 @@ export function usePreviewRenderers(file, emit, darkMode) {
     isPdf: isPdfFile,
     isOffice: isOfficeFile,
     isText: isTextFile,
-    isWordDoc,
-    isExcel,
-    isPowerPoint,
     previewUrl,
-    currentOfficePreviewUrl,
 
     // 保留的DOM引用
     officePreviewRef,
 
     // 保留的方法
     fetchAuthenticatedUrl,
-    getOfficeDirectUrlForPreview,
     updateOfficePreviewUrls,
-    startPreviewLoadTimeout,
-    clearPreviewLoadTimeout,
     initializePreview,
     toggleFullscreen,
     handleFullscreenChange,
@@ -564,7 +427,6 @@ export function usePreviewRenderers(file, emit, darkMode) {
     handleContentError,
     formatFileSize,
     formatDate,
-    toggleOfficePreviewService,
     toggleOfficeFullscreen,
     reinitializePreviewOnThemeChange,
     initializeForFile,

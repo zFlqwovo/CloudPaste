@@ -43,40 +43,8 @@ export async function getFileInfo(fs, path, userIdOrInfo, userType, request = nu
     request,
   });
 
-  // 再通过统一的 Link Resolver 生成用于 Office 预览的直链（如有）
-  let officeSourceUrl = baseInfo?.officeSourceUrl || null;
-
-  try {
-    // 预览直链：不强制下载
-    const previewLink = await featureGenerateFileLink(fs, path, userIdOrInfo, userType, {
-      request,
-      forceDownload: false,
-    });
-
-    // 下载直链：强制下载
-    const downloadLink = await featureGenerateFileLink(fs, path, userIdOrInfo, userType, {
-      request,
-      forceDownload: true,
-    });
-
-    // 为 Office 预览推导一个存储直链（如有）
-    const isDirectType = (t) => t === "custom_host" || t === "presigned";
-
-    if (!officeSourceUrl) {
-      if (previewLink?.url && isDirectType(previewLink.type)) {
-        officeSourceUrl = previewLink.url;
-      } else if (downloadLink?.url && isDirectType(downloadLink.type)) {
-        officeSourceUrl = downloadLink.url;
-      }
-    }
-  } catch (e) {
-    // 链接生成失败时保持基础信息不变，由上层决定如何处理
-    console.warn("通过统一 Link Resolver 生成文件链接失败，将使用驱动内置链接（如有）:", e?.message || e);
-  }
-
   return {
     ...baseInfo,
-    officeSourceUrl,
   };
 }
 

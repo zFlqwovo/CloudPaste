@@ -219,11 +219,8 @@ const openEditModal = async () => {
         currentPassword: prev.currentPassword,
         use_proxy: prev.use_proxy,
         rawUrl: prev.rawUrl,
-        officeSourceUrl: prev.officeSourceUrl,
         linkType: prev.linkType,
-        isPresigned: prev.isPresigned,
-        origin: prev.origin,
-        expiresAt: prev.expiresAt,
+        documentPreview: prev.documentPreview,
       };
     }
 

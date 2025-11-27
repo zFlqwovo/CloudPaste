@@ -6,9 +6,6 @@
  * @property {string} url              // 直链或可代理的底层 URL
  * @property {"direct"|"proxy"} kind   // 路由决策依据
  * @property {Object<string,string>=} headers
- * @property {boolean=} isPresigned
- * @property {"custom_host"|"default"=} origin
- * @property {string=} expiresAt       // ISO 字符串，若可用
  */
 
 /**
@@ -22,9 +19,6 @@ export function createDirectLink(url, options = {}) {
     url,
     kind: "direct",
     headers: options.headers || undefined,
-    isPresigned: options.isPresigned ?? undefined,
-    origin: options.origin || undefined,
-    expiresAt: options.expiresAt || undefined,
   };
 }
 
@@ -39,9 +33,5 @@ export function createProxyLink(url, options = {}) {
     url,
     kind: "proxy",
     headers: options.headers || undefined,
-    isPresigned: options.isPresigned ?? undefined,
-    origin: options.origin || undefined,
-    expiresAt: options.expiresAt || undefined,
   };
 }
-

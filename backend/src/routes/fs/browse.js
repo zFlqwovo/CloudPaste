@@ -6,6 +6,7 @@ import { getVirtualDirectoryListing, isVirtualPath } from "../../storage/fs/util
 import { createErrorResponse, getQueryBool, jsonOk } from "../../utils/common.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { LinkService } from "../../storage/link/LinkService.js";
+import { resolveDocumentPreview } from "../../services/documentPreviewService.js";
 
 export const registerBrowseRoutes = (router, helpers) => {
   const { getAccessibleMounts, getServiceParams, verifyPathPasswordToken } = helpers;
@@ -112,19 +113,40 @@ export const registerBrowseRoutes = (router, helpers) => {
       request: c.req.raw,
     });
 
-    const { officeSourceUrl, ...rest } = result;
+    // 使用 LinkService 的决策结果作为 Link JSON 核心字段
+    const rawUrl = link.url || null;
+    const linkType = link.kind;
 
     const responsePayload = {
-      ...rest,
-      officeSourceUrl: officeSourceUrl || (link.kind === "direct" && link.url ? link.url : null),
-      rawUrl: link.url || null,
-      linkType: link.kind,
-      isPresigned: link.isPresigned ?? false,
-      origin: link.origin || "default",
-      expiresAt: link.expiresAt || null,
+      ...result,
+      rawUrl,
+      linkType,
     };
 
-    return jsonOk(c, responsePayload, "获取文件信息成功");
+    const documentPreview = await resolveDocumentPreview(
+      {
+        type: responsePayload.type,
+        typeName: responsePayload.typeName,
+        mimetype: responsePayload.mimetype,
+        filename: responsePayload.name,
+        name: responsePayload.name,
+        size: responsePayload.size,
+      },
+      {
+        rawUrl,
+        linkType,
+        use_proxy: responsePayload.use_proxy ?? 0,
+      },
+    );
+
+    return jsonOk(
+      c,
+      {
+        ...responsePayload,
+        documentPreview,
+      },
+      "获取文件信息成功",
+    );
   });
 
   router.get("/api/fs/download", async (c) => {
@@ -208,9 +230,6 @@ export const registerBrowseRoutes = (router, helpers) => {
     const responsePayload = {
       rawUrl: link.url,
       linkType: link.kind,
-      isPresigned: link.isPresigned ?? false,
-      origin: link.origin || "default",
-      expiresAt: link.expiresAt || null,
     };
 
     return jsonOk(c, responsePayload, "获取文件直链成功");

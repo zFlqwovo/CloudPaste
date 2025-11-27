@@ -11,6 +11,7 @@ import { ApiStatus, DbTables, UserType } from "../constants/index.js";
 import { ValidationError, NotFoundError, AuthorizationError, ConflictError } from "../http/errors.js";
 import { ensureRepositoryFactory } from "../utils/repositories.js";
 import { ObjectStore } from "../storage/object/ObjectStore.js";
+import { resolveDocumentPreview } from "./documentPreviewService.js";
 
 export class FileService {
   /**
@@ -143,7 +144,6 @@ export class FileService {
    * - 统一返回 Link JSON 结构，供前端 fileshare 视图消费
    * - rawUrl 与 FS 一致，始终代表“最终 URL”（直链或 share 维度的代理 URL）
    * - 当具备直链能力且 use_proxy = 0 时直接返回存储直链；否则使用 `/api/s/:slug?mode=inline`
-   * - officeSourceUrl 仅在具备直链能力且未强制代理时（kind=direct 且 use_proxy = 0）返回真实直链，否则为 null
    * @param {Object} file - 文件对象
    * @param {boolean} requiresPassword - 是否需要密码
    * @param {import("../storage/link/LinkTypes.js").StorageLink|null} link - 由 LinkService 生成的 StorageLink
@@ -171,48 +171,43 @@ export class FileService {
 
     let rawUrl = null;
     let linkType = "proxy";
-    let origin = "default";
-    let isPresigned = false;
-    let expiresAt = null;
 
     if (hasSlug) {
       if (useProxyFlag) {
         // 代理模式：明确使用 share 内容路由（预览语义）
         rawUrl = buildShareUrl(file.slug, "inline");
         linkType = "proxy";
-        origin = "proxy";
-        isPresigned = false;
-        expiresAt = link?.expiresAt || null;
       } else if (hasDirectLink) {
         // 直链模式 + 具备直链能力：rawUrl 使用存储直链
         rawUrl = link.url;
         linkType = "direct";
-        origin = link.origin || "default";
-        isPresigned = link.isPresigned ?? false;
-        expiresAt = link.expiresAt || null;
       } else {
         // 直链模式 + 无直链能力：老实返回空，由前端根据缺失信息渲染“不支持直链/预览”
         rawUrl = null;
         linkType = "direct";
-        origin = link?.origin || "default";
-        isPresigned = false;
-        expiresAt = link?.expiresAt || null;
       }
-    }
-
-    // 仅当 Link 提供 direct 能力且未强制代理、且当前请求不处于“密码未验证”阶段时暴露存储直链供 Office 预览使用
-    let officeSourceUrl = null;
-    if (!useProxyFlag && hasDirectLink && !requiresPassword) {
-      officeSourceUrl = link.url;
     }
 
     // 对于受密码保护且尚未通过校验的场景，不应在 JSON 中暴露任何可直接访问的 URL
     if (requiresPassword) {
       rawUrl = null;
-      officeSourceUrl = null;
-      isPresigned = false;
-      expiresAt = null;
     }
+
+    // 基于文件信息和 Link JSON 生成 DocumentPreviewResult（仅用于文档/Office 预览）
+    const documentPreview = await resolveDocumentPreview(
+      {
+        type: fileType,
+        typeName: fileTypeName,
+        mimetype: file.mimetype,
+        filename: file.filename,
+        size: file.size,
+      },
+      {
+        rawUrl,
+        linkType,
+        use_proxy: useProxyFlag,
+      },
+    );
 
     return {
       id: file.id,
@@ -227,15 +222,12 @@ export class FileService {
       max_views: file.max_views,
       expires_at: file.expires_at,
       rawUrl,
-      officeSourceUrl,
       linkType,
-      isPresigned,
-      origin,
-      expiresAt,
       use_proxy: useProxyFlag,
       created_by: file.created_by || null,
       type: fileType, // 整数类型常量 (0-6)
       typeName: fileTypeName, // 类型名称（用于调试）
+      documentPreview,
     };
   }
 

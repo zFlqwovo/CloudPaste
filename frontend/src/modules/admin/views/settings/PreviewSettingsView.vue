@@ -174,6 +174,27 @@
               </p>
             </div>
 
+            <!-- 文档/Office DocumentApp 模板配置 -->
+            <div class="setting-item">
+              <label class="block text-sm font-medium mb-2" :class="darkMode ? 'text-gray-200' : 'text-gray-700'">
+                {{ t("admin.preview.documentAppsLabel") }}
+              </label>
+              <textarea
+                v-model="settings.preview_document_apps"
+                :placeholder="t('admin.preview.documentAppsPlaceholder')"
+                rows="6"
+                class="block w-full rounded border shadow-sm px-3 py-2 text-xs font-mono leading-snug"
+                :class="
+                  darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500'
+                "
+              ></textarea>
+              <p class="mt-2 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+                {{ t("admin.preview.documentAppsHelp") }}
+              </p>
+            </div>
+
             <!-- 操作按钮 -->
             <div class="flex justify-between items-center pt-6">
               <button
@@ -255,6 +276,7 @@ const settings = ref({
   preview_audio_types: "",
   preview_office_types: "",
   preview_document_types: "",
+  preview_document_apps: "",
 });
 
 // 默认设置
@@ -266,6 +288,20 @@ const defaultSettings = {
   preview_audio_types: "mp3,flac,ogg,m4a,wav,opus,wma",
   preview_office_types: "doc,docx,xls,xlsx,ppt,pptx,rtf",
   preview_document_types: "pdf",
+  preview_document_apps: JSON.stringify(
+    {
+      "doc,docx,xls,xlsx,ppt,pptx,rtf": {
+        microsoft: {
+          urlTemplate: "https://view.officeapps.live.com/op/view.aspx?src=$e_url",
+        },
+        google: {
+          urlTemplate: "https://docs.google.com/viewer?url=$e_url&embedded=true",
+        },
+      },
+    },
+    null,
+    2,
+  ),
 };
 
 // 加载设置
@@ -295,13 +331,32 @@ const loadSettings = async () => {
 const handleSaveSettings = async (event) => {
   event.preventDefault();
 
-  status.value = {
-    loading: true,
-    success: false,
-    error: "",
-  };
-
   try {
+    // 基础 JSON 校验：preview_document_apps 需要是合法的 JSON 对象
+    if (settings.value.preview_document_apps && settings.value.preview_document_apps.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(settings.value.preview_document_apps);
+        if (!parsed || typeof parsed !== "object") {
+          throw new Error("INVALID_DOCUMENT_APPS_JSON");
+        }
+        settings.value.preview_document_apps = JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        console.error("预览模板配置 JSON 解析失败:", e);
+        status.value = {
+          loading: false,
+          success: false,
+          error: t("admin.preview.documentAppsInvalidJson"),
+        };
+        return;
+      }
+    }
+
+    status.value = {
+      loading: true,
+      success: false,
+      error: "",
+    };
+
     // 预览设置组，分组ID = 2
     await updatePreviewSettings({
       preview_text_types: settings.value.preview_text_types,
@@ -309,6 +364,8 @@ const handleSaveSettings = async (event) => {
       preview_video_types: settings.value.preview_video_types,
       preview_audio_types: settings.value.preview_audio_types,
       preview_office_types: settings.value.preview_office_types,
+      preview_document_types: settings.value.preview_document_types,
+      preview_document_apps: settings.value.preview_document_apps,
     });
     status.value.success = true;
 

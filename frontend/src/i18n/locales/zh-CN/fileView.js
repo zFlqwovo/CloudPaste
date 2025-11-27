@@ -146,6 +146,8 @@ export default {
         title: "PDF预览",
         loading: "加载PDF中...",
         error: "PDF加载失败",
+        browserNative: "原生预览",
+        pdfjsLabel: "PDF.js",
       },
 
       // 图片预览
@@ -162,6 +164,9 @@ export default {
         error: "视频加载失败",
         notSupported: "您的浏览器不支持视频标签",
       },
+
+      // 直链预览提示
+      directNotSupported: "当前存储不支持直链预览，请切换为代理模式。",
 
       // 音频预览
       audio: {
@@ -195,6 +200,8 @@ export default {
         microsoftService: "使用Microsoft Office服务",
         proxyMode: " (Worker代理模式)",
         directMode: " (直接访问模式)",
+        providerMicrosoft: "Microsoft Office Online",
+        providerGoogle: "Google Docs",
       },
     },
 

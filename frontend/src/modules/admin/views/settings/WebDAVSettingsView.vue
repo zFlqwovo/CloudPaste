@@ -18,14 +18,14 @@ const props = defineProps({
 
 // WebDAV设置
 const webdavSettings = ref({
-  // 默认采用单次上传模式，可选值: single, chunked
-  webdav_upload_mode: "single",
+  // 默认采用流式上传模式，可选值: single, chunked
+  webdav_upload_mode: "chunked",
 });
 
 // WebDAV上传模式选项
 const webdavUploadModes = ref([
-  { value: "single", label: t("admin.webdav.uploadSettings.modes.single") },
   { value: "chunked", label: t("admin.webdav.uploadSettings.modes.chunked") },
+  { value: "single", label: t("admin.webdav.uploadSettings.modes.single") },
 ]);
 
 // WebDAV设置更新状态

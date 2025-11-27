@@ -61,10 +61,7 @@ export class LinkService {
     const type = preview?.type || null;
 
     if (url && (type === "custom_host" || type === "presigned")) {
-      return createDirectLink(url, {
-        origin: type === "custom_host" ? "custom_host" : "default",
-        isPresigned: type === "presigned",
-      });
+      return createDirectLink(url);
     }
 
     // 无直链能力：交由上层通过现有流式下载逻辑代理
@@ -97,11 +94,7 @@ export class LinkService {
     const type = linkResult?.type || null;
 
     if (url && (type === "custom_host" || type === "presigned")) {
-      return createDirectLink(url, {
-        origin: type === "custom_host" ? "custom_host" : "default",
-        isPresigned: type === "presigned",
-        expiresAt: linkResult?.expiresIn ? undefined : undefined, // 暂不映射 expiresIn，后续如有需要再扩展
-      });
+      return createDirectLink(url);
     }
 
     return createProxyLink(url || "");

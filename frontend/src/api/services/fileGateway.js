@@ -98,25 +98,27 @@ export function buildDownloadUrl(file, options = {}) {
 }
 
 export async function getOfficePreviewUrl(file, options = {}) {
-  // Office 预览仅在存在直链能力时可用（officeSourceUrl 不存在视为不支持）
-  if (!file?.officeSourceUrl) {
+  const preview = file?.documentPreview;
+
+  // 未提供 documentPreview 或不支持预览时直接返回 null
+  const providers = preview?.providers || {};
+  if (!preview || !Object.keys(providers).length) {
     return null;
   }
 
-  return await fileViewService.getOfficePreviewUrl(
-    { directUrl: file.officeSourceUrl },
-    {
-      provider: options.provider || "microsoft",
-      returnAll: options.returnAll || false,
-    },
-  );
-}
+  const returnAll = options.returnAll || false;
 
-export async function getOfficePreviewUrlsForDirectUrl(directUrl) {
-  if (!directUrl) {
-    return null;
+  if (!returnAll) {
+    // 默认使用 providers 中的 microsoft 作为推荐入口
+    return providers.microsoft || null;
   }
-  return await fileViewService.getOfficePreviewUrl({ directUrl }, { returnAll: true });
+
+  // 返回所有可用的预览 URL（如果服务端提供了 providers）
+  return {
+    directUrl: preview.rawUrl || null,
+    microsoft: providers.microsoft || "",
+    google: providers.google || "",
+  };
 }
 
 export function parseShareUrl(url) {

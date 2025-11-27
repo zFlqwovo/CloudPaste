@@ -88,8 +88,6 @@ export function useFileshareService() {
    * @returns {Promise<any>}
    */
   const getOfficePreviewUrl = async (file, options = {}) => {
-    // 仅在存在直链能力时支持 Office 在线预览
-    if (!file?.officeSourceUrl) return null;
     return gatewayGetOfficePreviewUrl(file, {
       provider: options.provider || "microsoft",
       returnAll: options.returnAll || false,

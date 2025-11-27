@@ -146,6 +146,8 @@ export default {
         title: "PDF Preview",
         loading: "Loading PDF...",
         error: "PDF load failed",
+        browserNative: "Browser Native",
+        pdfjsLabel: "PDF.js",
       },
 
       // Image preview
@@ -162,6 +164,9 @@ export default {
         error: "Video load failed",
         notSupported: "Your browser does not support video tag",
       },
+
+      // Direct preview hint
+      directNotSupported: "Current storage does not support direct-link preview, please switch to proxy mode.",
 
       // Audio preview
       audio: {
@@ -195,6 +200,8 @@ export default {
         microsoftService: "Using Microsoft Office service",
         proxyMode: " (Worker proxy mode)",
         directMode: " (Direct access mode)",
+        providerMicrosoft: "Microsoft Office Online",
+        providerGoogle: "Google Docs",
       },
     },
 
