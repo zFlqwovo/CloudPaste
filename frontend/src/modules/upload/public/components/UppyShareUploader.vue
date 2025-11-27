@@ -598,8 +598,11 @@ const buildShareResultEntry = (item) => {
     shareUrl = record.url.startsWith("http") || !origin ? record.url : `${origin.replace(/\/$/,"")}${record.url}`;
   }
 
-  const previewUrl = record.previewUrl || record.proxyPreviewUrl || shareUrl;
-  const downloadUrl = record.proxyDownloadUrl || record.downloadUrl || (slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "");
+  // 预览与下载统一依赖 Link JSON + share URL：
+  // - 预览：优先使用 fileshareService 基于 Link JSON 构造的预览入口，其次退回分享页
+  // - 下载：始终使用 Down 路由（getPermanentDownloadUrl）
+  const previewUrl = fileshareService.getPermanentPreviewUrl(record) || shareUrl;
+  const downloadUrl = slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "";
 
   return {
     id: record.id || meta.fileId || item?.id || slug,

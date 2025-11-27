@@ -5,63 +5,7 @@
 
 import { get } from "../client";
 
-/**
- * 通过slug下载文件
- * @param {string} slug - 文件短链接
- * @param {string} [password] - 文件密码（如果需要）
- * @returns {Promise<Response>} 文件下载响应
- */
-export async function downloadFileBySlug(slug, password = null) {
-  const params = {};
-  if (password) {
-    params.password = password;
-  }
-
-  // 使用原生fetch以获取文件流响应
-  const { getFullApiUrl, addAuthToken } = await import("../client");
-  const url = getFullApiUrl(`file-download/${slug}`);
-
-  // 构建查询参数
-  const searchParams = new URLSearchParams(params);
-  const fullUrl = searchParams.toString() ? `${url}?${searchParams}` : url;
-
-  // 添加认证头（如果需要）
-  const headers = await addAuthToken({});
-
-  return fetch(fullUrl, {
-    method: "GET",
-    headers,
-  });
-}
-
-/**
- * 通过slug预览文件
- * @param {string} slug - 文件短链接
- * @param {string} [password] - 文件密码（如果需要）
- * @returns {Promise<Response>} 文件预览响应
- */
-export async function previewFileBySlug(slug, password = null) {
-  const params = {};
-  if (password) {
-    params.password = password;
-  }
-
-  // 使用原生fetch以获取文件流响应
-  const { getFullApiUrl, addAuthToken } = await import("../client");
-  const url = getFullApiUrl(`file-view/${slug}`);
-
-  // 构建查询参数
-  const searchParams = new URLSearchParams(params);
-  const fullUrl = searchParams.toString() ? `${url}?${searchParams}` : url;
-
-  // 添加认证头（如果需要）
-  const headers = await addAuthToken({});
-
-  return fetch(fullUrl, {
-    method: "GET",
-    headers,
-  });
-}
+// 旧的基于 slug 的下载/预览函数已被 Down 路由 + Link JSON 替代
 
 // 预览服务提供商配置
 const PREVIEW_PROVIDERS = {
@@ -76,57 +20,31 @@ const PREVIEW_PROVIDERS = {
 };
 
 /**
- * 获取Office文件预览URL（通过slug）
- * @param {string} slug - 文件短链接
- * @param {string} [password] - 文件密码（如果需要）
- * @returns {Promise<string>} 预览URL字符串
- */
-export async function getOfficePreviewUrlBySlug(slug, password = null) {
-  const params = {};
-  if (password) {
-    params.password = password;
-  }
-
-  const response = await get(`office-preview/${slug}`, { params });
-
-  // 后端返回格式：{ url, filename, mimetype, expires_in, is_temporary }
-  // 提取 url 字段返回
-  if (response.success && response.data && response.data.url) {
-    return response.data.url;
-  } else if (response.url) {
-    // 兼容直接返回 url 字段的情况
-    return response.url;
-  } else {
-    throw new Error("无法从响应中获取预览URL");
-  }
-}
-
-/**
  * 统一的Office预览服务
- * @param {string|Object} input - 文件slug字符串 或 包含directUrl的对象
+ * @param {string|Object} input - 直接访问文件的 URL 字符串或包含 directUrl 的对象
  * @param {Object} options - 选项
- * @param {string} [options.password] - 文件密码（当input为slug时）
  * @param {string} [options.provider='microsoft'] - 预览服务提供商 ('microsoft' | 'google')
  * @param {boolean} [options.returnAll=false] - 是否返回所有提供商的URL
  * @returns {Promise<string|Object>} 预览URL或包含所有URL的对象
  */
 export async function getOfficePreviewUrl(input, options = {}) {
-  const { password, provider = "microsoft", returnAll = false } = options;
+  const { provider = "microsoft", returnAll = false } = options;
 
   try {
-    // 获取直接访问URL
+    // 获取直接访问URL（不再通过 slug + /api/office-preview 获取）
     let directUrl;
-    if (typeof input === "string") {
-      // input是slug，需要调用API获取directUrl
-      directUrl = await getOfficePreviewUrlBySlug(input, password);
-      if (!directUrl) {
-        throw new Error("无法获取Office预览URL");
-      }
-    } else if (input && typeof input === "object" && input.directUrl) {
-      // input是包含directUrl的对象
+    if (input && typeof input === "object" && input.directUrl) {
+      // input 是包含 directUrl 的对象
       directUrl = input.directUrl;
+    } else if (typeof input === "string") {
+      // 兼容直接传入直链 URL 的情况
+      directUrl = input;
     } else {
-      throw new Error("无效的输入参数，需要slug字符串或包含directUrl的对象");
+      throw new Error("无效的输入参数，需要包含 directUrl 的对象或直接传入直链 URL");
+    }
+
+    if (!directUrl) {
+      throw new Error("无法获取Office预览URL");
     }
 
     // 生成预览URL
@@ -160,33 +78,16 @@ export async function getOfficePreviewUrl(input, options = {}) {
  * @returns {string} 完整的下载URL
  */
 export function buildDownloadUrl(slug, password = null) {
-  // 使用相对路径构建URL，避免异步导入
+  // 使用 URL API 构建，避免重复 ? 与参数拼接错误
   const baseUrl = window.location.origin;
-  let url = `${baseUrl}/api/file-download/${slug}`;
+  const urlObj = new URL(`/api/s/${slug}`, baseUrl);
+  urlObj.searchParams.set("mode", "attachment");
 
   if (password) {
-    url += `?password=${encodeURIComponent(password)}`;
+    urlObj.searchParams.set("password", password);
   }
 
-  return url;
-}
-
-/**
- * 构建文件预览URL（用于直接链接）
- * @param {string} slug - 文件短链接
- * @param {string} [password] - 文件密码（如果需要）
- * @returns {string} 完整的预览URL
- */
-export function buildPreviewUrl(slug, password = null) {
-  // 使用相对路径构建URL，避免异步导入
-  const baseUrl = window.location.origin;
-  let url = `${baseUrl}/api/file-view/${slug}`;
-
-  if (password) {
-    url += `?password=${encodeURIComponent(password)}`;
-  }
-
-  return url;
+  return urlObj.toString();
 }
 
 /**
@@ -197,33 +98,20 @@ export function buildPreviewUrl(slug, password = null) {
 export function parseFileShareUrl(url) {
   if (!url) return { isFileShare: false };
 
-  // 检查是否为下载URL
-  const downloadMatch = url.match(/\/api\/file-download\/([^?]+)/);
-  if (downloadMatch) {
-    const slug = downloadMatch[1];
+  // 检查是否为 share 内容路由 URL（/api/s/:slug?mode=...）
+  const match = url.match(/\/api\/s\/([^?]+)/);
+  if (match) {
+    const slug = match[1];
     const urlObj = new URL(url, window.location.origin);
     const password = urlObj.searchParams.get("password");
+    const mode = urlObj.searchParams.get("mode") || "inline";
 
     return {
       isFileShare: true,
-      type: "download",
+      type: mode === "attachment" ? "download" : "preview",
       slug,
       password,
-    };
-  }
-
-  // 检查是否为预览URL
-  const previewMatch = url.match(/\/api\/file-view\/([^?]+)/);
-  if (previewMatch) {
-    const slug = previewMatch[1];
-    const urlObj = new URL(url, window.location.origin);
-    const password = urlObj.searchParams.get("password");
-
-    return {
-      isFileShare: true,
-      type: "preview",
-      slug,
-      password,
+      mode,
     };
   }
 

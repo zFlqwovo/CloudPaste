@@ -25,37 +25,6 @@ export class FileViewService {
   }
 
   /**
-   * 增加文件查看次数并检查是否超过限制
-   * @param {Object} file - 文件对象
-   * @returns {Promise<Object>} 包含更新后的文件信息和状态
-   */
-  async incrementAndCheckFileViews(file) {
-    // 使用 FileRepository 递增访问计数
-    const fileRepository = this.repositoryFactory.getFileRepository();
-
-    await fileRepository.incrementViews(file.id);
-
-    // 重新获取更新后的文件信息（包含存储配置）
-    const updatedFile = await fileRepository.findByIdWithStorageConfig(file.id);
-
-    // 检查是否超过最大访问次数
-    if (updatedFile.max_views && updatedFile.max_views > 0 && updatedFile.views > updatedFile.max_views) {
-      // 已超过最大查看次数，执行删除
-      await this.checkAndDeleteExpiredFile(updatedFile);
-      return {
-        isExpired: true,
-        reason: "max_views",
-        file: updatedFile,
-      };
-    }
-
-    return {
-      isExpired: false,
-      file: updatedFile,
-    };
-  }
-
-  /**
    * 检查并删除过期文件
    * @param {Object} file - 文件对象
    */

@@ -5,6 +5,7 @@ import { FileSystem } from "../../storage/fs/FileSystem.js";
 import { getVirtualDirectoryListing, isVirtualPath } from "../../storage/fs/utils/VirtualDirectory.js";
 import { createErrorResponse, getQueryBool, jsonOk } from "../../utils/common.js";
 import { getEncryptionSecret } from "../../utils/environmentUtils.js";
+import { LinkService } from "../../storage/link/LinkService.js";
 
 export const registerBrowseRoutes = (router, helpers) => {
   const { getAccessibleMounts, getServiceParams, verifyPathPasswordToken } = helpers;
@@ -75,11 +76,55 @@ export const registerBrowseRoutes = (router, helpers) => {
       throw new ValidationError("请提供文件路径");
     }
 
+    // 对受路径密码保护的文件路径应用与目录列表相同的校验逻辑
+    if (userType !== UserType.ADMIN && typeof verifyPathPasswordToken === "function") {
+      const pathToken = c.req.header("x-fs-path-token") || null;
+      const verification = await verifyPathPasswordToken(db, path, pathToken, encryptionSecret);
+
+      if (verification.requiresPassword && !verification.verified) {
+        return c.json(
+          {
+            ...createErrorResponse(
+              ApiStatus.FORBIDDEN,
+              verification.error === "PASSWORD_CHANGED"
+                ? "目录路径密码已更新，请重新输入"
+                : "该目录需要密码访问",
+              "FS_PATH_PASSWORD_REQUIRED",
+            ),
+            data: {
+              path,
+              requiresPassword: true,
+            },
+          },
+          ApiStatus.FORBIDDEN,
+        );
+      }
+    }
+
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.getFileInfo(path, userIdOrInfo, userType, c.req.raw);
 
-    return jsonOk(c, result, "获取文件信息成功");
+    // 通过 LinkService 生成统一 Link 信息，rawUrl 直接使用最终 URL（直链或代理）
+    const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
+    const link = await linkService.getLinkForFs(path, userIdOrInfo, userType, {
+      forceDownload: false,
+      request: c.req.raw,
+    });
+
+    const { officeSourceUrl, ...rest } = result;
+
+    const responsePayload = {
+      ...rest,
+      officeSourceUrl: officeSourceUrl || (link.kind === "direct" && link.url ? link.url : null),
+      rawUrl: link.url || null,
+      linkType: link.kind,
+      isPresigned: link.isPresigned ?? false,
+      origin: link.origin || "default",
+      expiresAt: link.expiresAt || null,
+    };
+
+    return jsonOk(c, responsePayload, "获取文件信息成功");
   });
 
   router.get("/api/fs/download", async (c) => {
@@ -94,6 +139,43 @@ export const registerBrowseRoutes = (router, helpers) => {
       throw new ValidationError("请提供文件路径");
     }
 
+    // 下载路由与元数据路由共享相同的路径密码校验规则
+    if (userType !== UserType.ADMIN && typeof verifyPathPasswordToken === "function") {
+      const pathToken = c.req.header("x-fs-path-token") || null;
+      const verification = await verifyPathPasswordToken(db, path, pathToken, encryptionSecret);
+
+      if (verification.requiresPassword && !verification.verified) {
+        return c.json(
+          {
+            ...createErrorResponse(
+              ApiStatus.FORBIDDEN,
+              verification.error === "PASSWORD_CHANGED"
+                ? "目录路径密码已更新，请重新输入"
+                : "该目录需要密码访问",
+              "FS_PATH_PASSWORD_REQUIRED",
+            ),
+            data: {
+              path,
+              requiresPassword: true,
+            },
+          },
+          ApiStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
+    const link = await linkService.getLinkForFs(path, userIdOrInfo, userType, {
+      forceDownload: true,
+      request: c.req.raw,
+    });
+
+    if (link.kind === "direct" && link.url) {
+      // 可直链：统一 302
+      return c.redirect(link.url, 302);
+    }
+
+    // 需要代理：使用现有 FileSystem.downloadFile 做服务端流式下载
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const response = await fileSystem.downloadFile(path, null, c.req.raw, userIdOrInfo, userType);
@@ -116,17 +198,21 @@ export const registerBrowseRoutes = (router, helpers) => {
       throw new ValidationError("请提供文件路径");
     }
 
-    const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
-    const fileSystem = new FileSystem(mountManager);
-    const result = await fileSystem.generateFileLink(path, userIdOrInfo, userType, {
-      operation: "download",
-      userType,
-      userId: userType === UserType.ADMIN ? userIdOrInfo : userIdOrInfo.id,
+    const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
+    const link = await linkService.getLinkForFs(path, userIdOrInfo, userType, {
       expiresIn,
       forceDownload,
       request: c.req.raw,
     });
 
-    return jsonOk(c, result, "获取文件直链成功");
+    const responsePayload = {
+      rawUrl: link.url,
+      linkType: link.kind,
+      isPresigned: link.isPresigned ?? false,
+      origin: link.origin || "default",
+      expiresAt: link.expiresAt || null,
+    };
+
+    return jsonOk(c, responsePayload, "获取文件直链成功");
   });
 };

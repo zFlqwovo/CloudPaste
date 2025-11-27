@@ -49,10 +49,9 @@ export async function generateFileLink(fs, path, userIdOrInfo, userType, options
       forceDownload,
     });
 
-    const url =
-      typeof result === "string"
-        ? result
-        : result?.url || result?.presignedUrl || result?.downloadUrl || result?.previewUrl || null;
+    // 约定：驱动在 generateDownloadUrl 边界统一输出 canonical 字段 result.url
+    // 此处仅消费 canonical url，不再读取驱动返回的任何 legacy 链接字段
+    const url = typeof result === "string" ? result : result?.url || null;
 
     return {
       url,

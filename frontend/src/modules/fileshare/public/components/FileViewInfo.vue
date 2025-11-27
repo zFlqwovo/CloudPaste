@@ -42,6 +42,15 @@
         @update-urls="handleUpdateUrls"
       />
     </div>
+    <!-- 当处于直链模式但当前存储不具备直链预览能力时，在原本内容区域显示占位提示 -->
+    <div
+      v-else-if="!fileInfo.use_proxy && !processedPreviewUrl"
+      class="file-preview mb-6 flex-grow flex items-center justify-center"
+    >
+      <p class="text-sm text-gray-600 dark:text-gray-400">
+        当前存储不支持直链预览，请切换为代理模式。
+      </p>
+    </div>
 
     <!-- 文件元数据 -->
     <div class="file-metadata grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
@@ -162,10 +171,7 @@
 import { computed, ref, defineProps, onMounted, watch, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { getFilePassword as resolveFilePassword } from "@/utils/filePasswordUtils.js";
-import {
-  getOfficePreviewUrl as gatewayGetOfficePreviewUrl,
-  getOfficePreviewUrlsForDirectUrl,
-} from "@/api/services/fileGateway.js";
+import { getOfficePreviewUrlsForDirectUrl } from "@/api/services/fileGateway.js";
 import { useFileshareService } from "@/modules/fileshare/fileshareService.js";
 
 const { t } = useI18n();
@@ -192,13 +198,6 @@ const props = defineProps({
     type: Object,
     required: true,
   },
-  fileUrls: {
-    type: Object,
-    default: () => ({
-      previewUrl: "",
-      downloadUrl: "",
-    }),
-  },
   darkMode: {
     type: Boolean,
     default: false,
@@ -215,9 +214,9 @@ const showCopyToast = ref(false);
 
 const getFilePassword = () => resolveFilePassword({ file: props.fileInfo });
 
-// 处理预览URL，优先通过 gateway 构造，自动根据代理/直链决定是否携带密码
+// 处理预览URL，统一通过 fileshareService 基于 Link JSON 构造
 const processedPreviewUrl = computed(() => {
-  return fileshareService.getPermanentPreviewUrl(props.fileInfo) || props.fileUrls.previewUrl || "";
+  return fileshareService.getPermanentPreviewUrl(props.fileInfo) || "";
 });
 
 // 格式化的文件大小
@@ -302,7 +301,7 @@ const currentPreviewComponent = computed(() => {
 
 // 是否应该显示预览
 const shouldShowPreview = computed(() => {
-  return props.fileUrls.previewUrl || isOfficeFile.value;
+  return processedPreviewUrl.value || isOfficeFile.value;
 });
 
 // 注意：预览能力检查现在通过 shouldShowPreview 计算属性处理
@@ -387,7 +386,7 @@ const previewComponentProps = computed(() => {
       mimetype: props.fileInfo.mimetype,
       filename: props.fileInfo.filename,
       useProxy: props.fileInfo.use_proxy,
-      downloadUrl: props.fileUrls.downloadUrl,
+      downloadUrl: fileshareService.getPermanentDownloadUrl(props.fileInfo),
     };
   }
 
@@ -519,57 +518,25 @@ const savePasswordToSessionStorage = () => {
   }
 };
 
-// 获取Office文件直接访问URL (用于Worker代理模式)
-const getOfficeDirectUrlForPreview = async () => {
-  if (!props.fileInfo.slug) return null;
-
-  try {
-    const filePassword = getFilePassword();
-
-    if (!filePassword && props.fileInfo.password) {
-      console.warn("文件需要密码，但无法获取到密码", {
-        hasCurrentPassword: !!props.fileInfo.currentPassword,
-        hasUrlPassword: !!new URL(window.location.href).searchParams.get("password"),
-        hasSessionStorage: !!sessionStorage.getItem(`file_password_${props.fileInfo.slug}`),
-      });
-    }
-
-    console.log("正在获取Office直接URL", { slug: props.fileInfo.slug, hasPassword: !!filePassword });
-
-    const previewUrls = await gatewayGetOfficePreviewUrl(props.fileInfo, {
-      returnAll: true,
-    });
-
-    // 缓存获取的直接URL
-    officeDirectUrl.value = previewUrls.directUrl;
-
-    // 确保密码被保存到会话存储中以便后续使用
-    if (filePassword && props.fileInfo.slug) {
-      try {
-        sessionStorage.setItem(`file_password_${props.fileInfo.slug}`, filePassword);
-      } catch (err) {
-        console.error("保存密码到会话存储失败:", err);
-      }
-    }
-
-    return previewUrls.directUrl;
-  } catch (error) {
-    console.error("获取Office直接URL出错:", error);
-    officePreviewError.value = `获取预览失败: ${error.message || "未知错误"}`;
-    return null;
-  }
-};
-
 // 更新Office预览URL
 const updateOfficePreviewUrls = async () => {
   // 重置加载状态
   officePreviewLoading.value = true;
   officePreviewError.value = "";
 
-  // 记录密码状态
+  // 记录密码状态（仅用于缓存键，不再传递给 Office 直链）
   const filePassword = getFilePassword();
 
   try {
+    // 统一依赖后端提供的 officeSourceUrl：缺失即视为不支持在线预览
+    if (!props.fileInfo.officeSourceUrl) {
+      microsoftOfficePreviewUrl.value = "";
+      googleDocsPreviewUrl.value = "";
+      officePreviewError.value = "当前存储不支持 Office 在线预览，请下载文件后在本地查看。";
+      officePreviewLoading.value = false;
+      return;
+    }
+
     // 生成缓存键
     const cacheKey = `${props.fileInfo.slug}_${props.fileInfo.use_proxy ? "proxy" : "direct"}_${filePassword || "no_password"}`;
 
@@ -586,66 +553,34 @@ const updateOfficePreviewUrls = async () => {
       return;
     }
 
-    // 如果是Worker代理模式，需要特殊处理
-    if (props.fileInfo.use_proxy) {
-      // 使用专门的API获取临时直接URL
-      const directUrl = await getOfficeDirectUrlForPreview();
+    // 基于 officeSourceUrl 生成各个 Office Viewer URL
+    const previewUrls = await getOfficePreviewUrlsForDirectUrl(props.fileInfo.officeSourceUrl);
 
-      if (directUrl) {
-        const previewUrls = await getOfficePreviewUrlsForDirectUrl(directUrl);
-
-        microsoftOfficePreviewUrl.value = previewUrls.microsoft;
-        googleDocsPreviewUrl.value = previewUrls.google;
-
-        // 缓存URL（代理模式的URL有时效性，缓存时间较短 - 10分钟）
-        officePreviewCache.set(
-          cacheKey,
-          {
-            microsoft: previewUrls.microsoft,
-            google: previewUrls.google,
-          },
-          10 * 60 * 1000
-        );
-
-        console.log("缓存Office预览URL (代理模式)", { cacheKey });
-      } else {
-        microsoftOfficePreviewUrl.value = "";
-        googleDocsPreviewUrl.value = "";
-        officePreviewError.value = "获取Office预览URL失败";
-      }
-    } else {
-      // S3直链模式，正常处理
-      if (!processedPreviewUrl.value) {
-        microsoftOfficePreviewUrl.value = "";
-        googleDocsPreviewUrl.value = "";
-        return;
-      }
-
-      // 确保URL是完整的绝对URL
-      let url = processedPreviewUrl.value;
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        // 如果是相对URL，转换为绝对URL
-        const baseUrl = window.location.origin;
-        url = url.startsWith("/") ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
-      }
-
-      const previewUrls = await getOfficePreviewUrlsForDirectUrl(url);
-
-      microsoftOfficePreviewUrl.value = previewUrls.microsoft;
-      googleDocsPreviewUrl.value = previewUrls.google;
-
-      // 缓存URL（直链模式的URL相对稳定，可以缓存更长时间 - 30分钟）
-      officePreviewCache.set(
-        cacheKey,
-        {
-          microsoft: previewUrls.microsoft,
-          google: previewUrls.google,
-        },
-        30 * 60 * 1000
-      );
-
-      console.log("缓存Office预览URL (直链模式)", { cacheKey });
+    if (!previewUrls || !previewUrls.microsoft || !previewUrls.google) {
+      microsoftOfficePreviewUrl.value = "";
+      googleDocsPreviewUrl.value = "";
+      officePreviewError.value = "当前存储不支持 Office 在线预览，请下载文件后在本地查看。";
+      officePreviewLoading.value = false;
+      return;
     }
+
+    // 缓存获取的直接URL
+    officeDirectUrl.value = previewUrls.directUrl || props.fileInfo.officeSourceUrl;
+
+    microsoftOfficePreviewUrl.value = previewUrls.microsoft;
+    googleDocsPreviewUrl.value = previewUrls.google;
+
+    // 缓存URL（不同模式缓存时间可以统一，这里保持 30 分钟）
+    officePreviewCache.set(
+      cacheKey,
+      {
+        microsoft: previewUrls.microsoft,
+        google: previewUrls.google,
+      },
+      30 * 60 * 1000,
+    );
+
+    console.log("缓存Office预览URL (基于 officeSourceUrl)", { cacheKey });
 
     // 开始预览加载超时计时
     startPreviewLoadTimeout();

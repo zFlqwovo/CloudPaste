@@ -20,7 +20,7 @@ function normalizeListResponse(response, limit, offset) {
 function ensurePasswordInUrl(url, password, file) {
   if (!url || !password) return url || "";
 
-  // 仅对代理 URL（/api/file-view 或 /api/file-download）追加密码
+  // 仅对 share 内容路由（/api/s/:slug?mode=...）追加密码
   // 以及标记为 use_proxy 的文件，避免污染直链/CDN URL
   const shareInfo = fileViewService.parseFileShareUrl(url);
   const isProxy = shareInfo.isFileShare || file?.use_proxy;
@@ -65,9 +65,13 @@ export function buildPreviewUrl(file, options = {}) {
   if (!file) return "";
   const password = resolvePassword(file, options.password);
 
-  let url = file.urls?.proxyPreviewUrl || file.previewUrl;
-  if (!url && file.slug) {
-    url = fileViewService.buildPreviewUrl(file.slug, password || null);
+  // 预览统一基于 Link JSON 的 rawUrl：
+  // - 当 rawUrl 为直链时直接使用
+  // - 当 rawUrl 为 `/api/s/:slug?mode=inline` 时视为需要附加 header 的代理入口
+  let url = file.rawUrl || "";
+  if (!url && file.slug && (file.linkType === "proxy" || file.use_proxy)) {
+    // 仅在代理模式下才回退到 share 内容路由的 inline 模式
+    url = `/api/s/${file.slug}?mode=inline`;
   }
 
   if (!url) return "";
@@ -79,8 +83,12 @@ export function buildDownloadUrl(file, options = {}) {
   if (!file) return "";
   const password = resolvePassword(file, options.password);
 
-  let url = file.urls?.proxyDownloadUrl || file.downloadUrl;
-  if (!url && file.slug) {
+  // 下载统一基于 share 内容路由：
+  // - 对于有 slug 的 share：始终使用 `/api/s/:slug?mode=attachment[&password=...]` 作为下载入口
+  let url = "";
+
+  if (file.slug) {
+    // 使用统一的内容路由构造下载 URL，由后端根据 use_proxy 决定直链 302 还是代理流式返回
     url = fileViewService.buildDownloadUrl(file.slug, password || null);
   }
 
@@ -90,13 +98,18 @@ export function buildDownloadUrl(file, options = {}) {
 }
 
 export async function getOfficePreviewUrl(file, options = {}) {
-  if (!file?.slug) return null;
-  const password = resolvePassword(file, options.password);
-  return await fileViewService.getOfficePreviewUrl(file.slug, {
-    password: password || undefined,
-    provider: options.provider || "microsoft",
-    returnAll: options.returnAll || false,
-  });
+  // Office 预览仅在存在直链能力时可用（officeSourceUrl 不存在视为不支持）
+  if (!file?.officeSourceUrl) {
+    return null;
+  }
+
+  return await fileViewService.getOfficePreviewUrl(
+    { directUrl: file.officeSourceUrl },
+    {
+      provider: options.provider || "microsoft",
+      returnAll: options.returnAll || false,
+    },
+  );
 }
 
 export async function getOfficePreviewUrlsForDirectUrl(directUrl) {

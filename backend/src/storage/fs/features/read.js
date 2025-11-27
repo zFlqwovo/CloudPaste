@@ -33,7 +33,7 @@ export async function getFileInfo(fs, path, userIdOrInfo, userType, request = nu
     });
   }
 
-  // 先获取基础文件信息（不关心其中是否包含 previewUrl/downloadUrl）
+  // 先获取基础文件信息（不关心其中是否包含任何 legacy 链接字段）
   const baseInfo = await driver.getFileInfo(path, {
     mount,
     subPath,
@@ -43,27 +43,31 @@ export async function getFileInfo(fs, path, userIdOrInfo, userType, request = nu
     request,
   });
 
-  // 再通过统一的 Link Resolver 生成预览/下载链接，并覆盖或补充 driver 返回的字段
-  let previewUrl = baseInfo?.previewUrl;
-  let downloadUrl = baseInfo?.downloadUrl;
+  // 再通过统一的 Link Resolver 生成用于 Office 预览的直链（如有）
+  let officeSourceUrl = baseInfo?.officeSourceUrl || null;
 
   try {
-    // 预览链接：不强制下载
+    // 预览直链：不强制下载
     const previewLink = await featureGenerateFileLink(fs, path, userIdOrInfo, userType, {
       request,
       forceDownload: false,
     });
-    if (previewLink?.url) {
-      previewUrl = previewLink.url;
-    }
 
-    // 下载链接：强制下载
+    // 下载直链：强制下载
     const downloadLink = await featureGenerateFileLink(fs, path, userIdOrInfo, userType, {
       request,
       forceDownload: true,
     });
-    if (downloadLink?.url) {
-      downloadUrl = downloadLink.url;
+
+    // 为 Office 预览推导一个存储直链（如有）
+    const isDirectType = (t) => t === "custom_host" || t === "presigned";
+
+    if (!officeSourceUrl) {
+      if (previewLink?.url && isDirectType(previewLink.type)) {
+        officeSourceUrl = previewLink.url;
+      } else if (downloadLink?.url && isDirectType(downloadLink.type)) {
+        officeSourceUrl = downloadLink.url;
+      }
     }
   } catch (e) {
     // 链接生成失败时保持基础信息不变，由上层决定如何处理
@@ -72,8 +76,7 @@ export async function getFileInfo(fs, path, userIdOrInfo, userType, request = nu
 
   return {
     ...baseInfo,
-    previewUrl,
-    downloadUrl,
+    officeSourceUrl,
   };
 }
 
@@ -108,5 +111,3 @@ export async function exists(fs, path, userIdOrInfo, userType) {
     userType,
   });
 }
-
-

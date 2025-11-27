@@ -886,7 +886,7 @@ export class S3BatchOperations {
 
           // 生成源文件的下载预签名URL
           const expiresIn = 3600; // 1小时
-          const downloadUrl = await generateDownloadUrl(sourceS3Config, s3SourcePath, this.encryptionSecret, expiresIn, false);
+          const rawUrl = await generateDownloadUrl(sourceS3Config, s3SourcePath, this.encryptionSecret, expiresIn, false);
 
           // 生成目标文件的上传预签名URL（使用重命名后的路径）
           const fileName = sourcePath.split("/").filter(Boolean).pop() || "file";
@@ -906,7 +906,7 @@ export class S3BatchOperations {
             storagePath: finalS3TargetPath,
             fileName,
             contentType,
-            downloadUrl,
+            rawUrl,
             uploadUrl,
             renamed: wasRenamed,
             originalTarget: targetPath,

@@ -80,19 +80,18 @@ export function usePreviewRenderers(file, emit, darkMode) {
   });
 
   /**
-  * 预览URL - 直接使用文件信息中的 previewUrl 字段
+   * 预览URL - 基于 Link JSON 中的 rawUrl
+   * 在 FS 视图下由后端统一构造为最终可访问的直链或代理URL
    */
   const previewUrl = computed(() => {
     if (!file.value) return "";
 
-    // 直接使用文件信息中的 previewUrl 字段（S3直链/代理）
-    if (file.value.previewUrl) {
-      console.log("使用文件信息中的previewUrl:", file.value.previewUrl);
-      return file.value.previewUrl;
+    if (file.value.rawUrl) {
+      console.log("使用文件信息中的 rawUrl 作为预览入口:", file.value.rawUrl);
+      return file.value.rawUrl;
     }
 
-    // 如果没有 previewUrl，说明后端有问题
-    console.error("文件信息中没有 previewUrl 字段，请检查后端 getFileInfo 实现");
+    console.error("文件信息中没有 rawUrl 字段，请检查后端 /api/fs/get 实现");
     return "";
   });
 
@@ -106,36 +105,33 @@ export function usePreviewRenderers(file, emit, darkMode) {
   // ===== 文本内容加载已移除 =====
 
   /**
-   * 获取认证预览URL
+   * 获取认证预览URL（保留方法以兼容可能的工具场景）
+   * FS 视图下默认直接使用 rawUrl，正常预览不再依赖 Blob 模式
    */
   const fetchAuthenticatedUrl = async () => {
-    try {
-      // 转换为Blob URL以解决认证问题
-      const authenticatedUrl = await createAuthenticatedPreviewUrl(previewUrl.value);
-      authenticatedPreviewUrl.value = authenticatedUrl;
-    } catch (error) {
-      console.error("获取认证预览URL失败:", error);
-      loadError.value = true;
-      emit("error");
+    const url = previewUrl.value;
+    if (!url) {
+      console.warn("预览URL为空，无法获取认证预览URL");
+      return;
     }
+    authenticatedPreviewUrl.value = url;
   };
 
   // ===== Office预览处理 =====
 
   /**
    * 获取Office文件的直接URL
+   * 仅在后端提供 officeSourceUrl（直链能力）时支持
    */
   const getOfficeDirectUrlForPreview = async () => {
     try {
-      // 直接使用文件信息中的 previewUrl 字段（S3直链/代理）
-      if (file.value.previewUrl) {
-        console.log("Office预览使用文件信息中的previewUrl:", file.value.previewUrl);
-        return file.value.previewUrl;
+      if (file.value?.officeSourceUrl) {
+        console.log("Office预览使用文件信息中的 officeSourceUrl:", file.value.officeSourceUrl);
+        return file.value.officeSourceUrl;
       }
 
-      // 如果没有 previewUrl，说明后端有问题
-      console.error("Office预览：文件信息中没有 previewUrl 字段，请检查后端 getFileInfo 实现");
-      throw new Error("文件信息中缺少 previewUrl 字段");
+      console.warn("当前文件没有 officeSourceUrl，视为不支持 Office 在线预览");
+      throw new Error("当前挂载不支持 Office 在线预览，请下载文件后在本地查看。");
     } catch (error) {
       console.error("获取Office预览URL失败:", error);
       throw error;
@@ -413,7 +409,7 @@ export function usePreviewRenderers(file, emit, darkMode) {
    */
   watch(
     () => file.value,
-    (newFile) => {
+    async (newFile) => {
       // 重置基本状态
       loadError.value = false;
       authenticatedPreviewUrl.value = null;
@@ -459,15 +455,16 @@ export function usePreviewRenderers(file, emit, darkMode) {
         console.log(`✅ 最终预览类型: ${selectedType}`);
         console.groupEnd();
 
-        // 使用S3预签名URL（图片、视频、音频、PDF、压缩文件）
-        if (typeChecks.isImage || typeChecks.isVideo || typeChecks.isAudio || typeChecks.isPdf) {
+        if (
+          typeChecks.isImage ||
+          typeChecks.isVideo ||
+          typeChecks.isAudio ||
+          typeChecks.isPdf ||
+          typeChecks.isText ||
+          (file.value?.name && isArchiveFile(file.value.name))
+        ) {
+          // 直接使用 rawUrl 作为预览入口
           authenticatedPreviewUrl.value = previewUrl.value;
-        }
-
-        // 为压缩文件也生成预览URL（用于在线解压）
-        if (file.value?.name && isArchiveFile(file.value.name)) {
-          authenticatedPreviewUrl.value = previewUrl.value;
-          console.log("为压缩文件生成预览URL:", previewUrl.value);
         }
 
         // 如果是Office文件，更新Office预览URL

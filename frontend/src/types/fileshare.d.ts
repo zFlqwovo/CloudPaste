@@ -15,6 +15,13 @@ export interface FileshareItem {
   passwordVerified?: boolean;
   currentPassword?: string | null;
   use_proxy?: boolean;
+  // Link JSON / share 视图补充字段（share 视图只保证提供 rawUrl 等字段）
+  rawUrl?: string | null;
+  officeSourceUrl?: string | null;
+  linkType?: "direct" | "proxy";
+  isPresigned?: boolean;
+  origin?: string;
+  expiresAt?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -23,4 +30,3 @@ export interface FileshareListResponse {
   files: FileshareItem[];
   pagination: PaginationInfo;
 }
-
