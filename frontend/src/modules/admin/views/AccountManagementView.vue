@@ -3,24 +3,18 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAuthStore } from "@/stores/authStore";
 import { useAdminAccountService } from "@/modules/admin/services/accountService.js";
+import { useThemeMode } from "@/composables/core/useThemeMode.js";
 
 // 使用i18n和认证Store
 const { t } = useI18n();
 const authStore = useAuthStore();
 const { changePassword } = useAdminAccountService();
+const { isDarkMode: darkMode } = useThemeMode();
 
 // 检测用户类型
 const isAdmin = computed(() => authStore.isAdmin);
 const isApiKeyUser = computed(() => authStore.authType === "apikey");
 const isGuest = computed(() => authStore.isGuest);
-
-// 定义props，接收父组件传递的darkMode
-const props = defineProps({
-  darkMode: {
-    type: Boolean,
-    required: true,
-  },
-});
 
 // 定义事件，用于通知父组件需要退出登录
 const emit = defineEmits(["logout"]);

@@ -3,18 +3,12 @@ import { ref, onMounted } from "vue";
 import { API_BASE_URL } from "@/api/config";
 import { useI18n } from "vue-i18n";
 import { useAdminSystemService } from "@/modules/admin/services/systemService.js";
+import { useThemeMode } from "@/composables/core/useThemeMode.js";
 
 // 使用i18n
 const { t } = useI18n();
 const { getWebdavSettings, updateWebdavSettings } = useAdminSystemService();
-
-// 定义props，接收父组件传递的darkMode
-const props = defineProps({
-  darkMode: {
-    type: Boolean,
-    required: true,
-  },
-});
+const { isDarkMode: darkMode } = useThemeMode();
 
 // WebDAV设置
 const webdavSettings = ref({

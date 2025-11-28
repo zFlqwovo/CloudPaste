@@ -2,18 +2,14 @@
 import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAdminSystemService } from "@/modules/admin/services/systemService.js";
+import { useThemeMode } from "@/composables/core/useThemeMode.js";
 
 // 使用i18n
 const { t } = useI18n();
 const { getGlobalSettings, updateGlobalSettings } = useAdminSystemService();
 
-// 定义props
-const props = defineProps({
-  darkMode: {
-    type: Boolean,
-    required: true,
-  },
-});
+
+const { isDarkMode: darkMode } = useThemeMode();
 
 // 上传限制设置
 const uploadSettings = ref({

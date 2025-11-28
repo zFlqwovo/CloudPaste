@@ -153,8 +153,7 @@ export default {
     documentTypesHelp: "用逗号分隔的文档文件扩展名，这些文件可以直接在浏览器中预览",
 
     documentAppsLabel: "文档/Office 预览模板",
-    documentAppsPlaceholder:
-      "例如：{\"doc,docx,xls,xlsx,ppt,pptx,rtf\": {\"microsoft\": {\"urlTemplate\": \"https://view.officeapps.live.com/op/view.aspx?src=$e_url\"}}}",
+    documentAppsPlaceholder: "例如：为 doc,docx,xls,xlsx,ppt,pptx,rtf 配置 microsoft/Google 等服务的 urlTemplate，详见下方示例",
     documentAppsHelp: "为文档/Office 文件配置 DocumentApp 模板，键为扩展名列表或正则，值为各个预览服务的 URL 模板。",
 
     resetDefaults: "重置为默认",

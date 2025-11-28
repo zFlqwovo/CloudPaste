@@ -157,7 +157,7 @@ export default {
 
     documentAppsLabel: "Document/Office preview templates",
     documentAppsPlaceholder:
-      'Example: {"doc,docx,xls,xlsx,ppt,pptx,rtf": {"microsoft": {"urlTemplate": "https://view.officeapps.live.com/op/view.aspx?src=$e_url"}}}',
+      "For example: Configure urlTemplate for services like Microsoft/Google for doc,docx,xls,xlsx,ppt,pptx,rtf files, see the example below for details",
     documentAppsHelp:
       "Configure DocumentApp templates for document/Office files, keys are extension lists or patterns, values are URL templates for each preview service.",
 
