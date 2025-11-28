@@ -129,7 +129,7 @@ export default {
       language: "语言:",
       autoDetect: "自动检测",
       configFile: "配置文件",
-      loadingPreview: "正在加载Office预览...",
+      loadingPreview: "加载中...",
       previewError: "加载文件预览失败",
       retryLoad: "请尝试重新加载或下载文件查看",
       retry: "重试",
@@ -155,7 +155,9 @@ export default {
       audioTag: "音频标签",
       cannotLoadText: "无法加载文本内容",
       loadTextError: "加载文本内容时出错",
-      officeLoading: "正在加载 Office 预览...",
+      pdfLoading: "加载中...",
+      noPdfPreview: "无法加载 PDF 预览",
+      officeLoading: "加载中...",
       getStorageLinkFailed: "获取存储直链失败: {message}",
       storagePreviewFailed: "存储直链预览失败: {message}",
       fileTooLarge: "文件内容过大，超过最大限制(10MB)。请减少文件大小后重试。",
@@ -169,15 +171,15 @@ export default {
       cannotGetEditorContent: "无法获取编辑器内容",
     },
     audioPreview: {
-      loadingAudio: "正在加载音频...",
+      loadingAudio: "加载中...",
       audioPlayer: "音频播放器",
     },
     videoPreview: {
-      loadingVideo: "正在加载视频...",
+      loadingVideo: "加载中...",
       videoPlayer: "视频播放器",
     },
     textPreview: {
-      loadingText: "正在加载文本内容...",
+      loadingText: "加载中...",
     },
 
     taskManager: {

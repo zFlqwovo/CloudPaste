@@ -12,41 +12,6 @@
       <div class="setting-group bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
         <h2 class="text-lg font-medium mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{{ t("admin.preview.title") }}</h2>
         <div class="space-y-4">
-          <!-- 状态消息 -->
-          <div
-            v-if="status.success"
-            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-            :class="darkMode ? 'bg-green-900/20 border-green-800/40 text-green-200' : 'bg-green-50 border-green-200 text-green-800'"
-          >
-            <div class="flex items-center">
-              <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fill-rule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              {{ t("admin.preview.saveSuccess") }}
-            </div>
-          </div>
-
-          <div
-            v-if="status.error"
-            class="mb-4 rounded-lg p-4 border transition-colors duration-200"
-            :class="darkMode ? 'bg-red-900/20 border-red-800/40 text-red-200' : 'bg-red-50 border-red-200 text-red-800'"
-          >
-            <div class="flex items-center">
-              <svg class="h-5 w-5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fill-rule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              {{ status.error }}
-            </div>
-          </div>
-
           <form @submit="handleSaveSettings" class="space-y-6">
             <!-- 文本文件类型设置 -->
             <div class="setting-item">
@@ -249,17 +214,17 @@ import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAdminSystemService } from "@/modules/admin/services/systemService.js";
 import { useThemeMode } from "@/composables/core/useThemeMode.js";
+import { useGlobalMessage } from "@/composables/core/useGlobalMessage.js";
 
 // 使用i18n
 const { t } = useI18n();
 const { getPreviewSettings, updatePreviewSettings } = useAdminSystemService();
 const { isDarkMode: darkMode } = useThemeMode();
+const { showSuccess, showError } = useGlobalMessage();
 
-// 状态管理
+// 状态管理（仅用于控制加载状态）
 const status = ref({
   loading: false,
-  success: false,
-  error: "",
 });
 
 // 预览设置数据
@@ -302,7 +267,6 @@ const defaultSettings = {
 const loadSettings = async () => {
   try {
     status.value.loading = true;
-    status.value.error = "";
 
     // 使用分组API获取预览设置（分组ID = 2）
     const previewSettings = await getPreviewSettings();
@@ -315,7 +279,8 @@ const loadSettings = async () => {
     });
   } catch (err) {
     console.error("加载预览设置失败:", err);
-    status.value.error = err.message || "加载设置失败";
+    const message = err.message || "加载设置失败";
+    showError(message);
   } finally {
     status.value.loading = false;
   }
@@ -336,20 +301,14 @@ const handleSaveSettings = async (event) => {
         settings.value.preview_document_apps = JSON.stringify(parsed, null, 2);
       } catch (e) {
         console.error("预览模板配置 JSON 解析失败:", e);
-        status.value = {
-          loading: false,
-          success: false,
-          error: t("admin.preview.documentAppsInvalidJson"),
-        };
+        const message = t("admin.preview.documentAppsInvalidJson");
+        status.value.loading = false;
+        showError(message);
         return;
       }
     }
 
-    status.value = {
-      loading: true,
-      success: false,
-      error: "",
-    };
+    status.value.loading = true;
 
     // 预览设置组，分组ID = 2
     await updatePreviewSettings({
@@ -361,15 +320,11 @@ const handleSaveSettings = async (event) => {
       preview_document_types: settings.value.preview_document_types,
       preview_document_apps: settings.value.preview_document_apps,
     });
-    status.value.success = true;
-
-    // 3秒后清除成功消息
-    setTimeout(() => {
-      status.value.success = false;
-    }, 3000);
+    showSuccess(t("admin.preview.saveSuccess"));
   } catch (err) {
     console.error("保存预览设置失败:", err);
-    status.value.error = err.message || "保存设置失败";
+    const message = err.message || "保存设置失败";
+    showError(message);
   } finally {
     status.value.loading = false;
   }

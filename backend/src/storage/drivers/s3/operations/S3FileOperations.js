@@ -286,7 +286,7 @@ export class S3FileOperations {
 
         // 统一在驱动层使用 canonical 字段 url，供上层 LinkStrategy/LinkService 消费
         const url = presignedUrl;
-        const type = this.config.custom_host ? "custom_host" : "presigned";
+        const type = this.config.custom_host ? "custom_host" : "native_direct";
 
         return {
           success: true,

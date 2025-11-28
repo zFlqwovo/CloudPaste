@@ -10,8 +10,7 @@ import { createS3Client, generateCustomHostDirectUrl } from "./utils/s3Utils.js"
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath, isCompleteFilePath } from "./utils/S3PathUtils.js";
 import { updateMountLastUsed, findMountPointByPath } from "../../fs/utils/MountResolver.js";
-import { buildFullProxyUrl, buildSignedProxyUrl } from "../../../constants/proxy.js";
-import { ProxySignatureService } from "../../../services/ProxySignatureService.js";
+import { buildFullProxyUrl } from "../../../constants/proxy.js";
 import { S3DriverError, AppError } from "../../../http/errors.js";
 
 // 导入各个操作模块
@@ -38,7 +37,7 @@ export class S3StorageDriver extends BaseDriver {
     this.capabilities = [
       CAPABILITIES.READER, // 读取能力：list, get, getInfo
       CAPABILITIES.WRITER, // 写入能力：put, mkdir, remove
-      CAPABILITIES.PRESIGNED, // 预签名URL能力：generatePresignedUrl
+      CAPABILITIES.DIRECT_LINK, // 直链能力（custom_host/预签名等）：generateDownloadUrl/generateUploadUrl
       CAPABILITIES.MULTIPART, // 分片上传能力：multipart upload
       CAPABILITIES.ATOMIC, // 原子操作能力：rename, copy
       CAPABILITIES.PROXY, // 代理能力：generateProxyUrl
@@ -437,15 +436,11 @@ export class S3StorageDriver extends BaseDriver {
   async generateDownloadUrl(path, options = {}) {
     this._ensureInitialized();
 
-    const { mount, subPath, db } = options;
+    const { subPath } = options;
     const s3SubPath = normalizeS3SubPath(subPath, false);
 
-    if (db && mount?.id) {
-      await updateMountLastUsed(db, mount.id);
-    }
-
     try {
-      const { expiresIn, forceDownload, userType, userId } = options;
+      const { expiresIn, forceDownload, userType, userId, mount } = options;
       return await this.fileOps.generateDownloadUrl(s3SubPath, {
         expiresIn,
         forceDownload,
@@ -467,12 +462,8 @@ export class S3StorageDriver extends BaseDriver {
   async generateWebDavProxyUrl(path, options = {}) {
     this._ensureInitialized();
 
-    const { mount, subPath, db } = options;
+    const { subPath } = options;
     const s3SubPath = normalizeS3SubPath(subPath, false);
-
-    if (db && mount?.id) {
-      await updateMountLastUsed(db, mount.id);
-    }
 
     if (!this.customHost) {
       return null;
@@ -898,44 +889,15 @@ export class S3StorageDriver extends BaseDriver {
    * @returns {Promise<Object>} 代理URL对象
    */
   async generateProxyUrl(path, options = {}) {
-    const { mount, request, download = false, db } = options;
+    const { request, download = false, channel = "web" } = options;
 
-    // 检查挂载点是否启用代理
-    if (!this.supportsProxyMode(mount)) {
-      throw new AppError("此挂载点未启用代理访问", { status: ApiStatus.FORBIDDEN, code: "FORBIDDEN", expose: true });
-    }
-
-    // 检查是否需要签名
-    const signatureService = new ProxySignatureService(db, this.encryptionSecret);
-    const signatureNeed = await signatureService.needsSignature(mount);
-
-    let proxyUrl;
-    let signInfo = null;
-
-    if (signatureNeed.required) {
-      // 生成签名
-      signInfo = await signatureService.generateStorageSignature(path, mount);
-
-      // 生成带签名的代理URL
-      proxyUrl = buildSignedProxyUrl(request, path, {
-        download,
-        signature: signInfo.signature,
-        requestTimestamp: signInfo.requestTimestamp,
-        needsSignature: true,
-      });
-    } else {
-      // 生成普通代理URL
-      proxyUrl = buildFullProxyUrl(request, path, download);
-    }
+    // 驱动层仅负责根据路径构造基础代理URL，不再做签名与策略判断
+    const proxyUrl = buildFullProxyUrl(request, path, download);
 
     return {
       url: proxyUrl,
       type: "proxy",
-      signed: signatureNeed.required,
-      signatureLevel: signatureNeed.level,
-      expiresAt: signInfo?.expiresAt,
-      isTemporary: signInfo?.isTemporary,
-      policy: mount?.webdav_policy || "302_redirect",
+      channel,
     };
   }
 
@@ -944,8 +906,8 @@ export class S3StorageDriver extends BaseDriver {
    * @param {Object} mount - 挂载点信息
    * @returns {boolean} 是否支持代理模式
    */
-  supportsProxyMode(mount) {
-    return mount && !!mount.web_proxy;
+  supportsProxyMode() {
+    return true;
   }
 
   /**
@@ -953,10 +915,9 @@ export class S3StorageDriver extends BaseDriver {
    * @param {Object} mount - 挂载点信息
    * @returns {Object} 代理配置对象
    */
-  getProxyConfig(mount) {
+  getProxyConfig() {
     return {
-      enabled: this.supportsProxyMode(mount),
-      webdavPolicy: mount?.webdav_policy || "302_redirect",
+      enabled: this.supportsProxyMode(),
     };
   }
 

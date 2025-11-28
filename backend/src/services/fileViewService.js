@@ -167,7 +167,7 @@ export class FileViewService {
         });
       }
 
-      // use_proxy != 1 时，尝试走直链：custom_host 优先，其次 PRESIGNED；不再“代理直链”
+      // use_proxy != 1 时，尝试走直链：custom_host 优先，其次直链能力（DirectLink，例如预签名 URL）；不再“代理直链”
       let directUrl = null;
       try {
         const objectStore = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);

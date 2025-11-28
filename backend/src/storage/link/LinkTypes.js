@@ -1,5 +1,5 @@
 // 通用 StorageLink 类型定义与辅助工具
-// kind 仅区分 direct/proxy；presigned/custom_host 通过附加标记表达
+// kind 仅区分 direct/proxy；custom_host / 直链（如预签名）通过附加标记表达
 
 /**
  * @typedef {Object} StorageLink

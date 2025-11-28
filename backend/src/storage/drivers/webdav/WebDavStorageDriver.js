@@ -1,6 +1,6 @@
 /**
  * WebDAV 存储驱动
- * 仅支持 Reader/Writer/Proxy/Atomic 能力，预签名与分片上传不支持
+ * 默认支持 Reader/Writer/Proxy/Atomic 能力，若配置了 custom_host 则额外提供 DirectLink 能力（基于 custom_host 的直链）
  */
 
 import { BaseDriver } from "../../interfaces/capabilities/BaseDriver.js";
@@ -9,8 +9,7 @@ import { ApiStatus, FILE_TYPES } from "../../../constants/index.js";
 import { DriverError, NotFoundError, AppError } from "../../../http/errors.js";
 import { decryptValue } from "../../../utils/crypto.js";
 import { getFileTypeName, GetFileType } from "../../../utils/fileTypeDetector.js";
-import { buildFullProxyUrl, buildSignedProxyUrl } from "../../../constants/proxy.js";
-import { ProxySignatureService } from "../../../services/ProxySignatureService.js";
+import { buildFullProxyUrl } from "../../../constants/proxy.js";
 import { createClient } from "webdav";
 import { Buffer } from "buffer";
 import https from "https";
@@ -30,6 +29,11 @@ export class WebDavStorageDriver extends BaseDriver {
     this.passwordEncrypted = config.password || "";
     this.customHost = config.custom_host || null;
     this.tlsSkipVerify = !!config.tls_insecure_skip_verify;
+
+    // 若配置了 custom_host，则声明具备 DirectLink 能力（可基于 custom_host 生成直链）
+    if (this.customHost) {
+      this.capabilities.push(CAPABILITIES.DIRECT_LINK);
+    }
   }
 
   /**
@@ -522,6 +526,35 @@ export class WebDavStorageDriver extends BaseDriver {
     }
   }
 
+  /**
+   * 批量复制文件/目录
+   * @param {Array<{sourcePath: string, targetPath: string}>} items
+   * @param {Object} options
+   * @returns {Promise<{success: number, failed: Array, results: Array}>}
+   */
+  async batchCopyItems(items, options = {}) {
+    this._ensureInitialized();
+    const results = [];
+    for (const item of items || []) {
+      const { sourcePath, targetPath } = item || {};
+      if (!sourcePath || !targetPath) {
+        results.push({ ...item, success: false, error: "缺少 sourcePath 或 targetPath" });
+        continue;
+      }
+      try {
+        const res = await this.copyItem(sourcePath, targetPath, options);
+        results.push({ ...item, success: true, result: res });
+      } catch (error) {
+        results.push({ ...item, success: false, error: error?.message || "复制失败" });
+      }
+    }
+    return {
+      success: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success),
+      results,
+    };
+  }
+
   async batchRemoveItems(paths, options = {}) {
     this._ensureInitialized();
     const results = [];
@@ -562,52 +595,50 @@ export class WebDavStorageDriver extends BaseDriver {
     throw new DriverError("WebDAV 不支持预签名直链", { status: ApiStatus.NOT_IMPLEMENTED, expose: true });
   }
 
-  async generateProxyUrl(path, options = {}) {
-    const { mount, request, download = false, db, forceProxy = false } = options;
-    const subPath = this._extractSubPath(path, mount);
-    const davPath = this._buildDavPath(subPath, false);
+  /**
+   * DirectLink 能力：基于 custom_host 生成可对外访问的直链 URL
+   * - 仅在配置了 custom_host 时可用
+   * - 用于 FS Web / WebDAV 渠道在 web_proxy=false 或 302_redirect 下的 external 直链场景
+   */
+  async generateDownloadUrl(path, options = {}) {
+    this._ensureInitialized();
 
-    const customHostUrl = this._buildCustomHostUrl(subPath || path);
-
-    // 代理路径 = 挂载路径 + 子路径（确保以 / 开头）
-    const proxyPath = `${mount?.mount_path || ""}${subPath.startsWith("/") ? subPath : `/${subPath}`}`;
-
-    const signatureService = new ProxySignatureService(db, this.encryptionSecret);
-    const signatureNeed = await signatureService.needsSignature(mount);
-
-    // 有 custom_host 且未强制代理 → 直链
-    if (customHostUrl && !forceProxy) {
-      return {
-        url: customHostUrl,
-        type: "custom_host",
-        policy: mount?.webdav_policy || "302_redirect",
-      };
-    }
-
-    // 默认走代理 /api/p
-    let proxyUrl;
-    let signInfo = null;
-    if (signatureNeed.required) {
-      signInfo = await signatureService.generateStorageSignature(proxyPath, mount);
-      // request 可能为空，buildSignedProxyUrl 会自行回退
-      proxyUrl = buildSignedProxyUrl(request, proxyPath, {
-        download,
-        signature: signInfo.signature,
-        requestTimestamp: signInfo.requestTimestamp,
-        needsSignature: true,
+    if (!this.customHost) {
+      throw new DriverError("WebDAV 未配置自定义域名，无法生成直链 URL", {
+        status: ApiStatus.NOT_IMPLEMENTED,
+        expose: true,
       });
-    } else {
-      proxyUrl = buildFullProxyUrl(request, proxyPath, download);
     }
+
+    const { subPath } = options;
+    const relativePath = subPath || path;
+    const url = this._buildCustomHostUrl(relativePath);
+
+    if (!url) {
+      throw new DriverError("无法基于 custom_host 构建 WebDAV 直链 URL", {
+        status: ApiStatus.INTERNAL_ERROR,
+        expose: true,
+      });
+    }
+
+    return {
+      url,
+      type: "custom_host",
+      expiresIn: null,
+      expiresAt: null,
+    };
+  }
+
+  async generateProxyUrl(path, options = {}) {
+    const { request, download = false, channel = "web" } = options;
+
+    // 驱动层仅负责根据路径构造基础代理URL，不再做签名与策略判断
+    const proxyUrl = buildFullProxyUrl(request, path, download);
 
     return {
       url: proxyUrl,
       type: "proxy",
-      signed: signatureNeed.required,
-      signatureLevel: signatureNeed.level,
-      expiresAt: signInfo?.expiresAt,
-      isTemporary: signInfo?.isTemporary,
-      policy: mount?.webdav_policy || "302_redirect",
+      channel,
     };
   }
 
@@ -620,12 +651,8 @@ export class WebDavStorageDriver extends BaseDriver {
   async generateWebDavProxyUrl(path, options = {}) {
     this._ensureInitialized();
 
-    const { mount, subPath, db } = options;
+    const { subPath } = options;
     const relativePath = subPath || path;
-
-    if (db && mount?.id) {
-      await updateMountLastUsed(db, mount.id);
-    }
 
     const url = this._buildCustomHostUrl(relativePath);
     if (!url) {
@@ -638,15 +665,13 @@ export class WebDavStorageDriver extends BaseDriver {
     };
   }
 
-  supportsProxyMode(mount) {
-    // WebDAV 默认可以走代理
+  supportsProxyMode() {
     return true;
   }
 
-  getProxyConfig(mount) {
+  getProxyConfig() {
     return {
-      enabled: this.supportsProxyMode(mount),
-      webdavPolicy: mount?.webdav_policy || "302_redirect",
+      enabled: this.supportsProxyMode(),
     };
   }
 

@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import TextRenderer from "@/components/common/text-preview/TextRenderer.vue";
 import { useTextPreview } from "@/composables/text-preview/useTextPreview.js";
 
@@ -202,11 +202,6 @@ watch(
     currentEncoding.value = newEncoding;
   }
 );
-
-// 组件挂载时初始化
-onMounted(() => {
-  initializeCurrentFile();
-});
 
 // 暴露方法供父组件调用
 defineExpose({

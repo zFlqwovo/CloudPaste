@@ -3,7 +3,7 @@
  * 场景：ObjectStore / 分享模块，以 storage_config_id + storage_path 为入口。
  *
  * 设计要点：
- * - 仅负责“直链”能力（custom_host 或 PRESIGNED），不参与应用代理决策
+ * - 仅负责“直链”能力（custom_host 或 DirectLink 能力），不参与应用代理决策
  *   - 分享层的代理由 share 内容路由 (/api/s/:slug) 自行处理
  * - 不再按 storage_type 硬编码 WebDAV 等类型，统一通过驱动能力 + storageConfig 决策
  */
@@ -20,9 +20,9 @@ function pickUrl(result) {
   return "";
 }
 
-function hasPresignedCapability(driver) {
+function hasDirectLinkCapability(driver) {
   try {
-    return typeof driver?.hasCapability === "function" && driver.hasCapability(CAPABILITIES.PRESIGNED);
+    return typeof driver?.hasCapability === "function" && driver.hasCapability(CAPABILITIES.DIRECT_LINK);
   } catch {
     return false;
   }
@@ -76,8 +76,8 @@ export async function resolveStorageLinks({
     };
   }
 
-  // 2) 无 custom_host：若驱动具备预签名能力，则使用预签名直链
-  if (hasPresignedCapability(driver)) {
+  // 2) 无 custom_host：若驱动具备直链能力，则使用直链（通常为预签名URL）
+  if (hasDirectLinkCapability(driver)) {
     const previewRes = await driver.generateDownloadUrl(path, {
       subPath: path,
       forceDownload: false,
@@ -96,8 +96,8 @@ export async function resolveStorageLinks({
     });
 
     return {
-      preview: { url: pickUrl(previewRes), type: "presigned" },
-      download: { url: pickUrl(downloadRes), type: "presigned" },
+      preview: { url: pickUrl(previewRes), type: "native_direct" },
+      download: { url: pickUrl(downloadRes), type: "native_direct" },
       proxyPolicy,
     };
   }

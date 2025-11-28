@@ -8,6 +8,9 @@ import { resolveStorageLinks } from "../object/ObjectLinkStrategy.js";
 import { MountManager } from "../managers/MountManager.js";
 import { FileSystem } from "../fs/FileSystem.js";
 import { createDirectLink, createProxyLink } from "./LinkTypes.js";
+import { findMountPointByPathForProxy } from "../fs/utils/MountResolver.js";
+import { ProxySignatureService } from "../../services/ProxySignatureService.js";
+import { buildSignedProxyUrl } from "../../constants/proxy.js";
 
 // FsLinkStrategy 已经实现了“优先预签名、否则代理”的策略，这里直接复用 FileSystem.generateFileLink 的结果
 
@@ -27,7 +30,7 @@ export class LinkService {
 
   /**
    * 根据分享文件记录生成下载用 StorageLink
-   * - 优先使用存储直链（custom_host / presigned）
+   * - 优先使用存储直链（custom_host / DirectLink 能力，如预签名URL）
    * - 不提供直链时，返回 kind=proxy，具体代理由调用方处理
    * @param {Object} file
    * @param {{ type?: string, id?: string } | null} userInfo
@@ -60,7 +63,7 @@ export class LinkService {
     const url = preview?.url || "";
     const type = preview?.type || null;
 
-    if (url && (type === "custom_host" || type === "presigned")) {
+    if (url && (type === "custom_host" || type === "native_direct")) {
       return createDirectLink(url);
     }
 
@@ -73,7 +76,7 @@ export class LinkService {
   /**
    * 为 FS 路径生成 StorageLink
    * - 复用 FileSystem.generateFileLink（FsLinkStrategy）
-   * - 将 custom_host/presigned 视为 direct，其余视为 proxy
+   * - 将 custom_host/直链（如预签名URL）视为 direct，其余视为 proxy
    * @param {string} path
    * @param {any} userIdOrInfo
    * @param {string} userType
@@ -93,11 +96,37 @@ export class LinkService {
     const url = linkResult?.url || "";
     const type = linkResult?.type || null;
 
-    if (url && (type === "custom_host" || type === "presigned")) {
+    // 直链：直接返回 direct link
+    if (url && (type === "custom_host" || type === "native_direct")) {
       return createDirectLink(url);
     }
 
-    return createProxyLink(url || "");
+    // 代理链接：如挂载要求签名，则在此生成带签名的 /api/p 链接
+    let finalUrl = url || "";
+    try {
+      const mountResult = await findMountPointByPathForProxy(this.db, path, this.repositoryFactory);
+      if (!mountResult.error) {
+        const signatureService = new ProxySignatureService(this.db, this.encryptionSecret, this.repositoryFactory);
+        const signatureNeed = await signatureService.needsSignature(mountResult.mount);
+        if (signatureNeed.required) {
+          const signInfo = await signatureService.generateStorageSignature(path, mountResult.mount, {
+            expiresIn: options.expiresIn,
+          });
+          finalUrl = buildSignedProxyUrl(options.request || null, path, {
+            download: options.forceDownload || false,
+            signature: signInfo.signature,
+            requestTimestamp: signInfo.requestTimestamp,
+            needsSignature: true,
+          });
+        }
+      }
+    } catch (e) {
+      // 签名失败时不阻断流程，只记录一条警告日志并返回未签名的代理 URL
+      console.warn("生成 FS 代理签名链接失败，将返回未签名链接：", e?.message || e);
+    }
+
+    // 其余情况一律视为代理链路（包括 /api/p 代理）
+    return createProxyLink(finalUrl);
   }
 }
 

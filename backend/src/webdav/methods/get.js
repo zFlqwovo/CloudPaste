@@ -72,8 +72,8 @@ async function downloadViaProxy(fileSystem, path, fileName, c, userId, userType,
  * @param {D1Database} db - D1数据库实例
  */
 export async function handleGet(c, path, userId, userType, db) {
-  const isHead = c.req.method === "HEAD";
-  return withWebDAVErrorHandling("GET", async () => {
+    const isHead = c.req.method === "HEAD";
+    return withWebDAVErrorHandling("GET", async () => {
     const userAgent = c.req.header("User-Agent") || "";
     const isWindowsMiniRedirector =
       userAgent.includes("Microsoft-WebDAV") || userAgent.includes("WebDAV-MiniRedir");
@@ -186,21 +186,6 @@ export async function handleGet(c, path, userId, userType, db) {
       }
     }
 
-    // 如果是HEAD请求，返回头信息
-    if (isHead) {
-      return new Response(null, {
-        status: 200,
-        headers: {
-          "Content-Length": String(contentLength),
-          "Content-Type": contentType,
-          "Last-Modified": lastModifiedStr,
-          ETag: etag,
-          "Accept-Ranges": "bytes",
-          "Cache-Control": "max-age=3600",
-        },
-      });
-    }
-
     // 根据挂载点的 webdav_policy 配置决定处理方式
     const { driver, mount, subPath } = await mountManager.getDriverByPath(path, userId, userType);
 
@@ -224,6 +209,7 @@ export async function handleGet(c, path, userId, userType, db) {
               userId,
               userType,
               forceDownload: false,
+              channel: "webdav",
             });
 
             const url = extractUrlFromResult(result);
@@ -263,6 +249,7 @@ export async function handleGet(c, path, userId, userType, db) {
               subPath,
               db,
               request: c.req.raw,
+              channel: "webdav",
             });
             const url = extractUrlFromResult(result);
             if (url) {
@@ -289,7 +276,34 @@ export async function handleGet(c, path, userId, userType, db) {
       case "native_proxy":
       default: {
         // 策略 3：本地服务器代理（默认兜底）
-        return downloadViaProxy(fileSystem, path, fileName, c, userId, userType, contentType, lastModifiedStr, etag);
+        if (isHead) {
+          // HEAD 请求下只返回头信息，不传输主体内容
+          const headHeaders = {
+            "Content-Length": String(contentLength),
+            "Content-Type": contentType,
+            "Last-Modified": lastModifiedStr,
+            ETag: etag,
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "max-age=3600",
+          };
+          const response = new Response(null, {
+            status: 200,
+            headers: headHeaders,
+          });
+          return addWebDAVHeaders(response);
+        }
+
+        return downloadViaProxy(
+          fileSystem,
+          path,
+          fileName,
+          c,
+          userId,
+          userType,
+          contentType,
+          lastModifiedStr,
+          etag,
+        );
       }
     }
   });
