@@ -63,7 +63,7 @@ function validateDriverContract(driver, entryMeta, storageType) {
   const typeMismatch = driverType && registeredType && driverType !== registeredType;
 
   // extraCapabilities / missingRegisteredCapabilities 目前仅作为调试信息存在：
-  // - 某些驱动（如 WebDAV）会根据配置（custom_host 等）在实例上追加能力，这在类型层面是“额外能力”，
+  // - 某些驱动（如基于 S3 的实现）会根据配置（custom_host 等）在实例上追加能力，这在类型层面是“额外能力”，
   //   但不会破坏既有行为，因而不视为致命错误。
   // - registeredCapabilities 描述的是该存储类型在理想情况下支持的能力集合，具体实例可以是其子集。
 

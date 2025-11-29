@@ -34,7 +34,7 @@ export const registerFilesPublicRoutes = (router) => {
 
       const repositoryFactory = useRepositories(c);
       const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-      const link = await linkService.getLinkForShare(guardedFile, null);
+      const link = await linkService.getShareExternalLink(guardedFile, null);
       const publicInfo = await getPublicFileInfo(db, guardedFile, requiresPassword, link, encryptionSecret, {
         baseOrigin: requestUrl.origin,
       });
@@ -44,7 +44,7 @@ export const registerFilesPublicRoutes = (router) => {
 
     const repositoryFactory = useRepositories(c);
     const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-    const link = await linkService.getLinkForShare(file, null);
+    const link = await linkService.getShareExternalLink(file, null);
     const publicInfo = await getPublicFileInfo(db, file, true, link, encryptionSecret, {
       baseOrigin: requestUrl.origin,
     });
@@ -66,7 +66,7 @@ export const registerFilesPublicRoutes = (router) => {
     if (!file.password) {
       const repositoryFactory = useRepositories(c);
       const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-      const link = await linkService.getLinkForShare(file, null);
+      const link = await linkService.getShareExternalLink(file, null);
       const publicInfo = await getPublicFileInfo(db, file, false, link, encryptionSecret, {
         baseOrigin: requestUrl.origin,
       });
@@ -86,7 +86,7 @@ export const registerFilesPublicRoutes = (router) => {
 
     const repositoryFactory = useRepositories(c);
     const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-    const link = await linkService.getLinkForShare(guardedFile, null);
+    const link = await linkService.getShareExternalLink(guardedFile, null);
     let fileWithPassword = guardedFile;
 
     if (fileWithPassword.password) {

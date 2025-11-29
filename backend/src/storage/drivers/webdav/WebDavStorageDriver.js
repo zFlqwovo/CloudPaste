@@ -1,6 +1,6 @@
 /**
  * WebDAV 存储驱动
- * 默认支持 Reader/Writer/Proxy/Atomic 能力，若配置了 custom_host 则额外提供 DirectLink 能力（基于 custom_host 的直链）
+ * 默认支持 Reader/Writer/Proxy/Atomic 能力，不提供存储直链（DirectLink）
  */
 
 import { BaseDriver } from "../../interfaces/capabilities/BaseDriver.js";
@@ -27,13 +27,8 @@ export class WebDavStorageDriver extends BaseDriver {
     this.endpoint = config.endpoint_url || "";
     this.username = config.username || "";
     this.passwordEncrypted = config.password || "";
-    this.customHost = config.custom_host || null;
+    this.urlProxy = config.url_proxy || null;
     this.tlsSkipVerify = !!config.tls_insecure_skip_verify;
-
-    // 若配置了 custom_host，则声明具备 DirectLink 能力（可基于 custom_host 生成直链）
-    if (this.customHost) {
-      this.capabilities.push(CAPABILITIES.DIRECT_LINK);
-    }
   }
 
   /**
@@ -596,37 +591,14 @@ export class WebDavStorageDriver extends BaseDriver {
   }
 
   /**
-   * DirectLink 能力：基于 custom_host 生成可对外访问的直链 URL
-   * - 仅在配置了 custom_host 时可用
-   * - 用于 FS Web / WebDAV 渠道在 web_proxy=false 或 302_redirect 下的 external 直链场景
+   * WebDAV 不提供存储直链能力（DirectLink），所有直链/代理决策由上层通过 url_proxy 或 native_proxy 处理。
    */
   async generateDownloadUrl(path, options = {}) {
     this._ensureInitialized();
-
-    if (!this.customHost) {
-      throw new DriverError("WebDAV 未配置自定义域名，无法生成直链 URL", {
-        status: ApiStatus.NOT_IMPLEMENTED,
-        expose: true,
-      });
-    }
-
-    const { subPath } = options;
-    const relativePath = subPath || path;
-    const url = this._buildCustomHostUrl(relativePath);
-
-    if (!url) {
-      throw new DriverError("无法基于 custom_host 构建 WebDAV 直链 URL", {
-        status: ApiStatus.INTERNAL_ERROR,
-        expose: true,
-      });
-    }
-
-    return {
-      url,
-      type: "custom_host",
-      expiresIn: null,
-      expiresAt: null,
-    };
+    throw new DriverError("WebDAV 不支持存储直链 URL", {
+      status: ApiStatus.NOT_IMPLEMENTED,
+      expose: true,
+    });
   }
 
   async generateProxyUrl(path, options = {}) {
@@ -643,25 +615,32 @@ export class WebDavStorageDriver extends BaseDriver {
   }
 
   /**
-   * 为 WebDAV use_proxy_url 策略生成代理 URL（基于 custom_host）
-   * @param {string} path - 挂载视图下的完整路径
-   * @param {Object} options - 选项参数
-   * @returns {Promise<{url: string, type: string}|null>}
+   * 上游 HTTP 能力：为 WebDAV 生成可由反向代理/Worker 直接访问的上游请求信息
+   * - 返回值仅描述 data plane 访问方式，不做权限与签名判断
+   * - headers 中只包含访问 WebDAV 必需的认证头，由外层按需附加 Range 等业务头
+   * @param {string} path 挂载视图下的完整路径
+   * @param {Object} [options]
+   * @param {string} [options.subPath] 挂载内相对路径（优先使用）
+   * @returns {Promise<{ url: string, headers: Record<string,string[]> }>}
    */
-  async generateWebDavProxyUrl(path, options = {}) {
+  async generateUpstreamRequest(path, options = {}) {
     this._ensureInitialized();
 
     const { subPath } = options;
     const relativePath = subPath || path;
+    const davPath = this._buildDavPath(relativePath, false);
+    const url = this._buildRequestUrl(davPath);
 
-    const url = this._buildCustomHostUrl(relativePath);
-    if (!url) {
-      return null;
+    /** @type {Record<string,string[]>} */
+    const headers = {};
+    const auth = this._basicAuthHeader();
+    if (auth) {
+      headers["Authorization"] = [auth];
     }
 
     return {
       url,
-      type: "proxy_url",
+      headers,
     };
   }
 
@@ -915,20 +894,6 @@ export class WebDavStorageDriver extends BaseDriver {
         throw e;
       }
     }
-  }
-
-  _buildCustomHostUrl(path) {
-    if (!this.customHost) return null;
-
-    const cleanHost = this.customHost.endsWith("/") ? this.customHost.slice(0, -1) : this.customHost;
-    const sub = this._normalize(path || "");
-    const relative = sub.startsWith("/") ? sub.slice(1) : sub;
-
-    if (!relative) {
-      return cleanHost;
-    }
-
-    return `${cleanHost}/${relative}`;
   }
 
   /**

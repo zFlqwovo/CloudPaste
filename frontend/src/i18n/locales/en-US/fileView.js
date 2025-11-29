@@ -19,8 +19,8 @@ export default {
       accessCount: "Access Count",
       expiresAt: "Expires At",
       accessMode: "Access Mode",
-      proxyAccess: "Worker Proxy Access",
-      directAccess: "Storage/CDN Direct Access",
+      proxyAccess: "Local Proxy Access",
+      directAccess: "Direct Link/URL Proxy Access",
       limit: "limit",
     },
 

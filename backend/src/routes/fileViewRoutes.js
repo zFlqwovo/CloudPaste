@@ -57,8 +57,8 @@ app.get("/api/s/:slug", async (c) => {
   }
 
   // 内容交付逻辑统一由 FileViewService 处理：
-  // - 当 use_proxy = 1 时，通过 ObjectStore 代理流式返回
-  // - 当 use_proxy = 0 时，优先使用存储直链（custom_host / DirectLink 能力），否则返回 501
+  // - 当 use_proxy = 1 时，通过 ObjectStore 代理流式返回（share 层本地代理）
+  // - 当 use_proxy = 0 时，优先使用存储直链（S3 custom_host / 预签名等 DirectLink 能力），否则返回 501
   return handleFileDownload(slug, db, encryptionSecret, c.req.raw, forceDownload, repositoryFactory);
 });
 

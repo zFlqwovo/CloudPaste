@@ -134,6 +134,7 @@ async function createStorageTables(db) {
         is_public INTEGER NOT NULL DEFAULT 0,
         is_default INTEGER NOT NULL DEFAULT 0,
         remark TEXT,
+        url_proxy TEXT,
         status TEXT NOT NULL DEFAULT 'ENABLED',
         config_json TEXT NOT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -798,6 +799,13 @@ async function executeMigrationForVersion(db, version) {
       console.log("版本23：更新 webdav_upload_mode 显示选项为“流式上传/单次上传”...");
       await normalizeWebDavUploadModeLabels(db);
       console.log("版本23：webdav_upload_mode 选项更新完成。");
+      break;
+
+    case 24:
+      // 版本24：为 storage_configs 表添加 url_proxy 字段（代理入口 URL）
+      console.log("版本24：为 storage_configs 表添加 url_proxy 字段...");
+      await addTableField(db, DbTables.STORAGE_CONFIGS, "url_proxy", "url_proxy TEXT");
+      console.log("版本24：storage_configs.url_proxy 字段检查/创建完成。");
       break;
 
     default:
@@ -1623,7 +1631,7 @@ export async function checkAndInitDatabase(db) {
     const versionSetting = await db.prepare(`SELECT value FROM ${DbTables.SYSTEM_SETTINGS} WHERE key = 'schema_version'`).first();
 
     const currentVersion = versionSetting ? parseInt(versionSetting.value) : 0;
-    const targetVersion = 23; // 当前最新版本
+    const targetVersion = 24; // 当前最新版本
 
     if (currentVersion < targetVersion) {
       console.log(`需要更新数据库结构，当前版本:${currentVersion}，目标版本:${targetVersion}`);

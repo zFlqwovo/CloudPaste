@@ -5,7 +5,7 @@
  * @typedef {Object} StorageLink
  * @property {string} url              // 直链或可代理的底层 URL
  * @property {"direct"|"proxy"} kind   // 路由决策依据
- * @property {Object<string,string>=} headers
+ * @property {Record<string,string[]>|undefined} headers // 可选上游 Header 映射（用于 /api/proxy/link → Worker）
  */
 
 /**

@@ -454,25 +454,38 @@ export class S3StorageDriver extends BaseDriver {
   }
 
   /**
-   * 为 WebDAV use_proxy_url 策略生成代理 URL（基于 custom_host）
-   * @param {string} path - 挂载视图下的完整路径
-   * @param {Object} options - 选项参数
-   * @returns {Promise<{url: string, type: string}|null>}
+   * 上游 HTTP 能力：为 S3 生成可由反向代理/Worker 直接访问的上游请求信息
+   * - 基于现有 generateDownloadUrl 生成预签名 URL
+   * - headers 通常为空或仅包含补充标头
+   * @param {string} path - 文件路径（FS 视图路径或 storage_path）
+   * @param {Object} [options] - 选项参数
+   * @returns {Promise<{ url: string, headers: Record<string,string[]> }>}
    */
-  async generateWebDavProxyUrl(path, options = {}) {
+  async generateUpstreamRequest(path, options = {}) {
     this._ensureInitialized();
 
-    const { subPath } = options;
-    const s3SubPath = normalizeS3SubPath(subPath, false);
+    const { subPath, expiresIn, forceDownload = true, userType, userId, mount } = options;
 
-    if (!this.customHost) {
-      return null;
-    }
+    // 对于 FS 场景优先使用 subPath（挂载内相对路径），storage-first 场景则使用传入的 path 作为对象 Key
+    const effectiveSubPath = subPath != null ? subPath : path;
 
-    const url = generateCustomHostDirectUrl(this.config, s3SubPath);
+    const downloadInfo = await this.generateDownloadUrl(effectiveSubPath, {
+      subPath: effectiveSubPath,
+      expiresIn,
+      forceDownload,
+      userType,
+      userId,
+      mount,
+    });
+
+    const url = downloadInfo?.url || null;
+
+    /** @type {Record<string,string[]>} */
+    const headers = {};
+
     return {
       url,
-      type: "proxy_url",
+      headers,
     };
   }
 

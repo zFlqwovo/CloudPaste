@@ -3,8 +3,8 @@
  * 场景：ObjectStore / 分享模块，以 storage_config_id + storage_path 为入口。
  *
  * 设计要点：
- * - 仅负责“直链”能力（custom_host 或 DirectLink 能力），不参与应用代理决策
- *   - 分享层的代理由 share 内容路由 (/api/s/:slug) 自行处理
+ * - 仅负责“直链”能力（storage_config.custom_host 或驱动 DirectLink 能力），不参与应用层代理决策
+ *   - 分享层的代理由 share 内容路由 (/api/s/:slug) 或 url_proxy 自行处理
  * - 不再按 storage_type 硬编码 WebDAV 等类型，统一通过驱动能力 + storageConfig 决策
  */
 

@@ -108,7 +108,7 @@ export const registerBrowseRoutes = (router, helpers) => {
 
     // 通过 LinkService 生成统一 Link 信息，rawUrl 直接使用最终 URL（直链或代理）
     const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-    const link = await linkService.getLinkForFs(path, userIdOrInfo, userType, {
+    const link = await linkService.getFsExternalLink(path, userIdOrInfo, userType, {
       forceDownload: false,
       request: c.req.raw,
     });
@@ -187,17 +187,17 @@ export const registerBrowseRoutes = (router, helpers) => {
     }
 
     const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-    const link = await linkService.getLinkForFs(path, userIdOrInfo, userType, {
+    const link = await linkService.getFsExternalLink(path, userIdOrInfo, userType, {
       forceDownload: true,
       request: c.req.raw,
     });
 
-    if (link.kind === "direct" && link.url) {
-      // 可直链：统一 302
+    if (link.url) {
+      // 无论直链还是代理 / Worker 入口，只要给出了 URL，一律通过 302 交给下游处理
       return c.redirect(link.url, 302);
     }
 
-    // 需要代理：使用现有 FileSystem.downloadFile 做服务端流式下载
+    // 未能生成任何 URL 时兜底：使用现有 FileSystem.downloadFile 做服务端流式下载
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
     const response = await fileSystem.downloadFile(path, null, c.req.raw, userIdOrInfo, userType);
@@ -221,7 +221,7 @@ export const registerBrowseRoutes = (router, helpers) => {
     }
 
     const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-    const link = await linkService.getLinkForFs(path, userIdOrInfo, userType, {
+    const link = await linkService.getFsExternalLink(path, userIdOrInfo, userType, {
       expiresIn,
       forceDownload,
       request: c.req.raw,

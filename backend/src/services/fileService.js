@@ -155,37 +155,35 @@ export class FileService {
     const fileType = await GetFileType(file.filename, this.db);
     const fileTypeName = await getFileTypeName(file.filename, this.db);
 
-    const hasSlug = !!file.slug;
     const useProxyFlag = file.use_proxy ?? 0;
-    const hasDirectLink = Boolean(link && link.kind === "direct" && link.url);
+    const storageUrlProxy = file.url_proxy || null;
 
     const baseOrigin = options.baseOrigin || null;
 
-    const buildSharePath = (slug, mode) => (slug ? `/api/s/${slug}?mode=${mode}` : null);
-    const buildShareUrl = (slug, mode) => {
-      const path = buildSharePath(slug, mode);
-      if (!path) return null;
-      // 若提供了 baseOrigin，则返回完整后端 URL；否则保留相对路径（内部使用场景）
-      return baseOrigin ? `${baseOrigin}${path}` : path;
-    };
-
-    let rawUrl = null;
+    // LinkService 已经根据 use_proxy / url_proxy / 直链能力生成了最终 URL，这里只做轻量封装：
+    let rawUrl = link && link.url ? link.url : null;
     let linkType = "proxy";
 
-    if (hasSlug) {
-      if (useProxyFlag) {
-        // 代理模式：明确使用 share 内容路由（预览语义）
-        rawUrl = buildShareUrl(file.slug, "inline");
-        linkType = "proxy";
-      } else if (hasDirectLink) {
-        // 直链模式 + 具备直链能力：rawUrl 使用存储直链
-        rawUrl = link.url;
-        linkType = "direct";
-      } else {
-        // 直链模式 + 无直链能力：老实返回空，由前端根据缺失信息渲染“不支持直链/预览”
-        rawUrl = null;
-        linkType = "direct";
-      }
+    // 补全 linkType 语义，方便前端区分“本地代理”“外部 Proxy/Worker 入口”和“直链”
+    if (useProxyFlag) {
+      linkType = "proxy";
+    } else if (storageUrlProxy && rawUrl) {
+      // 配置了 url_proxy 且存在可用 URL：视为外部 Proxy/Worker 入口
+      linkType = "url_proxy";
+    } else if (link && link.kind === "direct" && rawUrl) {
+      linkType = "direct";
+    } else if (rawUrl) {
+      // 其余非空 URL 默认视为 proxy 链路
+      linkType = "proxy";
+    } else {
+      // 没有任何 URL 时按“直链不可用”处理，方便前端渲染“不支持直链/预览”
+      linkType = "direct";
+    }
+
+    // 若提供了 baseOrigin，则仅对本地相对路径（/api/s/...）补全为绝对 URL；
+    // 对 Worker/直链等已为绝对 URL 的场景不做修改。
+    if (rawUrl && baseOrigin && rawUrl.startsWith("/")) {
+      rawUrl = `${baseOrigin}${rawUrl}`;
     }
 
     // 对于受密码保护且尚未通过校验的场景，不应在 JSON 中暴露任何可直接访问的 URL

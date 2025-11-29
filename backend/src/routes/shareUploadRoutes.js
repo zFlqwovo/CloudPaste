@@ -81,7 +81,7 @@ router.put("/api/upload-direct/:filename", requireFilesCreate, async (c) => {
     const file = await getFileBySlug(db, result.slug, encryptionSecret);
     const hasPassword = !!file.password;
     const linkService = new LinkService(db, encryptionSecret, repositoryFactory);
-    const link = await linkService.getLinkForShare(file, null);
+    const link = await linkService.getShareExternalLink(file, null);
     const requestUrl = new URL(c.req.url);
     const publicInfo = await getPublicFileInfo(
       db,

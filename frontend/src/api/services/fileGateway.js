@@ -66,11 +66,16 @@ export function buildPreviewUrl(file, options = {}) {
   const password = resolvePassword(file, options.password);
 
   // 预览统一基于 Link JSON 的 rawUrl：
-  // - 当 rawUrl 为直链时直接使用
-  // - 当 rawUrl 为 `/api/s/:slug?mode=inline` 时视为需要附加 header 的代理入口
+  // - 当 rawUrl 为直链或 url_proxy/Worker 入口时直接使用
+  // - 当 rawUrl 为空且 linkType=proxy/use_proxy=1 时才回退到 `/api/s/:slug?mode=inline`
   let url = file.rawUrl || "";
-  if (!url && file.slug && (file.linkType === "proxy" || file.use_proxy)) {
-    // 仅在代理模式下才回退到 share 内容路由的 inline 模式
+
+  if (
+    !url &&
+    file.slug &&
+    (file.linkType === "proxy" || file.use_proxy)
+  ) {
+    // 仅在本地 share 内容路由模式下才回退到 inline 模式
     url = `/api/s/${file.slug}?mode=inline`;
   }
 
@@ -83,12 +88,14 @@ export function buildDownloadUrl(file, options = {}) {
   if (!file) return "";
   const password = resolvePassword(file, options.password);
 
-  // 下载统一基于 share 内容路由：
-  // - 对于有 slug 的 share：始终使用 `/api/s/:slug?mode=attachment[&password=...]` 作为下载入口
+  // 下载入口按 linkType 分流：
+  // - linkType=url_proxy：直接复用 rawUrl（通常为 /proxy/share/:slug）
+  // - 其他场景：继续使用 share 内容路由 `/api/s/:slug?mode=attachment`
   let url = "";
 
-  if (file.slug) {
-    // 使用统一的内容路由构造下载 URL，由后端根据 use_proxy 决定直链 302 还是代理流式返回
+  if (file.linkType === "url_proxy" && file.rawUrl) {
+    url = file.rawUrl;
+  } else if (file.slug) {
     url = fileViewService.buildDownloadUrl(file.slug, password || null);
   }
 

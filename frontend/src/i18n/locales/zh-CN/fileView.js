@@ -19,8 +19,8 @@ export default {
       accessCount: "访问次数",
       expiresAt: "过期时间",
       accessMode: "访问模式",
-      proxyAccess: "Worker代理访问",
-      directAccess: "存储/CDN直链访问",
+      proxyAccess: "本地代理访问",
+      directAccess: "直链/URL代理访问",
       limit: "限制",
     },
 

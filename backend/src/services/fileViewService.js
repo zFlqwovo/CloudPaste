@@ -126,8 +126,8 @@ export class FileViewService {
       const fileRecord = result.file;
       const useProxyFlag = fileRecord.use_proxy ?? 0;
 
-      // use_proxy = 1 时，走真正的本机代理，通过 ObjectStore 调用底层驱动的 downloadFile
-      if (useProxyFlag === 1) {
+      // 抽取本地代理下载逻辑，便于在直链失败时复用
+      const proxyDownload = async () => {
         // 获取文件的MIME类型（用于覆盖/统一 Content-Type）
         const contentType = getEffectiveMimeType(fileRecord.mimetype, fileRecord.filename);
 
@@ -165,9 +165,14 @@ export class FileViewService {
           statusText: driverResponse.statusText,
           headers: responseHeaders,
         });
+      };
+
+      // use_proxy = 1 时，走本地代理访问
+      if (useProxyFlag === 1) {
+        return await proxyDownload();
       }
 
-      // use_proxy != 1 时，尝试走直链：custom_host 优先，其次直链能力（DirectLink，例如预签名 URL）；不再“代理直链”
+      // use_proxy != 1 时，优先尝试直链：S3 custom_host 优先，其次驱动 DirectLink 能力（例如预签名 URL）
       let directUrl = null;
       try {
         const objectStore = new ObjectStore(this.db, this.encryptionSecret, this.repositoryFactory);
@@ -179,17 +184,18 @@ export class FileViewService {
         console.error("生成存储直链失败:", e);
       }
 
-      if (!directUrl) {
-        return new Response("当前存储不支持直链下载", { status: 501 });
+      if (directUrl) {
+        const redirectHeaders = new Headers();
+        redirectHeaders.set("Location", directUrl);
+
+        return new Response(null, {
+          status: 302,
+          headers: redirectHeaders,
+        });
       }
 
-      const redirectHeaders = new Headers();
-      redirectHeaders.set("Location", directUrl);
-
-      return new Response(null, {
-        status: 302,
-        headers: redirectHeaders,
-      });
+      // 直链不可用时回退为本地代理访问，避免 501，保证“反代访问”场景下始终可用
+      return await proxyDownload();
     } catch (error) {
       console.error("代理文件下载出错:", error);
       return new Response("获取文件失败: " + error.message, { status: 500 });
