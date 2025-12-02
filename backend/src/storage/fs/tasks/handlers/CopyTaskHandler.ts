@@ -58,18 +58,11 @@ export class CopyTaskHandler implements TaskHandler {
     let skippedCount = 0;
     let totalBytesTransferred = 0;  // 累计已传输字节
 
-    // 初始化每个文件的状态跟踪数组
-    const itemResults: ItemResult[] = payload.items.map(item => ({
-      sourcePath: item.sourcePath,
-      targetPath: item.targetPath,
-      status: 'pending' as const,
-    }));
-
     console.log(
       `[CopyTaskHandler] 开始执行作业 ${job.jobId}, 共 ${payload.items.length} 项`
     );
 
-    // 预扫描所有源文件，获取 totalBytes
+    // 预扫描所有源文件，获取 totalBytes 和每个文件大小
     let totalBytes = 0;
     const fileSizes: number[] = [];
 
@@ -96,6 +89,14 @@ export class CopyTaskHandler implements TaskHandler {
         );
       }
     }
+
+    // 初始化每个文件的状态跟踪数组（包含文件大小）
+    const itemResults: ItemResult[] = payload.items.map((item, index) => ({
+      sourcePath: item.sourcePath,
+      targetPath: item.targetPath,
+      status: 'pending' as const,
+      fileSize: fileSizes[index],
+    }));
 
     await context.updateProgress(job.jobId, { totalBytes, itemResults });
 

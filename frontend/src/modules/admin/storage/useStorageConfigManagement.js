@@ -1,4 +1,5 @@
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useAdminBase } from "@/composables/admin-management/useAdminBase.js";
 import { useStorageConfigsStore } from "@/stores/storageConfigsStore.js";
 import { useAdminStorageConfigService } from "@/modules/admin/services/storageConfigService.js";
@@ -6,8 +7,15 @@ import { useAdminStorageConfigService } from "@/modules/admin/services/storageCo
 /**
  * 存储配置管理 composable
  * 提供多存储配置的 CRUD、分页管理、测试等能力
+ * @param {Object} options - 可选配置
+ * @param {Function} options.confirmFn - 自定义确认函数，接收 {title, message, confirmType} 参数，返回 Promise<boolean>
  */
-export function useStorageConfigManagement() {
+export function useStorageConfigManagement(options = {}) {
+  const { confirmFn } = options;
+
+  // 国际化
+  const { t } = useI18n();
+
   // 继承基础功能，使用独立的页面标识符
   const base = useAdminBase("storage");
   const storageConfigsStore = useStorageConfigsStore();
@@ -146,7 +154,19 @@ export function useStorageConfigManagement() {
    * 删除存储配置
    */
   const handleDeleteConfig = async (configId) => {
-    if (!confirm("确定要删除此存储配置吗？此操作不可恢复！")) {
+    // 使用传入的确认函数或默认的 window.confirm
+    let confirmed;
+    if (confirmFn) {
+      confirmed = await confirmFn({
+        title: t("common.dialogs.deleteTitle"),
+        message: t("common.dialogs.deleteItem", { name: t("admin.storage.item", "此存储配置") }),
+        confirmType: "danger",
+      });
+    } else {
+      confirmed = confirm(t("common.dialogs.deleteItem", { name: t("admin.storage.item", "此存储配置") }));
+    }
+
+    if (!confirmed) {
       return;
     }
 

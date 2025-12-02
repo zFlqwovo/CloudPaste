@@ -4,6 +4,11 @@ export default {
     description: '查看和管理系统中的所有后台任务',
     loading: '加载中...',
 
+    viewMode: {
+      table: '表格视图',
+      card: '卡片视图',
+    },
+
     filters: {
       searchPlaceholder: '搜索任务名称、ID或路径...',
       allStatuses: '全部状态',
@@ -76,6 +81,7 @@ export default {
       taskNotFound: '任务不存在',
       cannotDeleteRunning: '无法删除运行中的任务，请先取消任务',
       cannotDeleteRunningBatch: '有 {count} 个任务正在运行，无法删除。请先取消这些任务。',
+      noTasksToDelete: '选中的任务均无法删除',
       retryFailed: '重试失败',
       noFailedFiles: '没有失败的文件可以重试',
       cannotRetryRunning: '无法重试运行中的任务',
@@ -90,6 +96,7 @@ export default {
     },
 
     confirmDelete: {
+      title: '确认删除',
       single: '确定要删除任务 "{name}" 吗？此操作不可恢复。',
       batch: '确定要删除选中的 {count} 个任务吗？此操作不可恢复。',
     },

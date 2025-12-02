@@ -160,7 +160,8 @@ export const registerOpsRoutes = (router, helpers) => {
     return jsonOk(c, jobDescriptor, "作业已创建");
   });
 
-  router.get("/api/fs/jobs/:jobId", usePolicy("fs.copy", { pathCheck: false }), async (c) => {
+  // 注意：权限检查已移至 FileSystem 业务层，此处仅需基础挂载权限
+  router.get("/api/fs/jobs/:jobId", usePolicy("fs.base", { pathCheck: false }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
@@ -180,7 +181,8 @@ export const registerOpsRoutes = (router, helpers) => {
     return jsonOk(c, jobStatus);
   });
 
-  router.post("/api/fs/jobs/:jobId/cancel", usePolicy("fs.copy", { pathCheck: false }), async (c) => {
+  // 注意：权限检查已移至 FileSystem 业务层，此处仅需基础挂载权限
+  router.post("/api/fs/jobs/:jobId/cancel", usePolicy("fs.base", { pathCheck: false }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
@@ -200,7 +202,7 @@ export const registerOpsRoutes = (router, helpers) => {
     return jsonOk(c, undefined, "作业已取消");
   });
 
-  router.get("/api/fs/jobs", usePolicy("fs.copy", { pathCheck: false }), async (c) => {
+  router.get("/api/fs/jobs", usePolicy("fs.base", { pathCheck: false }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);
@@ -229,7 +231,8 @@ export const registerOpsRoutes = (router, helpers) => {
     return jsonOk(c, { jobs, total: jobs.length, limit: filter.limit, offset: filter.offset });
   });
 
-  router.delete("/api/fs/jobs/:jobId", usePolicy("fs.copy", { pathCheck: false }), async (c) => {
+  // 注意：权限检查已移至 FileSystem 业务层，此处仅需基础挂载权限
+  router.delete("/api/fs/jobs/:jobId", usePolicy("fs.base", { pathCheck: false }), async (c) => {
     const db = c.env.DB;
     const userInfo = c.get("userInfo");
     const { userIdOrInfo, userType } = getServiceParams(userInfo);

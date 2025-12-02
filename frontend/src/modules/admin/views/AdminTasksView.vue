@@ -14,18 +14,34 @@
         </div>
 
         <!-- 操作按钮组 -->
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2 self-end sm:self-auto">
+          <!-- 视图模式切换按钮组 -->
+          <ViewModeToggle
+            v-model="viewMode"
+            :options="viewModeOptions"
+            :dark-mode="isDarkMode"
+            size="sm"
+            class="sm:hidden"
+          />
+          <ViewModeToggle
+            v-model="viewMode"
+            :options="viewModeOptions"
+            :dark-mode="isDarkMode"
+            size="md"
+            class="hidden sm:inline-flex"
+          />
+
           <!-- 刷新按钮 -->
           <button
             @click="loadTasks"
             :disabled="isLoading"
-            class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-all duration-200 ease-in-out"
+            class="inline-flex items-center justify-center px-2 py-1.5 sm:px-3 sm:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-all duration-200 ease-in-out"
             :class="isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'"
           >
             <svg
               v-if="!isLoading"
               xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 mr-1.5"
+              class="h-4 w-4 sm:mr-1.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -37,23 +53,23 @@
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <svg v-else class="animate-spin h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24">
+            <svg v-else class="animate-spin h-4 w-4 sm:mr-1.5" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span class="hidden xs:inline">{{ $t('admin.tasks.actions.refresh') }}</span>
+            <span class="hidden sm:inline">{{ $t('admin.tasks.actions.refresh') }}</span>
           </button>
 
           <!-- 展开/收起全部按钮 -->
           <button
             v-if="paginatedTasks.length > 0"
             @click="toggleExpandAll"
-            class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border text-sm font-medium rounded-md shadow-sm transition-all duration-200 ease-in-out"
+            class="inline-flex items-center justify-center px-2 py-1.5 sm:px-3 sm:py-2 border text-sm font-medium rounded-md shadow-sm transition-all duration-200 ease-in-out"
             :class="isDarkMode ? 'border-gray-600 bg-gray-700 hover:bg-gray-600 text-gray-200' : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 mr-1.5 transition-transform duration-200"
+              class="h-4 w-4 sm:mr-1.5 transition-transform duration-200"
               :class="{ 'rotate-180': isAllExpanded }"
               fill="none"
               viewBox="0 0 24 24"
@@ -61,15 +77,15 @@
             >
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
-            <span class="hidden xs:inline">{{ isAllExpanded ? $t('admin.tasks.actions.collapseAll') : $t('admin.tasks.actions.expandAll') }}</span>
+            <span class="hidden sm:inline">{{ isAllExpanded ? $t('admin.tasks.actions.collapseAll') : $t('admin.tasks.actions.expandAll') }}</span>
           </button>
 
-          <!-- 批量删除按钮 -->
+          <!-- 批量删除按钮 - 只有选中了可删除的任务才显示 -->
           <button
-            v-if="hasTaskPermission"
+            v-if="selectedTasks.length > 0 && selectedTasks.some(id => tasks.find(t => t.id === id)?.allowedActions?.canDelete)"
             @click="deleteSelectedTasks"
             :disabled="selectedTasks.length === 0"
-            class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-all duration-200 ease-in-out"
+            class="inline-flex items-center justify-center px-2 py-1.5 sm:px-3 sm:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-all duration-200 ease-in-out"
             :class="[
               selectedTasks.length === 0
                 ? 'opacity-50 cursor-not-allowed bg-gray-400 dark:bg-gray-600'
@@ -78,11 +94,10 @@
                 : 'bg-red-500 hover:bg-red-600 text-white',
             ]"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            <span class="hidden xs:inline">{{ $t('admin.tasks.actions.delete') }}{{ selectedTasks.length ? ` (${selectedTasks.length})` : '' }}</span>
-            <span class="xs:hidden">{{ $t('admin.tasks.actions.deleteShort') }}{{ selectedTasks.length ? ` (${selectedTasks.length})` : '' }}</span>
+            <span class="hidden sm:inline">{{ $t('admin.tasks.actions.delete') }}{{ selectedTasks.length ? ` (${selectedTasks.length})` : '' }}</span>
           </button>
         </div>
       </div>
@@ -144,6 +159,328 @@
         </svg>
         <h3 class="mt-2 text-sm font-medium" :class="isDarkMode ? 'text-white' : 'text-gray-900'">{{ $t('admin.tasks.empty.title') }}</h3>
         <p class="mt-1 text-sm" :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'">{{ $t('admin.tasks.empty.description') }}</p>
+      </div>
+
+      <!-- 卡片视图 (用户选择card模式时显示) -->
+      <div v-else-if="viewMode === 'card'" class="space-y-3 p-3">
+        <div
+          v-for="task in paginatedTasks"
+          :key="task.id"
+          class="rounded-lg border transition-all duration-200"
+          :class="[
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
+            selectedTasks.includes(task.id) && 'ring-2 ring-blue-500'
+          ]"
+        >
+          <!-- 卡片头部 (任务名 + 状态 + 选择框) -->
+          <div class="flex items-start gap-3 p-3">
+            <!-- 状态图标 -->
+            <div class="flex-shrink-0 w-5 h-5">
+              <svg v-if="task.status === 'completed'" class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <svg v-else-if="task.status === 'failed'" class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <svg v-else-if="task.status === 'partial'" class="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <svg v-else-if="task.status === 'cancelled'" class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+              <svg v-else class="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+
+            <!-- 任务名 + 状态徽章 -->
+            <div class="flex-1 min-w-0">
+              <h3
+                class="text-sm font-medium leading-5 break-words"
+                :class="isDarkMode ? 'text-gray-100' : 'text-gray-900'"
+              >
+                {{ task.name }}
+              </h3>
+              <span
+                class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full"
+                :class="getStatusColor(task.status)"
+              >
+                {{ $t(`admin.tasks.status.${task.status}`) }}
+              </span>
+            </div>
+
+            <!-- 选择框 -->
+            <input
+              type="checkbox"
+              :checked="selectedTasks.includes(task.id)"
+              @change="toggleTaskSelection(task.id)"
+              class="w-5 h-5 rounded flex-shrink-0 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            />
+          </div>
+
+          <!-- 进度条 -->
+          <div class="px-3 pb-2">
+            <div
+              class="relative h-2 rounded-full overflow-hidden"
+              :class="isDarkMode ? 'bg-gray-700' : 'bg-gray-200'"
+            >
+              <div
+                class="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                :class="getProgressColor(task.status)"
+                :style="{ width: `${task.progress}%` }"
+              ></div>
+            </div>
+            <div
+              class="flex justify-between items-center mt-1 text-xs"
+              :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'"
+            >
+              <span>{{ task.progress }}%</span>
+              <span v-if="task.stats.totalBytes > 0">
+                {{ formatFileSize(task.stats.bytesTransferred) }} /
+                {{ formatFileSize(task.stats.totalBytes) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 统计摘要 -->
+          <div
+            class="flex items-center justify-between px-3 py-2 text-xs border-t"
+            :class="isDarkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-100 bg-gray-50'"
+          >
+            <div class="flex items-center gap-3">
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                <span class="text-green-600 dark:text-green-400 font-medium">{{ task.stats.success }}</span>
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                <span class="text-red-600 dark:text-red-400 font-medium">{{ task.stats.failed }}</span>
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                <span class="text-yellow-600 dark:text-yellow-400 font-medium">{{ task.stats.skipped }}</span>
+              </span>
+              <span :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'">
+                共 {{ task.stats.total }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 元信息行 -->
+          <div
+            class="flex items-center justify-between px-3 py-2 text-xs"
+            :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'"
+          >
+            <!-- 创建者徽章 -->
+            <span
+              class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+              :class="getCreatorBadgeClass(task.userId, task.keyName)"
+            >
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+              </svg>
+              {{ getCreatorText(task.userId, task.keyName) }}
+            </span>
+
+            <!-- 相对时间 -->
+            <span class="flex items-center gap-1">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+              </svg>
+              {{ task.relativeTime }}
+            </span>
+          </div>
+
+          <!-- 操作区域 -->
+          <div
+            class="flex items-center gap-2 px-3 py-3 border-t"
+            :class="isDarkMode ? 'border-gray-700' : 'border-gray-100'"
+          >
+            <!-- 展开按钮 -->
+            <button
+              @click="toggleExpandRow(task.id)"
+              class="flex-1 flex items-center justify-center sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg text-sm font-medium transition-colors"
+              :class="isDarkMode
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'"
+            >
+              <span class="hidden sm:inline">{{ expandedRows.includes(task.id) ? '收起详情' : '展开详情' }}</span>
+              <svg
+                class="w-4 h-4 transition-transform duration-200"
+                :class="{ 'rotate-180': expandedRows.includes(task.id) }"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <!-- 取消按钮 -->
+            <button
+              v-if="task.allowedActions?.canCancel"
+              @click="cancelTask(task.id)"
+              class="flex-shrink-0 p-2.5 rounded-lg transition-colors text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+              :class="isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'"
+              title="取消任务"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <!-- 删除按钮 -->
+            <button
+              v-if="task.allowedActions?.canDelete"
+              @click="deleteSingleTask(task.id)"
+              class="flex-shrink-0 p-2.5 rounded-lg transition-colors text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+              :class="isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-red-50'"
+              title="删除任务"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- 展开详情区域 (文件列表) -->
+          <div
+            v-if="expandedRows.includes(task.id)"
+            class="border-t"
+            :class="isDarkMode ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'"
+          >
+            <div class="p-3 space-y-2">
+              <!-- 文件列表标题 -->
+              <div v-if="task.itemResults && task.itemResults.length > 0" class="flex items-center justify-between mb-2">
+                <h4
+                  class="text-xs font-semibold uppercase tracking-wide"
+                  :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'"
+                >
+                  文件列表 ({{ task.itemResults.length }})
+                </h4>
+                <!-- 重试所有失败按钮 -->
+                <button
+                  v-if="task.allowedActions?.canRetry && task.stats.failed > 0"
+                  @click="retryAllFailedFiles(task.id)"
+                  class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
+                  :class="isDarkMode
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                    : 'bg-orange-500 hover:bg-orange-600 text-white'"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  重试 ({{ task.stats.failed }})
+                </button>
+              </div>
+
+              <!-- 文件项列表 -->
+              <div
+                v-for="(item, index) in task.itemResults"
+                :key="index"
+                class="relative rounded-md overflow-hidden"
+                :class="isDarkMode ? 'bg-gray-800' : 'bg-white border border-gray-200'"
+              >
+                <!-- 背景进度条 -->
+                <div
+                  class="absolute inset-0 transition-all duration-500"
+                  :class="getFileProgressBgClass(item.status)"
+                  :style="{ width: getFileProgressWidth(item) }"
+                ></div>
+
+                <!-- 文件信息 -->
+                <div class="relative flex items-center gap-2 px-3 py-2.5 text-xs">
+                  <!-- 状态图标 -->
+                  <span class="flex-shrink-0">
+                    <span v-if="item.status === 'success'" class="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                      <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                    <span v-else-if="item.status === 'processing'" class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                      <svg class="w-2.5 h-2.5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                    </span>
+                    <span v-else-if="item.status === 'failed'" class="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                      <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </span>
+                    <span v-else class="w-4 h-4 rounded-full border-2 flex items-center justify-center" :class="isDarkMode ? 'border-gray-500 bg-gray-700' : 'border-gray-300 bg-gray-100'">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="isDarkMode ? 'bg-gray-500' : 'bg-gray-400'"></span>
+                    </span>
+                  </span>
+
+                  <!-- 文件名 + 大小 -->
+                  <div class="flex-1 min-w-0">
+                    <div
+                      class="font-medium truncate"
+                      :class="isDarkMode ? 'text-gray-100' : 'text-gray-800'"
+                      :title="item.sourcePath"
+                    >
+                      {{ extractNameFromPath(item.sourcePath) }}
+                    </div>
+                    <div
+                      class="flex items-center gap-2 mt-0.5"
+                      :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'"
+                    >
+                      <span class="font-mono text-xs">
+                        {{ item.bytesTransferred ? formatFileSize(item.bytesTransferred) : '--' }}
+                      </span>
+                      <span v-if="item.retryCount && item.retryCount > 0" class="text-orange-500">
+                        重试 ×{{ item.retryCount }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- 状态徽章 -->
+                  <span
+                    class="flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-medium"
+                    :class="getFileStatusBadgeClass(item.status)"
+                  >
+                    {{ getFileStatusText(item.status) }}
+                  </span>
+
+                  <!-- 单文件重试按钮 -->
+                  <button
+                    v-if="task.allowedActions?.canRetry && item.status === 'failed'"
+                    @click.stop="retryFailedFile(task, item)"
+                    class="flex-shrink-0 p-1.5 rounded-full transition-colors"
+                    :class="isDarkMode
+                      ? 'hover:bg-gray-700 text-orange-400'
+                      : 'hover:bg-orange-50 text-orange-500'"
+                    title="重试此文件"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- 错误信息 -->
+                <div
+                  v-if="item.status === 'failed' && item.error"
+                  class="relative px-3 pb-2"
+                >
+                  <div
+                    class="flex items-start gap-1.5 px-2 py-1.5 rounded text-xs"
+                    :class="isDarkMode
+                      ? 'bg-red-900/30 text-red-300'
+                      : 'bg-red-50 text-red-600'"
+                  >
+                    <svg class="w-3 h-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span class="break-words">{{ item.error }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 任务表格 -->
@@ -291,7 +628,7 @@
                   <span
                     :class="[
                       'px-2 py-1 text-xs rounded inline-block',
-                      getCreatorBadgeClass(task.userId)
+                      getCreatorBadgeClass(task.userId, task.keyName)
                     ]"
                   >
                     {{ getCreatorText(task.userId, task.keyName) }}
@@ -306,9 +643,9 @@
                 <!-- 操作 -->
                 <td class="px-4 py-3 whitespace-nowrap text-right">
                   <div class="flex justify-end items-center gap-2">
-                    <!-- 取消按钮 - 仅对运行中或等待中的任务显示 -->
+                    <!-- 取消按钮 -->
                     <button
-                      v-if="hasTaskPermission && (task.status === 'running' || task.status === 'pending')"
+                      v-if="task.allowedActions?.canCancel"
                       @click="cancelTask(task.id)"
                       class="p-1.5 sm:p-2 rounded-full transition-colors text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                       :title="$t('admin.tasks.actions.cancel')"
@@ -339,7 +676,7 @@
 
                     <!-- 删除按钮 -->
                     <button
-                      v-if="hasTaskPermission"
+                      v-if="task.allowedActions?.canDelete"
                       @click="deleteSingleTask(task.id)"
                       class="p-1.5 sm:p-2 rounded-full transition-colors text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
                       :title="$t('admin.tasks.actions.delete')"
@@ -362,9 +699,9 @@
                         <div class="font-medium" :class="isDarkMode ? 'text-gray-300' : 'text-gray-700'">
                           {{ $t('admin.tasks.details.fileList') }} ({{ task.itemResults.length }})
                         </div>
-                        <!-- 重试所有失败文件按钮 -->
+                        <!-- 重试所有失败文件按钮 - 基于 allowedActions.canRetry -->
                         <button
-                          v-if="hasTaskPermission && task.stats.failed > 0 && (task.status === 'completed' || task.status === 'partial' || task.status === 'failed')"
+                          v-if="task.allowedActions?.canRetry && task.stats.failed > 0"
                           @click="retryAllFailedFiles(task.id)"
                           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
                           :class="isDarkMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'"
@@ -380,7 +717,7 @@
                         <div
                           v-for="(item, index) in task.itemResults"
                           :key="index"
-                          class="relative rounded-lg overflow-hidden transition-all duration-200"
+                          class="group relative rounded-lg overflow-hidden transition-all duration-200"
                           :class="isDarkMode ? 'bg-gray-800' : 'bg-white border border-gray-200'"
                         >
                           <!-- 背景进度条 - 从左到右渐变填充 -->
@@ -475,9 +812,9 @@
 
                             <!-- 单文件重试按钮 -->
                             <button
-                              v-if="hasTaskPermission && item.status === 'failed' && (task.status === 'completed' || task.status === 'partial' || task.status === 'failed')"
+                              v-if="task.allowedActions?.canRetry && item.status === 'failed'"
                               @click.stop="retryFailedFile(task, item)"
-                              class="flex-shrink-0 p-1 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                              class="flex-shrink-0 p-1 rounded-full transition-colors"
                               :class="isDarkMode ? 'hover:bg-gray-700 text-orange-400 hover:text-orange-300' : 'hover:bg-orange-50 text-orange-500 hover:text-orange-600'"
                               :title="$t('admin.tasks.actions.retryFile')"
                             >
@@ -556,6 +893,13 @@
         @limit-changed="handleLimitChange"
       />
     </div>
+
+    <!-- 确认对话框 -->
+    <ConfirmDialog
+      v-bind="dialogState"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 
@@ -565,15 +909,56 @@ import { useI18n } from 'vue-i18n';
 import { formatRelativeTime } from '@/utils/timeUtils.js';
 import { formatFileSize } from '@/utils/fileUtils.js';
 import CommonPagination from '@/components/common/CommonPagination.vue';
+import ConfirmDialog from '@/components/common/dialogs/ConfirmDialog.vue';
+import ViewModeToggle from '@/components/common/ViewModeToggle.vue';
 import { listJobs, getJobStatus, cancelJob, deleteJob, createJob } from '@/api/services/fsService.js';
 import { useGlobalMessage } from '@/composables/core/useGlobalMessage.js';
+import { useConfirmDialog } from '@/composables/core/useConfirmDialog.js';
 import { useThemeMode } from '@/composables/core/useThemeMode.js';
+import { useAdminBase } from '@/composables/admin-management/useAdminBase.js';
+import { useCreatorBadge } from '@/composables/admin-management/useCreatorBadge.js';
 import { useAuthStore } from '@/stores/authStore.js';
 
 const { t } = useI18n();
 const { showSuccess, showError, showWarning } = useGlobalMessage();
 const { isDarkMode } = useThemeMode();
 const authStore = useAuthStore();
+
+// 确认对话框
+const { dialogState, confirm, handleConfirm, handleCancel } = useConfirmDialog();
+
+// 创建者徽章统一逻辑
+const { getCreatorType, getCreatorText, getCreatorBadgeClass } = useCreatorBadge({
+  apiKeyNames: authStore.apiKeyNames,
+});
+
+// 管理页面基础功能（含视图模式切换 + 分页）
+const {
+  viewMode,
+  switchViewMode,
+  pagination,
+  pageSizeOptions,
+  handlePaginationChange,
+  changePageSize,
+  resetPagination,
+  updatePagination,
+} = useAdminBase('tasks', {
+  viewMode: {
+    storageKey: 'admin-tasks-view-mode',
+    defaultMode: 'table',
+    responsive: {
+      breakpoint: 640,
+      mobileMode: 'card',
+      desktopMode: 'table',
+    },
+  },
+});
+
+// 视图模式选项配置
+const viewModeOptions = [
+  { value: 'table', icon: 'table', titleKey: 'admin.tasks.viewMode.table' },
+  { value: 'card', icon: 'card', titleKey: 'admin.tasks.viewMode.card' },
+];
 
 // 状态管理
 const tasks = ref([]);
@@ -584,14 +969,6 @@ const expandedRows = ref([]);
 const filters = ref({
   search: '',
   status: '',
-});
-
-// 分页
-const pagination = ref({
-  page: 1,
-  limit: 20,
-  total: 0,
-  totalPages: 0,
 });
 
 // 轮询定时器
@@ -609,48 +986,10 @@ const isAllExpanded = computed(() => {
          paginatedTasks.value.every(task => expandedRows.value.includes(task.id));
 });
 
-// 权限相关 - 使用挂载权限（与后端保持一致）
-const hasTaskPermission = computed(() => {
-  return authStore.hasPermission('mount');
-});
-
-// 检查用户是否可以查看特定任务
-const canViewTask = (task) => {
-  // 管理员可以查看所有任务
-  if (authStore.isAdmin) {
-    return true;
-  }
-
-  // API密钥只能查看自己的任务
-  if (authStore.isApiKey) {
-    return task.userId === authStore.userInfo?.id;
-  }
-
-  return false;
-};
-
-// 检查用户是否可以删除特定任务
-const canDeleteTask = (task) => {
-  // 首先要能查看任务
-  if (!canViewTask(task)) {
-    return false;
-  }
-
-  // 复制任务需要复制权限
-  if (task.type === 'copy') {
-    return hasTaskPermission.value;
-  }
-
-  // 其他任务类型的权限检查可以在这里扩展
-  return hasTaskPermission.value;
-};
 
 // 筛选后的任务
 const filteredTasks = computed(() => {
   let result = [...tasks.value];
-
-  // 权限过滤：用户只能看到自己有权限的任务
-  result = result.filter(task => canViewTask(task));
 
   // 状态筛选
   if (filters.value.status) {
@@ -668,17 +1007,13 @@ const filteredTasks = computed(() => {
     );
   }
 
-  // 更新分页信息
-  pagination.value.total = result.length;
-  pagination.value.totalPages = Math.ceil(result.length / pagination.value.limit);
-
   return result;
 });
 
 // 分页后的任务
 const paginatedTasks = computed(() => {
-  const start = (pagination.value.page - 1) * pagination.value.limit;
-  const end = start + pagination.value.limit;
+  const start = (pagination.page - 1) * pagination.limit;
+  const end = start + pagination.limit;
   return filteredTasks.value.slice(start, end);
 });
 
@@ -745,78 +1080,27 @@ const getFileProgressWidth = (item) => {
   if (['success', 'failed', 'skipped'].includes(item.status)) {
     return '100%';
   }
-  // 处理中或重试中 - 根据实际进度或显示动画效果
+  // 处理中或重试中 - 显示动态进度
   if (item.status === 'processing' || item.status === 'retrying') {
-    // 如果有进度数据则使用，否则显示50%作为视觉反馈
+    // 优先使用 progress 字段
     if (item.progress !== undefined && item.progress > 0) {
       return `${Math.min(100, Math.max(5, item.progress))}%`;
     }
-    return '50%'; // 默认动画位置
+    // 其次使用 bytesTransferred 计算进度（如果有文件大小）
+    if (item.bytesTransferred > 0 && item.fileSize > 0) {
+      const progress = Math.round((item.bytesTransferred / item.fileSize) * 100);
+      return `${Math.min(100, Math.max(5, progress))}%`;
+    }
+    // 如果有字节传输但没有总大小，根据传输量显示部分进度
+    if (item.bytesTransferred > 0) {
+      // 显示50%表示正在传输（视觉反馈）
+      return '50%';
+    }
+    // 等待开始传输 - 显示10%（表示已加入队列）
+    return '10%';
   }
   // 等待中 - 0%
   return '0%';
-};
-
-// 获取创建者徽章样式类（匹配文本/文件管理界面）
-const getCreatorBadgeClass = (userId) => {
-  const creatorType = getCreatorType(userId);
-
-  switch (creatorType) {
-    case 'admin':
-      return 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100';
-    case 'apikey':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100';
-    case 'system':
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-  }
-};
-
-// 获取创建者类型（匹配挂载管理界面标准逻辑）
-const getCreatorType = (userId) => {
-  if (!userId) {
-    return "system";
-  }
-
-  if (userId === "admin") {
-    return "admin";
-  }
-
-  // 处理带"apikey:"前缀的API密钥ID
-  if (typeof userId === "string" && userId.startsWith("apikey:")) {
-    return "apikey";
-  }
-
-  // 检查是否在已知的API密钥列表中的UUID
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) &&
-      authStore.apiKeyNames && authStore.apiKeyNames[userId]) {
-    return "apikey";
-  }
-
-  // UUID格式但不在已知API密钥列表中，则视为管理员
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
-    return "admin";
-  }
-
-  // 默认为其他类型
-  return "other";
-};
-
-// 获取创建者文本（匹配文本/文件管理界面）
-const getCreatorText = (userId, keyName) => {
-  const creatorType = getCreatorType(userId);
-
-  switch (creatorType) {
-    case 'admin':
-      return '管理员';
-    case 'apikey':
-      return keyName ? `密钥：${keyName}` : `密钥：${userId.substring(0, 8)}...`;
-    case 'system':
-      return '未知来源';
-    default:
-      return userId;
-  }
 };
 
 /**
@@ -916,14 +1200,13 @@ const transformTaskData = (jobData) => {
       bytesTransferred,
       totalBytes,
     },
-    // 保留原有的 details (兼容单文件显示)
     details: {
       sourcePath: firstItem.sourcePath || '',
       targetPath: firstItem.targetPath || '',
     },
-    // 新增: 所有文件的处理结果列表
     itemResults,
     error: jobData.error || null,
+    allowedActions: jobData.allowedActions || null,
   };
 };
 
@@ -936,7 +1219,8 @@ const loadTasks = async () => {
     const response = await listJobs({ taskType: 'copy' });
     const jobsList = response?.data?.jobs || response?.jobs || [];
     tasks.value = jobsList.map(transformTaskData);
-    pagination.value.page = 1;
+    resetPagination();
+    updatePagination({ total: tasks.value.length }, 'page');
   } catch (error) {
     console.error('Failed to load tasks:', error);
     loadError.value = t('admin.tasks.error.loadFailed');
@@ -1042,12 +1326,6 @@ const toggleExpandAll = () => {
 
 // 删除单个任务
 const deleteSingleTask = async (taskId) => {
-  // 权限验证：检查复制权限
-  if (!hasTaskPermission.value) {
-    showError(t('admin.common.permissionDenied.title'));
-    return;
-  }
-
   // 查找任务
   const task = tasks.value.find(t => t.id === taskId);
   if (!task) {
@@ -1055,14 +1333,22 @@ const deleteSingleTask = async (taskId) => {
     return;
   }
 
-  // 检查任务状态，不允许删除运行中的任务
-  if (task.status === 'pending' || task.status === 'running') {
-    showWarning(t('admin.tasks.error.cannotDeleteRunning'));
+  // 前端二次检查（防止并发状态变化）
+  if (!task.allowedActions?.canDelete) {
+    showError(t('admin.common.permissionDenied.title'));
     return;
   }
 
   // 确认删除
-  if (!confirm(t('admin.tasks.confirmDelete.single', { name: task.name }))) {
+  const confirmed = await confirm({
+    title: t('common.dialogs.deleteTitle'),
+    message: t('common.dialogs.deleteItem', { name: task.name }),
+    confirmType: 'danger',
+    confirmText: t('common.dialogs.deleteButton'),
+    darkMode: isDarkMode.value,
+  });
+
+  if (!confirmed) {
     return;
   }
 
@@ -1091,33 +1377,35 @@ const deleteSingleTask = async (taskId) => {
 const deleteSelectedTasks = async () => {
   if (selectedTasks.value.length === 0) return;
 
-  // 权限验证：检查复制权限
-  if (!hasTaskPermission.value) {
-    showError(t('admin.common.permissionDenied.title'));
-    return;
-  }
-
-  // 检查是否有运行中的任务
-  const runningTasks = selectedTasks.value.filter(taskId => {
+  // 过滤出可删除的任务（基于 allowedActions）
+  const deletableTasks = selectedTasks.value.filter(taskId => {
     const task = tasks.value.find(t => t.id === taskId);
-    return task && (task.status === 'pending' || task.status === 'running');
+    return task?.allowedActions?.canDelete;
   });
 
-  if (runningTasks.length > 0) {
-    showWarning(t('admin.tasks.error.cannotDeleteRunningBatch', { count: runningTasks.length }));
+  if (deletableTasks.length === 0) {
+    showWarning(t('admin.tasks.error.noTasksToDelete'));
     return;
   }
 
   // 确认批量删除
-  if (!confirm(t('admin.tasks.confirmDelete.batch', { count: selectedTasks.value.length }))) {
+  const confirmed = await confirm({
+    title: t('common.dialogs.deleteTitle'),
+    message: t('common.dialogs.deleteMultiple', { count: deletableTasks.length }),
+    confirmType: 'danger',
+    confirmText: t('common.dialogs.deleteButton') + ` (${deletableTasks.length})`,
+    darkMode: isDarkMode.value,
+  });
+
+  if (!confirmed) {
     return;
   }
 
-  // 执行批量删除
+  // 执行批量删除（仅删除可删除的任务）
   let successCount = 0;
   let failedCount = 0;
 
-  for (const taskId of selectedTasks.value) {
+  for (const taskId of deletableTasks) {
     try {
       await deleteJob(taskId);
       successCount++;
@@ -1127,14 +1415,17 @@ const deleteSelectedTasks = async () => {
       if (index > -1) {
         tasks.value.splice(index, 1);
       }
+
+      // 从选中列表移除
+      const selectedIndex = selectedTasks.value.indexOf(taskId);
+      if (selectedIndex > -1) {
+        selectedTasks.value.splice(selectedIndex, 1);
+      }
     } catch (error) {
       console.error(`Failed to delete task ${taskId}:`, error);
       failedCount++;
     }
   }
-
-  // 清空选中列表
-  selectedTasks.value = [];
 
   // 显示结果
   if (failedCount === 0) {
@@ -1148,18 +1439,23 @@ const deleteSelectedTasks = async () => {
 
 // 处理页码变化
 const handlePageChange = (page) => {
-  pagination.value.page = page;
+  handlePaginationChange(page, 'page');
 };
 
 // 处理每页数量变化
 const handleLimitChange = (limit) => {
-  pagination.value.limit = limit;
-  pagination.value.page = 1;
+  changePageSize(limit);
+  // 更新总数（筛选后的列表长度）
+  updatePagination({ total: filteredTasks.value.length }, 'page');
 };
 
-// 监听筛选条件变化,重置到第一页
+// 监听筛选条件变化,重置到第一页并更新总数
 watch(filters, () => {
-  pagination.value.page = 1;
+  resetPagination();
+  // 延迟更新总数，等待 filteredTasks 计算完成
+  setTimeout(() => {
+    updatePagination({ total: filteredTasks.value.length }, 'page');
+  }, 0);
 }, { deep: true });
 
 // 组件挂载
@@ -1175,15 +1471,9 @@ onMounted(async () => {
  * 创建新任务，仅包含该失败文件
  */
 const retryFailedFile = async (task, failedItem) => {
-  // 权限验证
-  if (!hasTaskPermission.value) {
+  // 前端二次检查（防止并发状态变化）
+  if (!task.allowedActions?.canRetry) {
     showError(t('admin.common.permissionDenied.title'));
-    return;
-  }
-
-  // 检查任务是否还在运行
-  if (task.status === 'running' || task.status === 'pending') {
-    showWarning(t('admin.tasks.error.cannotRetryRunning'));
     return;
   }
 
@@ -1216,12 +1506,6 @@ const retryFailedFile = async (task, failedItem) => {
  * 创建新任务，包含所有失败文件
  */
 const retryAllFailedFiles = async (taskId) => {
-  // 权限验证
-  if (!hasTaskPermission.value) {
-    showError(t('admin.common.permissionDenied.title'));
-    return;
-  }
-
   // 查找任务
   const task = tasks.value.find(t => t.id === taskId);
   if (!task) {
@@ -1229,9 +1513,9 @@ const retryAllFailedFiles = async (taskId) => {
     return;
   }
 
-  // 检查任务是否还在运行
-  if (task.status === 'running' || task.status === 'pending') {
-    showWarning(t('admin.tasks.error.cannotRetryRunning'));
+  // 前端二次检查（防止并发状态变化）
+  if (!task.allowedActions?.canRetry) {
+    showError(t('admin.common.permissionDenied.title'));
     return;
   }
 

@@ -30,6 +30,7 @@ export interface ItemResult {
   targetPath: string;
   status: ItemStatus;
   error?: string;              // 失败时的错误信息
+  fileSize?: number;           // 文件总大小（字节）
   bytesTransferred?: number;   // 已传输字节数
   retryCount?: number;         // 重试次数
   lastRetryAt?: number;        // 最后重试时间戳

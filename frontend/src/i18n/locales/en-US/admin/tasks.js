@@ -4,6 +4,11 @@ export default {
     description: 'View and manage all background tasks in the system',
     loading: 'Loading...',
 
+    viewMode: {
+      table: 'Table View',
+      card: 'Card View',
+    },
+
     filters: {
       searchPlaceholder: 'Search task name, ID or path...',
       allStatuses: 'All Statuses',
@@ -76,6 +81,7 @@ export default {
       taskNotFound: 'Task not found',
       cannotDeleteRunning: 'Cannot delete running task, please cancel it first',
       cannotDeleteRunningBatch: '{count} tasks are running and cannot be deleted. Please cancel them first.',
+      noTasksToDelete: 'None of the selected tasks can be deleted',
       retryFailed: 'Failed to retry',
       noFailedFiles: 'No failed files to retry',
       cannotRetryRunning: 'Cannot retry running task',
@@ -90,6 +96,7 @@ export default {
     },
 
     confirmDelete: {
+      title: 'Confirm Delete',
       single: 'Are you sure you want to delete task "{name}"? This action cannot be undone.',
       batch: 'Are you sure you want to delete {count} selected tasks? This action cannot be undone.',
     },

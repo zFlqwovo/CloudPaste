@@ -1,14 +1,34 @@
 <script setup>
 import { onMounted, computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStorageConfigManagement } from "@/modules/admin/storage/useStorageConfigManagement.js";
 import ConfigForm from "@/modules/admin/components/ConfigForm.vue";
 import CommonPagination from "@/components/common/CommonPagination.vue";
+import ConfirmDialog from "@/components/common/dialogs/ConfirmDialog.vue";
 import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
 import { getAdminStorageStrategy } from "@/modules/storage-core/schema/adminStorageSchemas.js";
 import { useThemeMode } from "@/composables/core/useThemeMode.js";
-
+import { useConfirmDialog } from "@/composables/core/useConfirmDialog.js";
 
 const { isDarkMode: darkMode } = useThemeMode();
+
+// 国际化
+const { t } = useI18n();
+
+// 确认对话框
+const { dialogState, confirm, handleConfirm, handleCancel } = useConfirmDialog();
+
+// 创建适配确认函数，用于传递给 composable
+const confirmFn = async ({ title, message, confirmType }) => {
+  return await confirm({
+    title,
+    message,
+    confirmType,
+    confirmText: t("common.dialogs.deleteButton"),
+    darkMode: darkMode.value,
+  });
+};
+
 const {
   // 状态
   loading,
@@ -40,7 +60,7 @@ const {
   showTestDetailsModal,
   getProviderIcon,
   STORAGE_TYPE_UNKNOWN,
-} = useStorageConfigManagement();
+} = useStorageConfigManagement({ confirmFn });
 
 const formatStorageTypeLabel = (type) => {
   if (!type || type === STORAGE_TYPE_UNKNOWN) {
@@ -1121,6 +1141,13 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 确认对话框 -->
+    <ConfirmDialog
+      v-bind="dialogState"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 

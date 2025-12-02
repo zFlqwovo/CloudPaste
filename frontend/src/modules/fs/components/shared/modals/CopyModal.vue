@@ -161,6 +161,13 @@
         </div>
       </div>
     </div>
+
+    <!-- 确认对话框 -->
+    <ConfirmDialog
+      v-bind="dialogState"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 
@@ -169,9 +176,16 @@
   import { useI18n } from "vue-i18n";
   import { useTaskManager, TaskType } from "@/utils/taskManager.js";
   import { useFsService } from "@/modules/fs";
-  
+  import { useGlobalMessage } from "@/composables/core/useGlobalMessage.js";
+  import { useConfirmDialog } from "@/composables/core/useConfirmDialog.js";
+  import ConfirmDialog from "@/components/common/dialogs/ConfirmDialog.vue";
+
   const { t } = useI18n();
   const fsApi = useFsService();
+  const { showError } = useGlobalMessage();
+
+// 确认对话框
+const { dialogState, confirm, handleConfirm, handleCancel } = useConfirmDialog();
 
 // 注册递归组件
 import { h } from "vue";
@@ -646,7 +660,14 @@ const confirmCopy = async () => {
 
   // 如果有警告，需要用户确认
   if (pathWarning.value) {
-    if (!confirm(t("mount.copyModal.confirmPotentialIssue", { warning: pathWarning.value }))) {
+    const confirmed = await confirm({
+      title: t("mount.copyModal.warningTitle", "复制警告"),
+      message: t("mount.copyModal.confirmPotentialIssue", { warning: pathWarning.value }),
+      confirmType: "warning",
+      confirmText: t("mount.copyModal.continueCopy", "继续复制"),
+      darkMode: props.darkMode,
+    });
+    if (!confirmed) {
       return;
     }
   }
@@ -696,6 +717,7 @@ const confirmCopy = async () => {
     // 如果 API 请求失败，保持模态框打开并显示错误
     // 注意：此时尚未创建前端任务，无需标记任何任务为失败
     console.error('[CopyModal] 复制启动失败:', error);
+    showError(error.message || t('mount.copyModal.copyFailed'));
     copying.value = false;
   }
 };

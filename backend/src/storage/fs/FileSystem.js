@@ -34,6 +34,7 @@ import { getAccessibleMountsForUser } from "../../security/helpers/access.js";
 import { UserType } from "../../constants/index.js";
 import { FsMetaService } from "../../services/fsMetaService.js";
 import { sortSearchResults } from "./utils/SearchUtils.js";
+import { TaskPermissionMap, PermissionChecker, Permission } from "../../constants/permissions.js";
 
 export class FileSystem {
   /**
@@ -572,11 +573,44 @@ export class FileSystem {
   }
 
   /**
+   * 计算任务的允许操作
+   * @private
+   * @param {Object} job - 任务对象
+   * @param {number|undefined} userPermissions - 用户权限位标志
+   * @param {string} userType - 用户类型
+   * @returns {Object} 允许的操作 { canView, canCancel, canDelete, canRetry }
+   */
+  _computeAllowedActions(job, userPermissions, userType) {
+    // 管理员拥有所有操作权限
+    if (userType === UserType.ADMIN) {
+      return {
+        canView: true,
+        canCancel: ['pending', 'running'].includes(job.status),
+        canDelete: !['pending', 'running'].includes(job.status),
+        canRetry: ['failed', 'partial'].includes(job.status),
+      };
+    }
+
+    // 非管理员：根据任务类型检查权限
+    const requiredPermission = TaskPermissionMap[job.taskType];
+    const hasTypePermission = requiredPermission && userPermissions !== undefined
+      ? PermissionChecker.hasPermission(userPermissions, requiredPermission)
+      : false;
+
+    return {
+      canView: true,  // 能获取到任务说明有查看权限
+      canCancel: hasTypePermission && ['pending', 'running'].includes(job.status),
+      canDelete: hasTypePermission && !['pending', 'running'].includes(job.status),
+      canRetry: hasTypePermission && ['failed', 'partial'].includes(job.status),
+    };
+  }
+
+  /**
    * 获取作业状态
    * @param {string} jobId - 作业ID
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
-   * @returns {Promise<Object>} 作业状态 { jobId, taskType, status, stats, createdAt, startedAt?, finishedAt?, errorMessage? }
+   * @returns {Promise<Object>} 作业状态 { jobId, taskType, status, stats, allowedActions, ... }
    */
   async getJobStatus(jobId, userIdOrInfo, userType) {
     if (!jobId) {
@@ -597,7 +631,14 @@ export class FileSystem {
       }
     }
 
-    return jobStatus;
+    // 计算允许的操作
+    const userPermissions = typeof userIdOrInfo === 'object' ? userIdOrInfo?.permissions : undefined;
+    const allowedActions = this._computeAllowedActions(jobStatus, userPermissions, userType);
+
+    return {
+      ...jobStatus,
+      allowedActions,
+    };
   }
 
   /**
@@ -614,6 +655,11 @@ export class FileSystem {
 
     // 先获取任务状态并验证权限（复用 getJobStatus 的权限检查）
     const jobStatus = await this.getJobStatus(jobId, userIdOrInfo, userType);
+
+    // 检查操作权限（基于 allowedActions）
+    if (!jobStatus.allowedActions?.canCancel) {
+      throw new AuthorizationError('无权取消此任务');
+    }
 
     // 检查任务状态是否可取消
     if (jobStatus.status !== 'pending' && jobStatus.status !== 'running') {
@@ -634,7 +680,7 @@ export class FileSystem {
    * @param {number} filter.offset - 偏移量
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
-   * @returns {Promise<Array<Object>>} 作业描述符数组
+   * @returns {Promise<Array<Object>>} 作业描述符数组（含 allowedActions）
    */
   async listJobs(filter = {}, userIdOrInfo, userType) {
     // 非管理员用户：强制过滤为只能看到自己的任务
@@ -650,9 +696,33 @@ export class FileSystem {
     }
 
     const orchestrator = await this.getTaskOrchestrator();
-    const jobs = await orchestrator.listJobs(finalFilter);
+    let jobs = await orchestrator.listJobs(finalFilter);
 
-    return jobs;
+    // 获取用户权限
+    const userPermissions = typeof userIdOrInfo === 'object' ? userIdOrInfo?.permissions : undefined;
+
+    // 非管理员用户：根据任务类型权限过滤任务
+    if (userType !== UserType.ADMIN && userPermissions !== undefined) {
+      jobs = jobs.filter(job => {
+        const requiredPermission = TaskPermissionMap[job.taskType];
+
+        // 如果任务类型没有对应的权限映射，默认不显示
+        if (!requiredPermission) {
+          return false;
+        }
+
+        // 检查用户是否拥有该任务类型所需的权限
+        return PermissionChecker.hasPermission(userPermissions, requiredPermission);
+      });
+    }
+
+    // 为每个任务计算 allowedActions
+    const enrichedJobs = jobs.map(job => ({
+      ...job,
+      allowedActions: this._computeAllowedActions(job, userPermissions, userType),
+    }));
+
+    return enrichedJobs;
   }
 
   /**
@@ -669,6 +739,11 @@ export class FileSystem {
 
     // 先获取任务状态并验证权限
     const jobStatus = await this.getJobStatus(jobId, userIdOrInfo, userType);
+
+    // 检查操作权限
+    if (!jobStatus.allowedActions?.canDelete) {
+      throw new AuthorizationError('无权删除此任务');
+    }
 
     // 检查任务状态是否可删除
     if (jobStatus.status === 'pending' || jobStatus.status === 'running') {

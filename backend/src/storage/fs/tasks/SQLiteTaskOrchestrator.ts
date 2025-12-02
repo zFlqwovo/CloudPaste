@@ -21,12 +21,14 @@ export class SQLiteTaskOrchestrator implements TaskOrchestratorAdapter {
   private db: Database.Database;
   private workers: Promise<void>[] = [];
   private running = false;
+  private fileSystem: any;
 
   constructor(
-    private fileSystem: any,  // FileSystem 实例 (从工厂传入)
+    fileSystem: any,  // FileSystem 实例 (从工厂传入)
     private dbPath: string = './data/database.db',  // 现有 D1 兼容 SQLite 数据库路径
     private concurrency: number = 10  // Worker Pool 并发数
   ) {
+    this.fileSystem = fileSystem;
     // 初始化 SQLite 连接 (tasks 表已由 database.js migration case 25 创建)
     this.db = new Database(dbPath);
 
@@ -44,6 +46,13 @@ export class SQLiteTaskOrchestrator implements TaskOrchestratorAdapter {
     console.log(
       `[SQLiteTaskOrchestrator] 已启动 (并发数: ${concurrency}, 数据库: ${dbPath})`
     );
+  }
+
+  /**
+   * 更新 FileSystem 实例引用（单例模式下每次请求可能传入不同实例）
+   */
+  updateFileSystem(fileSystem: any): void {
+    this.fileSystem = fileSystem;
   }
 
   /**

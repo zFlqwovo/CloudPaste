@@ -647,7 +647,7 @@ const visibleMenuItems = computed(() => {
     items.push({ id: "mount-management", name: t("admin.sidebar.mountManagement"), icon: "server", type: "item", routeName: "AdminMountManagement" });
   }
 
-  // 任务管理：所有有挂载权限的用户都可以访问（包含复制功能）
+  // 任务管理：有挂载权限即可访问，具体任务根据权限类型在列表内过滤
   if (props.permissions.mount) {
     items.push({ id: "tasks", name: t("admin.sidebar.tasks"), icon: "clipboard-list", type: "item", routeName: "AdminTasks" });
   }

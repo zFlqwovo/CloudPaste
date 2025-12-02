@@ -11,7 +11,7 @@
     >
       <!-- 固定头部 -->
       <div
-        class="flex-shrink-0 px-4 py-2.5 border-b flex justify-between items-center"
+        class="flex-shrink-0 px-4 py-3 border-b flex justify-between items-center"
         :class="darkMode ? 'border-gray-700' : 'border-gray-200'"
       >
         <div class="flex items-center space-x-2">
@@ -28,12 +28,12 @@
           <!-- 跳转到任务管理 -->
           <button
             @click="goToTaskManagement"
-            class="p-1 rounded transition-colors"
+            class="p-1.5 rounded transition-colors duration-150"
             :class="darkMode ? 'hover:bg-gray-700 text-gray-500 hover:text-blue-400' : 'hover:bg-gray-100 text-gray-400 hover:text-blue-600'"
             :title="t('mount.taskList.viewFullManagement')"
           >
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </button>
         </div>
@@ -42,13 +42,13 @@
           <button
             @click="loadTasks"
             :disabled="isLoading"
-            class="p-1.5 rounded-full transition-colors"
+            class="p-2 rounded-full transition-colors duration-150"
             :class="darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'"
             :title="t('mount.operations.refresh')"
           >
             <svg
               :class="{ 'animate-spin': isLoading }"
-              class="h-4 w-4"
+              class="w-5 h-5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -56,7 +56,7 @@
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                stroke-width="2"
+                stroke-width="1.75"
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
@@ -64,11 +64,11 @@
           <!-- 关闭按钮 -->
           <button
             @click="close"
-            class="p-1.5 rounded-full transition-colors"
+            class="p-2 rounded-full transition-colors duration-150"
             :class="darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'"
           >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -91,7 +91,7 @@
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p class="mt-2 text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
+          <p class="mt-2 text-xs" :class="darkMode ? 'text-gray-300' : 'text-gray-600'">
             {{ t('mount.taskList.loading') }}
           </p>
         </div>
@@ -112,25 +112,25 @@
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             />
           </svg>
-          <p class="text-xs" :class="darkMode ? 'text-gray-400' : 'text-gray-600'">
+          <p class="text-xs" :class="darkMode ? 'text-gray-300' : 'text-gray-700'">
             {{ t('mount.taskList.empty') }}
           </p>
         </div>
 
         <!-- 任务列表 -->
-        <div v-else class="divide-y" :class="darkMode ? 'divide-gray-700/50' : 'divide-gray-100'">
+        <div v-else class="divide-y" :class="darkMode ? 'divide-gray-700/60' : 'divide-gray-200'">
           <div
             v-for="task in tasks"
             :key="task.id"
-            class="group px-3 py-2.5 transition-colors cursor-pointer"
+            class="group px-4 py-3.5 transition-colors duration-150 cursor-pointer"
             :class="[
-              darkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50',
+              darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50/80',
               hasTaskError(task) ? (darkMode ? 'bg-red-900/10' : 'bg-red-50/50') : ''
             ]"
             @click="toggleExpand(task.id)"
           >
             <!-- 主信息行 -->
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-3">
               <!-- 状态指示器 -->
               <span class="flex-shrink-0 relative">
                 <!-- 运行中：脉冲圆点 -->
@@ -139,15 +139,15 @@
                   <span class="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-75"></span>
                 </template>
                 <!-- 完成：绿色对勾 -->
-                <svg v-else-if="task.status === 'completed'" class="w-4 h-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg v-else-if="task.status === 'completed'" class="w-5 h-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
                 <!-- 失败：红色叉号 -->
-                <svg v-else-if="task.status === 'failed'" class="w-4 h-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg v-else-if="task.status === 'failed'" class="w-5 h-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                 </svg>
                 <!-- 部分完成：黄色警告 -->
-                <svg v-else-if="task.status === 'partial'" class="w-4 h-4 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg v-else-if="task.status === 'partial'" class="w-5 h-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                 </svg>
                 <!-- 取消/等待：灰色圆点 -->
@@ -157,7 +157,7 @@
               <!-- 任务名称 -->
               <span
                 class="flex-1 text-sm font-medium truncate"
-                :class="darkMode ? 'text-gray-200' : 'text-gray-800'"
+                :class="darkMode ? 'text-gray-100' : 'text-gray-900'"
                 :title="task.name"
               >
                 {{ task.name }}
@@ -177,20 +177,20 @@
               <button
                 v-if="task.status === 'running' || task.status === 'pending'"
                 @click.stop="handleCancelTask(task.id)"
-                class="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                class="flex-shrink-0 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                 :class="darkMode
                   ? 'hover:bg-gray-700 text-gray-400 hover:text-red-400'
                   : 'hover:bg-gray-100 text-gray-400 hover:text-red-500'"
                 :title="t('mount.taskList.cancel')"
               >
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
 
               <!-- 展开指示器 -->
               <svg
-                class="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200"
+                class="w-4 h-4 flex-shrink-0 transition-transform duration-200"
                 :class="[
                   expandedIds.has(task.id) ? 'rotate-180' : '',
                   darkMode ? 'text-gray-500' : 'text-gray-400'
@@ -199,14 +199,14 @@
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9l-7 7-7-7" />
               </svg>
             </div>
 
             <!-- 进度条（仅运行中显示） -->
             <div
               v-if="task.status === 'running'"
-              class="mt-1.5 h-1 rounded-full overflow-hidden"
+              class="mt-2 h-1.5 rounded-full overflow-hidden"
               :class="darkMode ? 'bg-gray-700' : 'bg-gray-200'"
             >
               <div
@@ -226,17 +226,17 @@
             >
               <div
                 v-if="expandedIds.has(task.id) && task.itemResults && task.itemResults.length > 0"
-                class="mt-2 overflow-hidden"
+                class="mt-2.5 overflow-hidden"
               >
                 <div
-                  class="space-y-1 max-h-32 overflow-y-auto rounded p-2"
+                  class="space-y-1.5 max-h-32 overflow-y-auto rounded-md p-3"
                   :class="darkMode ? 'bg-gray-900/50' : 'bg-gray-50'"
                 >
                   <div
                     v-for="(item, index) in task.itemResults"
                     :key="index"
                     class="flex items-center gap-2 text-xs"
-                    :class="darkMode ? 'text-gray-400' : 'text-gray-500'"
+                    :class="darkMode ? 'text-gray-300' : 'text-gray-600'"
                   >
                     <!-- 文件状态图标 -->
                     <span class="flex-shrink-0 w-4 text-center">
