@@ -19,7 +19,7 @@ import {
   commitPresignedUpload as featureCommitPresignedUpload,
 } from "./features/presign.js";
 import { uploadFile as featureUploadFile, uploadDirect as featureUploadDirect, createDirectory as featureCreateDirectory, updateFile as featureUpdateFile } from "./features/write.js";
-import { renameItem as featureRenameItem, copyItem as featureCopyItem, batchRemoveItems as featureBatchRemoveItems, batchCopyItems as featureBatchCopyItems, handleCrossStorageCopy as featureHandleCrossStorageCopy, commitCrossStorageCopy as featureCommitCrossStorageCopy } from "./features/ops.js";
+import { renameItem as featureRenameItem, copyItem as featureCopyItem, batchRemoveItems as featureBatchRemoveItems } from "./features/ops.js";
 import {
   initializeFrontendMultipartUpload as featureInitMultipart,
   completeFrontendMultipartUpload as featureCompleteMultipart,
@@ -39,10 +39,13 @@ export class FileSystem {
   /**
    * 构造函数
    * @param {MountManager} mountManager - 挂载管理器实例
+   * @param {Object} env - 运行时环境（可选，用于 TaskOrchestrator 初始化）
    */
-  constructor(mountManager) {
+  constructor(mountManager, env = null) {
     this.mountManager = mountManager;
     this.repositoryFactory = mountManager?.repositoryFactory ?? null;
+    this.env = env;
+    this._taskOrchestrator = null; // 懒加载的 TaskOrchestrator 实例
   }
 
   /**
@@ -205,17 +208,6 @@ export class FileSystem {
   }
 
   /**
-   * 批量复制文件和目录
-   * @param {Array<Object>} items - 复制项数组，每项包含sourcePath和targetPath
-   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
-   * @param {string} userType - 用户类型
-   * @returns {Promise<Object>} 批量复制结果
-   */
-  async batchCopyItems(items, userIdOrInfo, userType) {
-    return await featureBatchCopyItems(this, items, userIdOrInfo, userType);
-  }
-
-  /**
    * 生成预签名上传URL（严格模式，仅支持具备 PRESIGNED 能力的驱动）
    * @param {string} path - 文件路径
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
@@ -343,18 +335,6 @@ export class FileSystem {
    */
   async updateFile(path, content, userIdOrInfo, userType) {
     return await featureUpdateFile(this, path, content, userIdOrInfo, userType);
-  }
-
-  /**
-   * 跨存储复制文件
-   * @param {string} sourcePath - 源路径
-   * @param {string} targetPath - 目标路径
-   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
-   * @param {string} userType - 用户类型
-   * @returns {Promise<Object>} 跨存储复制结果
-   */
-  async handleCrossStorageCopy(sourcePath, targetPath, userIdOrInfo, userType) {
-    return await featureHandleCrossStorageCopy(this, sourcePath, targetPath, userIdOrInfo, userType);
   }
 
   /**
@@ -494,16 +474,6 @@ export class FileSystem {
     return searchResult;
   }
 
-  /**
-   * 提交跨存储复制（客户端已完成复制后，通知后端进行缓存失效等收尾）
-   * @param {Object} mount - 目标挂载点对象
-   * @param {Array<Object>} files - 提交的文件列表，包含 targetPath 与 storagePath
-   * @returns {Promise<{success: Array, failed: Array}>}
-   */
-  async commitCrossStorageCopy(mount, files) {
-    return await featureCommitCrossStorageCopy(this, mount, files);
-  }
-
   emitCacheInvalidation(payload = {}) {
     try {
       const { mount = null, mountId = null, storageConfigId = null, paths = [], reason = "fs_operation" } = payload;
@@ -545,10 +515,180 @@ export class FileSystem {
   }
 
   /**
+   * 获取 TaskOrchestrator 实例（懒加载）
+   * @private
+   * @returns {Promise<TaskOrchestratorAdapter>} TaskOrchestrator 实例
+   */
+  async getTaskOrchestrator() {
+    if (!this._taskOrchestrator) {
+      // 动态导入 TaskOrchestrator 工厂函数
+      const { createTaskOrchestrator } = await import('./tasks/index.js');
+
+      // 构建 RuntimeEnv 对象
+      const runtimeEnv = {
+        // Cloudflare Workers bindings (如果存在)
+        JOB_WORKFLOW: this.env?.JOB_WORKFLOW,
+        DB: this.env?.DB,
+
+        // Docker/Node.js configuration (由 unified-entry.js 自动设置，复用主数据库)
+        TASK_DATABASE_PATH: this.env?.TASK_DATABASE_PATH,
+        TASK_WORKER_POOL_SIZE: this.env?.TASK_WORKER_POOL_SIZE,
+      };
+
+      this._taskOrchestrator = createTaskOrchestrator(this, runtimeEnv);
+    }
+
+    return this._taskOrchestrator;
+  }
+
+  /**
+   * 创建通用作业 (支持多任务类型)
+   * @param {string} taskType - 任务类型 (copy, scheduled-sync, cleanup, etc.)
+   * @param {any} payload - 任务载荷 (由 TaskHandler 验证)
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @returns {Promise<Object>} 作业描述符 { jobId, taskType, status, stats, createdAt }
+   */
+  async createJob(taskType, payload, userIdOrInfo, userType) {
+    if (!taskType || typeof taskType !== 'string') {
+      throw new ValidationError('请提供有效的任务类型');
+    }
+
+    if (!payload) {
+      throw new ValidationError('请提供任务载荷');
+    }
+
+    const orchestrator = await this.getTaskOrchestrator();
+
+    // 创建作业 (验证逻辑由 TaskHandler 负责)
+    const jobDescriptor = await orchestrator.createJob({
+      taskType,
+      payload,
+      userId: typeof userIdOrInfo === 'string' ? userIdOrInfo : userIdOrInfo?.id || userIdOrInfo?.name,
+      userType,
+    });
+
+    return jobDescriptor;
+  }
+
+  /**
+   * 获取作业状态
+   * @param {string} jobId - 作业ID
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @returns {Promise<Object>} 作业状态 { jobId, taskType, status, stats, createdAt, startedAt?, finishedAt?, errorMessage? }
+   */
+  async getJobStatus(jobId, userIdOrInfo, userType) {
+    if (!jobId) {
+      throw new ValidationError('请提供作业ID');
+    }
+
+    const orchestrator = await this.getTaskOrchestrator();
+    const jobStatus = await orchestrator.getJobStatus(jobId);
+
+    // 权限验证：只有任务创建者或管理员可以查看
+    if (userType !== UserType.ADMIN) {
+      const currentUserId = typeof userIdOrInfo === 'string'
+        ? userIdOrInfo
+        : userIdOrInfo?.id || userIdOrInfo?.name;
+
+      if (jobStatus.userId !== currentUserId) {
+        throw new AuthorizationError('无权访问此任务');
+      }
+    }
+
+    return jobStatus;
+  }
+
+  /**
+   * 取消作业
+   * @param {string} jobId - 作业ID
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @returns {Promise<void>}
+   */
+  async cancelJob(jobId, userIdOrInfo, userType) {
+    if (!jobId) {
+      throw new ValidationError('请提供作业ID');
+    }
+
+    // 先获取任务状态并验证权限（复用 getJobStatus 的权限检查）
+    const jobStatus = await this.getJobStatus(jobId, userIdOrInfo, userType);
+
+    // 检查任务状态是否可取消
+    if (jobStatus.status !== 'pending' && jobStatus.status !== 'running') {
+      throw new ValidationError('只能取消待执行或执行中的任务');
+    }
+
+    const orchestrator = await this.getTaskOrchestrator();
+    await orchestrator.cancelJob(jobId);
+  }
+
+  /**
+   * 列出作业 (支持任务类型过滤)
+   * @param {Object} filter - 过滤条件
+   * @param {string} filter.taskType - 任务类型（copy, scheduled-sync, cleanup, etc.）
+   * @param {string} filter.status - 作业状态（pending/running/completed/partial/failed/cancelled）
+   * @param {string} filter.userId - 用户ID（内部使用，由权限检查逻辑控制）
+   * @param {number} filter.limit - 返回数量限制
+   * @param {number} filter.offset - 偏移量
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @returns {Promise<Array<Object>>} 作业描述符数组
+   */
+  async listJobs(filter = {}, userIdOrInfo, userType) {
+    // 非管理员用户：强制过滤为只能看到自己的任务
+    const finalFilter = { ...filter };
+
+    if (userType !== UserType.ADMIN) {
+      const currentUserId = typeof userIdOrInfo === 'string'
+        ? userIdOrInfo
+        : userIdOrInfo?.id || userIdOrInfo?.name;
+
+      // 强制设置 userId 过滤条件，防止非管理员查看他人任务
+      finalFilter.userId = currentUserId;
+    }
+
+    const orchestrator = await this.getTaskOrchestrator();
+    const jobs = await orchestrator.listJobs(finalFilter);
+
+    return jobs;
+  }
+
+  /**
+   * 删除作业
+   * @param {string} jobId - 作业ID
+   * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
+   * @param {string} userType - 用户类型
+   * @returns {Promise<void>}
+   */
+  async deleteJob(jobId, userIdOrInfo, userType) {
+    if (!jobId) {
+      throw new ValidationError('请提供作业ID');
+    }
+
+    // 先获取任务状态并验证权限
+    const jobStatus = await this.getJobStatus(jobId, userIdOrInfo, userType);
+
+    // 检查任务状态是否可删除
+    if (jobStatus.status === 'pending' || jobStatus.status === 'running') {
+      throw new ValidationError('不能删除待执行或执行中的任务，请先取消任务');
+    }
+
+    const orchestrator = await this.getTaskOrchestrator();
+    await orchestrator.deleteJob(jobId);
+  }
+
+  /**
    * 清理资源
    * @returns {Promise<void>}
    */
   async cleanup() {
+    // 清理任务编排器资源
+    if (this._taskOrchestrator && typeof this._taskOrchestrator.shutdown === 'function') {
+      await this._taskOrchestrator.shutdown();
+    }
+
     // 清理挂载管理器的资源
     if (this.mountManager && typeof this.mountManager.cleanup === "function") {
       await this.mountManager.cleanup();

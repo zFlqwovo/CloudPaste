@@ -82,6 +82,8 @@ export default {
       accountSettings: "账号管理",
       webdavSettings: "WebDAV设置",
       siteSettings: "站点设置",
+      backup: "数据备份",
+      tasks: "任务管理",
     },
   },
   nav: {

@@ -122,16 +122,6 @@ export class TemplateStorageDriver extends BaseDriver {
     throw new Error("TemplateStorageDriver: 请在此实现 copyItem 逻辑");
   }
 
-  /**
-   * 批量复制文件/目录
-   * @param {Array<Object>} items 复制项数组
-   * @param {Object} options      上下文选项
-   */
-  async batchCopyItems(items, options = {}) {
-    this._ensureInitialized();
-    throw new Error("TemplateStorageDriver: 请在此实现 batchCopyItems 逻辑");
-  }
-
   // ========== DIRECT_LINK 能力（可选）：generateDownloadUrl ==========
 
   /**

@@ -27,6 +27,7 @@
     "@aws-sdk/lib-storage": "3.726.1",
     "@aws-sdk/s3-request-presigner": "3.726.1",
     "@hono/node-server": "^1.19.6",
+    "better-sqlite3": "^12.5.0",
     "fast-xml-parser": "^5.2.5",
     "file-type": "^21.0.0",
     "hono": "^4.10.6",
@@ -34,7 +35,10 @@
     "webdav": "^5.8.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251128.0",
+    "@types/better-sqlite3": "^7.6.13",
     "cross-env": "^7.0.3",
+    "typescript": "^5.9.3",
     "wrangler": "^4.50.0"
   },
   "optionalDependencies": {

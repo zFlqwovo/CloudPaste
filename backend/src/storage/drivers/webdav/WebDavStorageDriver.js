@@ -506,10 +506,32 @@ export class WebDavStorageDriver extends BaseDriver {
 
   async copyItem(sourcePath, targetPath, options = {}) {
     this._ensureInitialized();
-    const { mount } = options;
+    const { mount, skipExisting = false, _skipExistingChecked = false } = options;
     const fromSubPath = options.mount ? (options.subPath || "") : (options.subPath || sourcePath);
     const from = this._buildDavPath(fromSubPath, false);
     const to = this._buildDavPath(this._relativeTargetPath(targetPath, mount), false);
+
+    // skipExisting 检查：在复制前检查目标文件是否已存在
+    // 如果入口层已检查（_skipExistingChecked=true），跳过重复检查
+    if (skipExisting && !_skipExistingChecked) {
+      try {
+        const targetExists = await this.client.exists(to);
+        if (targetExists) {
+          return {
+            status: "skipped",
+            skipped: true,
+            reason: "target_exists",
+            source: from,
+            target: to,
+            contentLength: 0,
+          };
+        }
+      } catch (checkError) {
+        // exists 检查失败时继续复制（降级处理）
+        console.warn(`[WebDAV copyItem] skipExisting 检查失败 for ${to}:`, checkError?.message || checkError);
+      }
+    }
+
     try {
       await this.client.copyFile(from, to, { overwrite: false });
       return { status: "success", source: from, target: to };
@@ -519,35 +541,6 @@ export class WebDavStorageDriver extends BaseDriver {
       }
       throw this._wrapError(error, "复制失败", this._statusFromError(error));
     }
-  }
-
-  /**
-   * 批量复制文件/目录
-   * @param {Array<{sourcePath: string, targetPath: string}>} items
-   * @param {Object} options
-   * @returns {Promise<{success: number, failed: Array, results: Array}>}
-   */
-  async batchCopyItems(items, options = {}) {
-    this._ensureInitialized();
-    const results = [];
-    for (const item of items || []) {
-      const { sourcePath, targetPath } = item || {};
-      if (!sourcePath || !targetPath) {
-        results.push({ ...item, success: false, error: "缺少 sourcePath 或 targetPath" });
-        continue;
-      }
-      try {
-        const res = await this.copyItem(sourcePath, targetPath, options);
-        results.push({ ...item, success: true, result: res });
-      } catch (error) {
-        results.push({ ...item, success: false, error: error?.message || "复制失败" });
-      }
-    }
-    return {
-      success: results.filter((r) => r.success).length,
-      failed: results.filter((r) => !r.success),
-      results,
-    };
   }
 
   async batchRemoveItems(paths, options = {}) {

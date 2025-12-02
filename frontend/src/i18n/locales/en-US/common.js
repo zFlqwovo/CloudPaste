@@ -80,6 +80,8 @@ export default {
       accountSettings: "Account Management",
       webdavSettings: "WebDAV Settings",
       siteSettings: "Site Settings",
+      backup: "Backup",
+      tasks: "Task Management",
     },
   },
   nav: {

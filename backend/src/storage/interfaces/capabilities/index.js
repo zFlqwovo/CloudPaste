@@ -3,6 +3,8 @@
  * 模块化能力接口
  */
 
+import { ValidationError } from "../../../http/errors.js";
+
 // 基础驱动接口
 export { BaseDriver } from "./BaseDriver.js";
 
@@ -56,7 +58,6 @@ export const REQUIRED_METHODS_BY_CAPABILITY = {
     "renameItem",
     "batchRemoveItems",
     "copyItem",
-    "batchCopyItems",
   ],
   /**
    * DIRECT_LINK 能力：
@@ -165,4 +166,3 @@ export function mixinCapabilities(BaseClass, ...capabilities) {
 
   return MixedClass;
 }
-import { ValidationError } from "../../../http/errors.js";

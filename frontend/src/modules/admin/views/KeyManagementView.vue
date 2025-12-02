@@ -233,7 +233,7 @@ onBeforeUnmount(() => {
     <!-- 顶部操作栏 -->
     <div class="flex flex-col space-y-3 mb-4">
       <!-- 标题和操作按钮行 -->
-      <div class="flex flex-col sm:flex-row sm:justify-between gap-3">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
         <h2 class="text-lg sm:text-xl font-medium" :class="darkMode ? 'text-white' : 'text-gray-900'">{{ $t("admin.keyManagement.title") }}</h2>
 
         <div class="flex flex-wrap gap-2">
