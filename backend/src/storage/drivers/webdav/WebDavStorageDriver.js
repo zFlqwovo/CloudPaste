@@ -4,6 +4,12 @@
  */
 
 import { BaseDriver } from "../../interfaces/capabilities/BaseDriver.js";
+/**
+ * 模块说明：
+ * - 作用：WebDAV 驱动，负责目录/文件的读写、重命名/复制、搜索、代理 URL 生成等。
+ * - 能力：声明 READER/WRITER/ATOMIC/PROXY/SEARCH，供 FS/features 按能力路由。
+ * - 约定：路径规范化与错误映射封装在 _normalize/_buildDavPath/_wrapError 中，外层无需关心 webdav 客户端细节。
+ */
 import { CAPABILITIES } from "../../interfaces/capabilities/index.js";
 import { ApiStatus, FILE_TYPES } from "../../../constants/index.js";
 import { DriverError, NotFoundError, AppError } from "../../../http/errors.js";
@@ -21,7 +27,7 @@ export class WebDavStorageDriver extends BaseDriver {
     super(config);
     this.type = "WEBDAV";
     this.encryptionSecret = encryptionSecret;
-    this.capabilities = [CAPABILITIES.READER, CAPABILITIES.WRITER, CAPABILITIES.ATOMIC, CAPABILITIES.PROXY];
+    this.capabilities = [CAPABILITIES.READER, CAPABILITIES.WRITER, CAPABILITIES.ATOMIC, CAPABILITIES.PROXY, CAPABILITIES.SEARCH];
     this.client = null;
     this.defaultFolder = config.default_folder || "";
     this.endpoint = config.endpoint_url || "";
@@ -487,6 +493,22 @@ export class WebDavStorageDriver extends BaseDriver {
     }
   }
 
+  /**
+   * 获取存储驱动统计信息
+   * @returns {Promise<Object>} 统计信息
+   */
+  async getStats() {
+    this._ensureInitialized();
+    return {
+      type: this.type,
+      endpoint: this.endpoint,
+      defaultFolder: this.defaultFolder || "/",
+      capabilities: this.capabilities,
+      initialized: this.initialized,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   async renameItem(oldPath, newPath, options = {}) {
     this._ensureInitialized();
     const { mount } = options;
@@ -495,7 +517,7 @@ export class WebDavStorageDriver extends BaseDriver {
     const to = this._buildDavPath(this._relativeTargetPath(newPath, mount), false);
     try {
       await this.client.moveFile(from, to, { overwrite: false });
-      return { success: true, from, to };
+      return { success: true, source: from, target: to };
     } catch (error) {
       if (this._isNotSupported(error)) {
         throw new DriverError("WebDAV 不支持移动操作", { status: ApiStatus.NOT_IMPLEMENTED, expose: true });
@@ -534,7 +556,7 @@ export class WebDavStorageDriver extends BaseDriver {
 
     try {
       await this.client.copyFile(from, to, { overwrite: false });
-      return { status: "success", source: from, target: to };
+      return { status: "success", success: true, source: from, target: to };
     } catch (error) {
       if (this._isNotSupported(error)) {
         throw new DriverError("WebDAV 不支持复制操作", { status: ApiStatus.NOT_IMPLEMENTED, expose: true });

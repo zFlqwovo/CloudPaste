@@ -7,7 +7,12 @@
 
 import { S3StorageDriver } from "../drivers/s3/S3StorageDriver.js";
 import { WebDavStorageDriver } from "../drivers/webdav/WebDavStorageDriver.js";
-import { CAPABILITIES, REQUIRED_METHODS_BY_CAPABILITY } from "../interfaces/capabilities/index.js";
+import {
+  CAPABILITIES,
+  REQUIRED_METHODS_BY_CAPABILITY,
+  BASE_REQUIRED_METHODS,
+  getObjectCapabilities,
+} from "../interfaces/capabilities/index.js";
 import { ValidationError, NotFoundError, DriverContractError } from "../../http/errors.js";
 
 const registry = new Map();
@@ -39,13 +44,22 @@ function validateDriverContract(driver, entryMeta, storageType) {
       ? driver.capabilities
       : [];
 
-  const driverCapabilities = Array.from(new Set(rawCaps));
+  const detectedCapabilities = getObjectCapabilities(driver);
+  const driverCapabilities = Array.from(new Set(rawCaps.length ? rawCaps : detectedCapabilities));
 
   const extraCapabilities = driverCapabilities.filter((cap) => !registeredCapabilities.includes(cap));
   const missingRegisteredCapabilities = registeredCapabilities.filter((cap) => !driverCapabilities.includes(cap));
 
   /** @type {Array<{capability: string, method: string}>} */
   const missingMethods = [];
+  const missingBaseMethods = [];
+
+  // 校验基础契约（所有驱动必须实现）
+  for (const methodName of BASE_REQUIRED_METHODS) {
+    if (typeof driver[methodName] !== "function") {
+      missingBaseMethods.push(methodName);
+    }
+  }
 
   // 仅针对“注册表与驱动都声明”的能力进行方法级校验
   const effectiveCapabilities = driverCapabilities.filter((cap) => registeredCapabilities.includes(cap));
@@ -67,7 +81,7 @@ function validateDriverContract(driver, entryMeta, storageType) {
   //   但不会破坏既有行为，因而不视为致命错误。
   // - registeredCapabilities 描述的是该存储类型在理想情况下支持的能力集合，具体实例可以是其子集。
 
-  if (typeMismatch || missingMethods.length > 0) {
+  if (typeMismatch || missingBaseMethods.length > 0 || missingMethods.length > 0) {
     throw new DriverContractError("存储驱动契约校验失败", {
       details: {
         storageType,
@@ -75,8 +89,10 @@ function validateDriverContract(driver, entryMeta, storageType) {
         driverType,
         registeredCapabilities,
         driverCapabilities,
+        detectedCapabilities,
         extraCapabilities,
         missingRegisteredCapabilities,
+        missingBaseMethods,
         missingMethods,
       },
     });
@@ -152,13 +168,6 @@ export class StorageFactory {
     if (typeof entry.validate === "function") {
       return entry.validate(config);
     }
-    // 默认的S3验证
-    if (storageType === StorageFactory.SUPPORTED_TYPES.S3) {
-      return StorageFactory._validateS3Config(config);
-    }
-    if (storageType === StorageFactory.SUPPORTED_TYPES.WEBDAV) {
-      return StorageFactory._validateWebDavConfig(config);
-    }
     return { valid: true, errors: [] };
   }
 
@@ -221,6 +230,7 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.S3, {
     CAPABILITIES.MULTIPART,
     CAPABILITIES.ATOMIC,
     CAPABILITIES.PROXY,
+    CAPABILITIES.SEARCH,
   ],
 });
 
@@ -231,5 +241,6 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.WEBDAV, {
   tester: webDavTestConnection,
   displayName: "WebDAV 存储",
   validate: (cfg) => StorageFactory._validateWebDavConfig(cfg),
-  capabilities: [CAPABILITIES.READER, CAPABILITIES.WRITER, CAPABILITIES.ATOMIC, CAPABILITIES.PROXY],
+  capabilities: [CAPABILITIES.READER, CAPABILITIES.WRITER, CAPABILITIES.ATOMIC, CAPABILITIES.PROXY, CAPABILITIES.SEARCH],
 });
+

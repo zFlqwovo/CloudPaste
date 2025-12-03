@@ -4,6 +4,12 @@
  */
 
 import { ApiStatus } from "../../../../constants/index.js";
+/**
+ * 模块说明：
+ * - 作用域：单一 S3 挂载内的批量删除、复制、伪原子重命名，以及目录层级元数据维护。
+ * - 输入：仅接受 FS 视图路径，内部统一规范化为 S3 Key；跨挂载/跨存储 orchestrator 由 FS 层处理。
+ * - 错误：统一经 S3DriverError / handleFsError 封装，尽量不直接抛出底层 SDK 原始错误。
+ */
 import { AppError, ValidationError, NotFoundError, ConflictError, AuthenticationError, AuthorizationError, S3DriverError } from "../../../../http/errors.js";
 import { S3Client, DeleteObjectCommand, CopyObjectCommand, ListObjectsV2Command, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath } from "../utils/S3PathUtils.js";
@@ -368,9 +374,10 @@ export class S3BatchOperations {
     await updateParentDirectoriesModifiedTime(this.s3Client, s3Config.bucket_name, s3TargetPath, rootPrefix);
 
     return {
+      status: "success",
+      success: true,
       source: sourcePath,
       target: targetPath,
-      status: "success",
       message: "文件复制成功",
     };
   }
@@ -678,8 +685,8 @@ export class S3BatchOperations {
 
         return {
           success: true,
-          oldPath,
-          newPath,
+          source: oldPath,
+          target: newPath,
           message: oldIsDirectory ? "目录重命名成功" : "文件重命名成功",
         };
       },
@@ -860,71 +867,6 @@ export class S3BatchOperations {
     return { baseName, extension, directory };
   }
 
-  /**
-   * 使用指定的S3客户端检查文件是否存在
-   * @private
-   * @param {S3Client} s3Client - S3客户端实例
-   * @param {string} bucketName - 存储桶名称
-   * @param {string} key - 文件路径
-   * @returns {Promise<boolean>} 是否存在
-   */
-  async _checkItemExistsWithClient(s3Client, bucketName, key) {
-    try {
-      const listParams = {
-        Bucket: bucketName,
-        Prefix: key,
-        MaxKeys: 1,
-      };
 
-      const listCommand = new ListObjectsV2Command(listParams);
-      const listResponse = await s3Client.send(listCommand);
 
-      // 检查是否找到精确匹配的对象
-      const exactMatch = listResponse.Contents?.find((item) => item.Key === key);
-      return !!exactMatch;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * 使用指定的S3客户端检查目录是否存在
-   * @private
-   * @param {S3Client} s3Client - S3客户端实例
-   * @param {string} bucketName - 存储桶名称
-   * @param {string} dirPath - 目录路径
-   * @returns {Promise<boolean>} 是否存在
-   */
-  async _checkDirectoryExistsWithClient(s3Client, bucketName, dirPath) {
-    try {
-      // 首先尝试检查目录标记对象是否存在
-      const headParams = {
-        Bucket: bucketName,
-        Key: dirPath,
-      };
-      const headCommand = new HeadObjectCommand(headParams);
-      await s3Client.send(headCommand);
-      return true;
-    } catch (error) {
-      if (error.$metadata && error.$metadata.httpStatusCode === 404) {
-        // 目录标记对象不存在，检查是否有以此路径为前缀的对象
-        try {
-          const listParams = {
-            Bucket: bucketName,
-            Prefix: dirPath,
-            MaxKeys: 1,
-          };
-          const listCommand = new ListObjectsV2Command(listParams);
-          const result = await s3Client.send(listCommand);
-
-          // 如果有任何对象以此路径为前缀，则认为目录存在
-          return result.Contents && result.Contents.length > 0;
-        } catch (listError) {
-          console.error(`检查目录存在性时出错: ${listError.message}`);
-          return false;
-        }
-      }
-      throw error;
-    }
-  }
 }

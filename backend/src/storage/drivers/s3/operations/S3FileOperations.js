@@ -5,7 +5,15 @@
 
 import { AppError, NotFoundError, ConflictError, ValidationError, S3DriverError } from "../../../../http/errors.js";
 import { generateDownloadUrl, createS3Client } from "../utils/s3Utils.js";
-import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  CopyObjectCommand,
+  HeadObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getMimeTypeFromFilename } from "../../../../utils/fileUtils.js";
 import { handleFsError } from "../../../fs/utils/ErrorHandler.js";
 import { updateParentDirectoriesModifiedTime } from "../utils/S3DirectoryUtils.js";
@@ -309,20 +317,46 @@ export class S3FileOperations {
    * @returns {Promise<boolean>} 是否存在
    */
   async exists(s3SubPath) {
+    const key = s3SubPath.startsWith("/") ? s3SubPath.slice(1) : s3SubPath;
+    const isDirectory = key === "" || key.endsWith("/");
+
+    // 文件优先使用 HEAD，避免 List 前缀误判
+    if (!isDirectory) {
+      try {
+        const headCommand = new HeadObjectCommand({
+          Bucket: this.config.bucket_name,
+          Key: key,
+        });
+        await this.s3Client.send(headCommand);
+        return true;
+      } catch (error) {
+        const status = error?.$metadata?.httpStatusCode;
+        const code = error?.name || error?.Code;
+        const notFound = status === 404 || code === "NotFound" || code === "NoSuchKey";
+        if (!notFound) {
+          // 非 404 级错误时降级为前缀检查，避免硬失败
+          console.warn("[S3FileOperations.exists] headObject fallback", error?.message || error);
+        }
+      }
+    }
+
+    // 目录或 Head 未命中的情况下，使用前缀列举兜底
     try {
+      const prefix = isDirectory ? key : `${key}/`;
       const listParams = {
         Bucket: this.config.bucket_name,
-        Prefix: s3SubPath,
+        Prefix: prefix,
         MaxKeys: 1,
       };
 
       const listCommand = new ListObjectsV2Command(listParams);
       const listResponse = await this.s3Client.send(listCommand);
 
-      // 检查是否找到精确匹配的文件
-      const exactMatch = listResponse.Contents?.find((item) => item.Key === s3SubPath);
-      return !!exactMatch;
+      const hasObject = (listResponse.Contents?.length || 0) > 0;
+      const hasPrefix = (listResponse.CommonPrefixes?.length || 0) > 0;
+      return hasObject || hasPrefix;
     } catch (error) {
+      console.warn("[S3FileOperations.exists] listObjects fallback failed", error?.message || error);
       return false;
     }
   }

@@ -35,6 +35,12 @@ import { UserType } from "../../constants/index.js";
 import { FsMetaService } from "../../services/fsMetaService.js";
 import { sortSearchResults } from "./utils/SearchUtils.js";
 import { TaskPermissionMap, PermissionChecker, Permission } from "../../constants/permissions.js";
+/**
+ * 模块说明：
+ * - 角色：FS 视图的门面层，连接路由/API 与底层存储驱动。
+ * - 职责：挂载解析、权限校验、缓存失效、CRUD/分片/预签名/跨存储复制/搜索的调度，具体操作委托 fs/features/*。
+ * - 约定：所有驱动调用通过能力检查（CAPABILITIES），不直接依赖具体驱动类型；输入路径均为挂载视图路径。
+ */
 
 export class FileSystem {
   /**
@@ -425,8 +431,12 @@ export class FileSystem {
       try {
         const driver = await this.mountManager.getDriver(mount);
 
-        // 检查驱动是否支持搜索（通过ReaderCapable）
-        if (!driver.hasCapability(CAPABILITIES.READER)) {
+        // 检查驱动是否支持搜索：同时具备 READER + SEARCH 能力，且实现 search 方法
+        if (
+          !driver.hasCapability(CAPABILITIES.READER) ||
+          !driver.hasCapability(CAPABILITIES.SEARCH) ||
+          typeof driver.search !== "function"
+        ) {
           return [];
         }
 
@@ -504,7 +514,16 @@ export class FileSystem {
   async getStats(path, userIdOrInfo, userType) {
     if (path) {
       const { driver } = await this.mountManager.getDriverByPath(path, userIdOrInfo, userType);
-      return await driver.getStats();
+      // 安全检查：getStats 是可选方法，不是所有驱动都实现
+      if (typeof driver.getStats === "function") {
+        return await driver.getStats();
+      }
+      // 驱动未实现 getStats，返回基本信息
+      return {
+        type: driver.getType?.() || "unknown",
+        supported: false,
+        message: "此存储驱动不支持统计信息",
+      };
     } else {
       // 返回整个文件系统的统计信息
       return {

@@ -42,6 +42,7 @@ export class S3StorageDriver extends BaseDriver {
       CAPABILITIES.MULTIPART, // 分片上传能力：multipart upload
       CAPABILITIES.ATOMIC, // 原子操作能力：rename, copy
       CAPABILITIES.PROXY, // 代理能力：generateProxyUrl
+      CAPABILITIES.SEARCH, // 搜索能力：search(query, options)
     ];
 
     // 操作模块实例

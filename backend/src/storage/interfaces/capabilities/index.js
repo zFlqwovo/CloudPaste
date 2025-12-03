@@ -8,13 +8,13 @@ import { ValidationError } from "../../../http/errors.js";
 // 基础驱动接口
 export { BaseDriver } from "./BaseDriver.js";
 
-// 能力接口
-export { ReaderCapable, isReaderCapable, READER_CAPABILITY } from "./ReaderCapable.js";
-export { WriterCapable, isWriterCapable, WRITER_CAPABILITY } from "./WriterCapable.js";
-export { DirectLinkCapable, isDirectLinkCapable, DIRECT_LINK_CAPABILITY } from "./DirectLinkCapable.js";
-export { MultipartCapable, isMultipartCapable, MULTIPART_CAPABILITY } from "./MultipartCapable.js";
-export { AtomicCapable, isAtomicCapable, ATOMIC_CAPABILITY } from "./AtomicCapable.js";
-export { ProxyCapable, isProxyCapable, PROXY_CAPABILITY } from "./ProxyCapable.js";
+// 能力接口（仅导出检测函数和标识符，具体实现由各驱动提供）
+export { isReaderCapable, READER_CAPABILITY } from "./ReaderCapable.js";
+export { isWriterCapable, WRITER_CAPABILITY } from "./WriterCapable.js";
+export { isDirectLinkCapable, DIRECT_LINK_CAPABILITY } from "./DirectLinkCapable.js";
+export { isMultipartCapable, MULTIPART_CAPABILITY } from "./MultipartCapable.js";
+export { isAtomicCapable, ATOMIC_CAPABILITY } from "./AtomicCapable.js";
+export { isProxyCapable, PROXY_CAPABILITY } from "./ProxyCapable.js";
 
 // 导入检查函数用于内部使用
 import { isReaderCapable } from "./ReaderCapable.js";
@@ -23,6 +23,14 @@ import { isDirectLinkCapable } from "./DirectLinkCapable.js";
 import { isMultipartCapable } from "./MultipartCapable.js";
 import { isAtomicCapable } from "./AtomicCapable.js";
 import { isProxyCapable } from "./ProxyCapable.js";
+
+/**
+ * 额外搜索能力检测（可选）
+ * - 仅用于能力探测与文档说明，不强制所有驱动实现
+ */
+export function isSearchCapable(obj) {
+  return !!(obj && typeof obj.search === "function");
+}
 
 /**
  * 所有可用的能力标识符
@@ -34,7 +42,14 @@ export const CAPABILITIES = {
   MULTIPART: "MultipartCapable",
   ATOMIC: "AtomicCapable",
   PROXY: "ProxyCapable",
+  SEARCH: "SearchCapable",
 };
+
+/**
+ * 所有驱动必须实现的基础契约
+ * - StorageFactory 在实例化后会统一校验
+ */
+export const BASE_REQUIRED_METHODS = ["stat", "exists"];
 
 /**
  * 能力对应的最小方法契约映射表
@@ -76,6 +91,18 @@ export const REQUIRED_METHODS_BY_CAPABILITY = {
     "listMultipartParts",
     "refreshMultipartUrls",
   ],
+  /**
+   * SEARCH 能力：
+   * - 最小要求：search(query, options)
+   * - 仅在驱动声明 SEARCH 能力时强制校验
+   */
+  [CAPABILITIES.SEARCH]: ["search"],
+  /**
+   * ATOMIC 能力：
+   * - 最小要求：renameItem / copyItem
+   * - 这些方法保证原子性操作（重命名、复制）
+   */
+  [CAPABILITIES.ATOMIC]: ["renameItem", "copyItem"],
 };
 
 /**
@@ -88,6 +115,7 @@ export const CAPABILITY_CHECKERS = {
   [CAPABILITIES.MULTIPART]: isMultipartCapable,
   [CAPABILITIES.ATOMIC]: isAtomicCapable,
   [CAPABILITIES.PROXY]: isProxyCapable,
+  [CAPABILITIES.SEARCH]: isSearchCapable,
 };
 
 /**
