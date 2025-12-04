@@ -853,11 +853,16 @@ server {
 
         # 处理大文件
         client_max_body_size 0;
+        client_body_buffer_size 128k;
 
-        # 超时设置
-        proxy_connect_timeout 3600s;
-        proxy_send_timeout 3600s;
-        proxy_read_timeout 3600s;
+        # WebDAV 上传/下载优化
+        proxy_buffering off;           # 关闭代理缓冲，减少延迟
+        proxy_request_buffering off;   # 关闭请求缓冲，让数据流式传输
+        proxy_max_temp_file_size 0;    # 不生成临时文件
+        send_timeout 3600;             # 上传超时时间
+        proxy_read_timeout 3600;       # 读取超时
+        proxy_send_timeout 3600;       # 发送超时
+        proxy_connect_timeout 300;     # 连接超时
     }
 }
 ```

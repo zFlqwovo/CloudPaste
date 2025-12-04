@@ -34,6 +34,14 @@ const RETRYABLE_STATUS_CODES = [
 export function isRetryableError(error: any): boolean {
   if (!error) return false;
 
+  // Cloudflare Workflows 平台级限流错误（单次调用子请求超限）：
+  // 此类错误在当前 Worker/Workflow 调用中继续重试没有意义，应该直接视为不可重试，
+  // 由上层通过新的调用或人工干预进行恢复。
+  const rawMessage = String(error?.message || '').toUpperCase();
+  if (rawMessage.includes('TOO MANY API REQUESTS BY SINGLE WORKER INVOCATION')) {
+    return false;
+  }
+
   if (typeof error.retryable === 'boolean') {
     return error.retryable;
   }

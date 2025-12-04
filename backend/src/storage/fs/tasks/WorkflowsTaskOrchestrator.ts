@@ -143,11 +143,48 @@ export class WorkflowsTaskOrchestrator implements TaskOrchestratorAdapter {
       console.log(`Workflow ${jobId} 不可用，使用数据库状态:`, error);
     }
 
-    const dbStatus = taskRecord.status as string;
+    // 当前数据库中的状态
+    let dbStatus = taskRecord.status as string;
+
     if (workflowStatus) {
-      const effectiveStatus = dbStatus === TaskStatus.CANCELLED
-        ? TaskStatus.CANCELLED
-        : this.mapWorkflowStatus(workflowStatus.status);
+      // 映射 Workflow 实例状态到任务状态
+      const mappedStatus = this.mapWorkflowStatus(workflowStatus.status);
+
+      // 如果 Workflow 已经进入终态，而数据库仍然是 pending/running，则进行一次状态同步
+      const isDbRunning =
+        dbStatus === TaskStatus.PENDING || dbStatus === TaskStatus.RUNNING;
+      const isFinalStatus =
+        mappedStatus === TaskStatus.COMPLETED ||
+        mappedStatus === TaskStatus.FAILED ||
+        mappedStatus === TaskStatus.CANCELLED ||
+        mappedStatus === TaskStatus.PARTIAL;
+
+      if (isDbRunning && isFinalStatus) {
+        try {
+          const finishedAtMs = workflowStatus.output?.finishedAt
+            ? new Date(workflowStatus.output.finishedAt).getTime()
+            : Date.now();
+          const updatedAtMs = Date.now();
+
+          await this.env.DB.prepare(`
+            UPDATE ${DbTables.TASKS}
+            SET status = ?, finished_at = ?, updated_at = ?
+            WHERE task_id = ?
+          `)
+            .bind(mappedStatus, finishedAtMs, updatedAtMs, jobId)
+            .run();
+
+          dbStatus = mappedStatus;
+        } catch (error) {
+          console.warn(
+            `[WorkflowsTaskOrchestrator] 同步作业 ${jobId} 状态到 D1 失败，将继续使用内存状态:`,
+            error,
+          );
+        }
+      }
+
+      const effectiveStatus =
+        dbStatus === TaskStatus.CANCELLED ? TaskStatus.CANCELLED : mappedStatus;
 
       return {
         jobId: taskRecord.task_id as string,

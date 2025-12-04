@@ -10,6 +10,10 @@ import {
   DEFAULT_RETRY_POLICY
 } from '../utils/retryUtils.js';
 
+// 进度上报节流：限制单个文件的进度写入次数，避免在 Workers Free 计划下触发 50 次子请求上限
+const MAX_PROGRESS_UPDATES_PER_ITEM = 5;
+const DEFAULT_PROGRESS_BYTES_STEP = 5 * 1024 * 1024; // 默认按 5MB 步长上报
+
 /**
  * 复制任务处理器 - 支持同存储原子复制和跨存储流式复制
  * - 同存储: 驱动层原子复制 (S3 自动使用 CopyObject API)
@@ -52,6 +56,14 @@ export class CopyTaskHandler implements TaskHandler {
   async execute(job: InternalJob, context: ExecutionContext): Promise<void> {
     const payload = job.payload as CopyTaskPayload;
     const fileSystem = context.getFileSystem();
+
+    // 通过 ExecutionContext 获取运行时环境，用于区分 Cloudflare Workers (D1/Workflows) 与本地 SQLite (Docker/Node)
+    // 只有在 Workers 环境下才开启进度上报节流，Docker 部署仍保持细粒度进度反馈
+    const env = typeof context.getEnv === 'function' ? context.getEnv() : null;
+    const isWorkersEnv =
+      !!env &&
+      (Object.prototype.hasOwnProperty.call(env, 'DB') ||
+        Object.prototype.hasOwnProperty.call(env, 'JOB_WORKFLOW'));
 
     let successCount = 0;
     let failedCount = 0;
@@ -109,6 +121,16 @@ export class CopyTaskHandler implements TaskHandler {
     console.log(
       `[CopyTaskHandler] 重试策略: limit=${retryPolicy.limit}, delay=${retryPolicy.delay}ms, backoff=${retryPolicy.backoff}`
     );
+
+    // 为每个文件计算进度上报的最小步长和最近一次上报的字节数（仅在 Workers 环境下会使用）
+    const lastReportedBytesPerItem: number[] = new Array(payload.items.length).fill(0);
+    const progressStepPerItem: number[] = fileSizes.map((size) => {
+      if (!size || size <= 0) {
+        return DEFAULT_PROGRESS_BYTES_STEP;
+      }
+      const step = Math.ceil(size / MAX_PROGRESS_UPDATES_PER_ITEM);
+      return Math.max(step, DEFAULT_PROGRESS_BYTES_STEP);
+    });
 
     for (let i = 0; i < payload.items.length; i++) {
       const item = payload.items[i];
@@ -173,10 +195,31 @@ export class CopyTaskHandler implements TaskHandler {
               onProgress: (bytesTransferred: number) => {
                 currentFileBytes = bytesTransferred;
                 itemResults[i].bytesTransferred = bytesTransferred;
-                context.updateProgress(job.jobId, {
-                  bytesTransferred: totalBytesTransferred + currentFileBytes,
-                  itemResults,
-                }).catch(() => {});
+                const absoluteBytes = totalBytesTransferred + currentFileBytes;
+
+                // Docker/Node.js 环境：无 Cloudflare 子请求上限，保持细粒度进度反馈
+                if (!isWorkersEnv) {
+                  context
+                    .updateProgress(job.jobId, {
+                      bytesTransferred: absoluteBytes,
+                      itemResults,
+                    })
+                    .catch(() => {});
+                  return;
+                }
+
+                // Cloudflare Workers 环境：按字节步长节流进度上报，减少 D1 子请求次数
+                const lastReported = lastReportedBytesPerItem[i];
+                const step = progressStepPerItem[i];
+                if (absoluteBytes - lastReported >= step) {
+                  lastReportedBytesPerItem[i] = absoluteBytes;
+                  context
+                    .updateProgress(job.jobId, {
+                      bytesTransferred: absoluteBytes,
+                      itemResults,
+                    })
+                    .catch(() => {});
+                }
               },
             }
           );
