@@ -10,11 +10,22 @@
  * - listDirectory(path, options): Promise<Object>
  *   列出目录内容，返回 { path, type, isRoot, isVirtual, items: Array<FileInfo> }
  *
- * - downloadFile(path, options): Promise<Response>
- *   下载文件，返回 Response 对象（带 body 流和适当的 headers）
+ * - downloadFile(path, options): Promise<StorageStreamDescriptor>
+ *   下载文件，返回 StorageStreamDescriptor 对象
+ *   StorageStreamDescriptor 结构：
+ *   {
+ *     size: number | null,           // 文件大小（字节）
+ *     contentType: string | null,    // MIME 类型
+ *     etag?: string | null,          // ETag
+ *     lastModified?: Date | null,    // 最后修改时间
+ *     getStream(options?): Promise<StreamHandle>,  // 获取完整流
+ *     getRange?(range, options?): Promise<StreamHandle>  // 获取范围流（可选）
+ *   }
+ *   StreamHandle 结构：{ stream: NodeReadable | ReadableStream, close(): Promise<void> }
  *
  * - getFileInfo(path, options): Promise<Object>
  *   获取文件信息，返回 { path, name, isDirectory, size, modified, mimetype?, type, typeName }
+ *
  */
 
 /**

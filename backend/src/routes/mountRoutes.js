@@ -9,6 +9,7 @@ import { usePolicy } from "../security/policies/policies.js";
 import { resolvePrincipal } from "../security/helpers/principal.js";
 import { getAccessibleMountsForUser } from "../security/helpers/access.js";
 import { StorageFactory } from "../storage/factory/StorageFactory.js";
+import { getMountConfigSchema } from "../storage/factory/MountConfigSchema.js";
 
 /**
  * 为挂载点列表附加能力信息
@@ -94,7 +95,7 @@ mountRoutes.delete("/api/mount/:id", requireAdmin, async (c) => {
 /**
  * 获取存储类型的能力列表
  * GET /api/storage-types/:type/capabilities
- * 返回指定存储类型支持的能力列表
+ * 返回指定存储类型支持的能力列表及元数据
  */
 mountRoutes.get("/api/storage-types/:type/capabilities", requireMountView, async (c) => {
   const { type } = c.req.param();
@@ -103,31 +104,40 @@ mountRoutes.get("/api/storage-types/:type/capabilities", requireMountView, async
     return c.json({ success: false, message: `不支持的存储类型: ${type}` }, ApiStatus.NOT_FOUND);
   }
 
-  const capabilities = StorageFactory.getRegisteredCapabilities(type);
-  const displayName = StorageFactory.getTypeDisplayName(type);
+  const meta = StorageFactory.getTypeMetadata(type);
 
-  return jsonOk(c, {
-    storageType: type,
-    displayName,
-    capabilities,
-  }, "获取存储类型能力成功");
+  return jsonOk(
+    c,
+    {
+      storageType: type,
+      displayName: meta?.displayName || type,
+      capabilities: meta?.capabilities || [],
+      ui: meta?.ui || null,
+      configSchema: meta?.configSchema || null,
+      providerOptions: meta?.providerOptions || null,
+    },
+    "获取存储类型能力成功",
+  );
 });
 
 /**
  * 获取所有支持的存储类型及其能力
  * GET /api/storage-types
- * 返回所有注册的存储类型及其能力信息
+ * 返回所有注册的存储类型及其能力与配置元数据信息
  */
 mountRoutes.get("/api/storage-types", requireMountView, async (c) => {
-  const types = StorageFactory.getSupportedTypes();
-
-  const result = types.map(type => ({
-    type,
-    displayName: StorageFactory.getTypeDisplayName(type),
-    capabilities: StorageFactory.getRegisteredCapabilities(type),
-  }));
-
+  const result = StorageFactory.getAllTypeMetadata();
   return jsonOk(c, result, "获取存储类型列表成功");
+});
+
+/**
+ * 获取挂载点配置Schema
+ * GET /api/mount-schema
+ * 返回挂载点表单的Schema定义，供前端动态渲染表单
+ */
+mountRoutes.get("/api/mount-schema", requireAdmin, async (c) => {
+  const schema = getMountConfigSchema();
+  return jsonOk(c, schema, "获取挂载点Schema成功");
 });
 
 export default mountRoutes;

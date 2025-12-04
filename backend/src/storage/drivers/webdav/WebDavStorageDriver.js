@@ -182,36 +182,151 @@ export class WebDavStorageDriver extends BaseDriver {
   }
 
   /**
-   * 下载文件（代理转发 WebDAV 请求）
+   * 下载文件（返回 StorageStreamDescriptor）
+   * @param {string} path - 文件路径
+   * @param {Object} options - 选项参数
+   * @returns {Promise<import('../../streaming/types.js').StorageStreamDescriptor>} 流描述对象
    */
   async downloadFile(path, options = {}) {
     this._ensureInitialized();
     const davPath = this._buildDavPath(options.subPath || path, false);
     const url = this._buildRequestUrl(davPath);
+
+    // 先获取文件元数据（HEAD 请求）
+    let metadata;
     try {
-      const headers = {};
-      const rangeHeader = options.request?.headers?.get?.("range");
-      if (rangeHeader) {
-        headers["Range"] = rangeHeader;
-      }
-      headers["Authorization"] = this._basicAuthHeader();
-      const resp = await fetch(url, { headers });
-      if (!resp.ok) {
-        throw this._wrapError(new Error(`HTTP ${resp.status}`), "下载失败", resp.status);
-      }
-      const passthroughHeaders = ["content-type", "content-length", "last-modified", "etag", "accept-ranges", "content-range", "cache-control"];
-      const responseHeaders = new Headers();
-      passthroughHeaders.forEach((h) => {
-        const v = resp.headers.get(h);
-        if (v) responseHeaders.set(h, v);
+      const headResp = await fetch(url, {
+        method: "HEAD",
+        headers: { Authorization: this._basicAuthHeader() },
       });
-      return new Response(resp.body, {
-        status: resp.status,
-        headers: responseHeaders,
-      });
+      if (!headResp.ok) {
+        if (headResp.status === 404) {
+          throw new NotFoundError("文件不存在");
+        }
+        throw this._wrapError(new Error(`HTTP ${headResp.status}`), "获取文件元数据失败", headResp.status);
+      }
+      metadata = {
+        contentType: headResp.headers.get("content-type") || "application/octet-stream",
+        contentLength: headResp.headers.get("content-length"),
+        etag: headResp.headers.get("etag"),
+        lastModified: headResp.headers.get("last-modified"),
+      };
     } catch (error) {
-      throw this._wrapError(error, "下载文件失败", this._statusFromError(error));
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw this._wrapError(error, "获取文件元数据失败", this._statusFromError(error));
     }
+
+    const size = metadata.contentLength ? parseInt(metadata.contentLength, 10) : null;
+    const contentType = metadata.contentType;
+    const etag = metadata.etag || null;
+    const lastModified = metadata.lastModified ? new Date(metadata.lastModified) : null;
+
+    // 保存 url 和 auth 供闭包使用
+    const fileUrl = url;
+    const authHeader = this._basicAuthHeader();
+    const wrapError = this._wrapError.bind(this);
+    const statusFromError = this._statusFromError.bind(this);
+
+    // 返回 StorageStreamDescriptor
+    return {
+      size,
+      contentType,
+      etag,
+      lastModified,
+
+      /**
+       * 获取完整文件流
+       * @param {{ signal?: AbortSignal }} [streamOptions]
+       * @returns {Promise<{ stream: ReadableStream, close: () => Promise<void> }>}
+       */
+      async getStream(streamOptions = {}) {
+        const { signal } = streamOptions;
+        try {
+          const resp = await fetch(fileUrl, {
+            headers: { Authorization: authHeader },
+            signal,
+          });
+          if (!resp.ok) {
+            if (resp.status === 404) {
+              throw new NotFoundError("文件不存在");
+            }
+            throw wrapError(new Error(`HTTP ${resp.status}`), "下载失败", resp.status);
+          }
+
+          const stream = resp.body;
+
+          return {
+            stream,
+            async close() {
+              if (stream && typeof stream.cancel === "function") {
+                try {
+                  await stream.cancel();
+                } catch {
+                  // 忽略取消错误
+                }
+              }
+            },
+          };
+        } catch (error) {
+          if (error instanceof AppError) {
+            throw error;
+          }
+          throw wrapError(error, "下载文件失败", statusFromError(error));
+        }
+      },
+
+      /**
+       * 获取指定范围的流（WebDAV 原生支持 Range）
+       * @param {{ start: number, end?: number }} range
+       * @param {{ signal?: AbortSignal }} [streamOptions]
+       * @returns {Promise<{ stream: ReadableStream, close: () => Promise<void> }>}
+       */
+      async getRange(range, streamOptions = {}) {
+        const { signal } = streamOptions;
+        const { start, end } = range;
+
+        // 构建 Range 头
+        const rangeHeader = end !== undefined ? `bytes=${start}-${end}` : `bytes=${start}-`;
+
+        try {
+          const resp = await fetch(fileUrl, {
+            headers: {
+              Authorization: authHeader,
+              Range: rangeHeader,
+            },
+            signal,
+          });
+          if (!resp.ok && resp.status !== 206) {
+            if (resp.status === 404) {
+              throw new NotFoundError("文件不存在");
+            }
+            throw wrapError(new Error(`HTTP ${resp.status}`), "下载失败", resp.status);
+          }
+
+          const stream = resp.body;
+
+          return {
+            stream,
+            async close() {
+              if (stream && typeof stream.cancel === "function") {
+                try {
+                  await stream.cancel();
+                } catch {
+                  // 忽略取消错误
+                }
+              }
+            },
+          };
+        } catch (error) {
+          if (error instanceof AppError) {
+            throw error;
+          }
+          throw wrapError(error, "下载文件失败", statusFromError(error));
+        }
+      },
+    };
   }
 
   /**

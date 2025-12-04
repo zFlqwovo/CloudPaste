@@ -51,14 +51,16 @@ export const CAPABILITIES = {
  */
 export const BASE_REQUIRED_METHODS = ["stat", "exists"];
 
+
 /**
  * 能力对应的最小方法契约映射表
  * - 该表用于在运行时对驱动进行契约校验（例如 StorageFactory.validateDriverContract）
- * - 每个能力列出的方法名必须在驱动实例上存在且为 function，才视为满足该能力的“最小实现”
+ * - 每个能力列出的方法名必须在驱动实例上存在且为 function，才视为满足该能力的"最小实现"
  *
  * 约定说明：
- * - READER: 面向所有需要“读取”能力的场景（FS Web / Share / WebDAV 等），必须能够列目录、获取文件信息以及下载文件。
- * - WRITER: 面向“写入/修改”能力，涵盖上传、建目录、重命名、批量删除/复制等基本操作。
+ * - READER: 面向所有需要"读取"能力的场景（FS Web / Share / WebDAV 等），必须能够列目录、获取文件信息以及下载文件。
+ *   StreamHandle 结构：{ stream: NodeReadable | ReadableStream, close(): Promise<void> }
+ * - WRITER: 面向"写入/修改"能力，涵盖上传、建目录、重命名、批量删除/复制等基本操作。
  * - DIRECT_LINK: 最小要求是能够生成下载直链 generateDownloadUrl；
  *   - 对于 S3 等对象存储，通常还会额外实现 generateUploadUrl / generatePresignedUrl，用于预签名上传；
  *   - 对于 WebDAV 等仅支持下载直链的驱动，可以只实现 generateDownloadUrl 即可，不强制要求上传相关方法。
@@ -104,6 +106,7 @@ export const REQUIRED_METHODS_BY_CAPABILITY = {
    */
   [CAPABILITIES.ATOMIC]: ["renameItem", "copyItem"],
 };
+
 
 /**
  * 能力检查函数映射

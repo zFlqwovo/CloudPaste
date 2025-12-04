@@ -6,7 +6,7 @@ import ConfigForm from "@/modules/admin/components/ConfigForm.vue";
 import CommonPagination from "@/components/common/CommonPagination.vue";
 import ConfirmDialog from "@/components/common/dialogs/ConfirmDialog.vue";
 import { formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
-import { getAdminStorageStrategy } from "@/modules/storage-core/schema/adminStorageSchemas.js";
+import { api } from "@/api";
 import { useThemeMode } from "@/composables/core/useThemeMode.js";
 import { useConfirmDialog } from "@/composables/core/useConfirmDialog.js";
 
@@ -62,25 +62,75 @@ const {
   STORAGE_TYPE_UNKNOWN,
 } = useStorageConfigManagement({ confirmFn });
 
+// 存储类型元数据（从后端 /api/storage-types 加载）
+const storageTypesMeta = ref([]);
+
 const formatStorageTypeLabel = (type) => {
   if (!type || type === STORAGE_TYPE_UNKNOWN) {
     return "未指定类型";
   }
-  const map = {
-    S3: "S3/对象存储",
-    WEBDAV: "WebDAV",
-    LOCAL: "本地存储",
-  };
-  return map[type] || type;
+
+  const meta = storageTypesMeta.value.find((m) => m.type === type);
+
+  // 优先使用后端提供的 i18nKey，其次是 displayName，最后回退到原始类型值
+  if (meta?.ui?.i18nKey) {
+    return t(meta.ui.i18nKey);
+  }
+  if (meta?.displayName) {
+    return meta.displayName;
+  }
+
+  return type;
 };
 
 const getConfigSummaryRows = (config) => {
   if (!config) return [];
-  const strategy = getAdminStorageStrategy(config.storage_type);
-  if (!strategy || typeof strategy.buildCardSummary !== "function") {
+  const meta = storageTypesMeta.value.find((m) => m.type === config.storage_type);
+  const schema = meta?.configSchema;
+  const layout = schema?.layout;
+  const summaryFields = layout?.summaryFields;
+  if (!schema || !Array.isArray(summaryFields) || summaryFields.length === 0) {
     return [];
   }
-  return strategy.buildCardSummary(config) || [];
+
+  return summaryFields
+    .map((fieldName) => {
+      const fieldMeta = schema.fields?.find((f) => f.name === fieldName) || null;
+      const labelKey = fieldMeta?.labelKey;
+      const label = labelKey ? t(labelKey) : fieldName;
+
+      const rawValue = config[fieldName];
+      let value = rawValue;
+      const ui = fieldMeta?.ui;
+
+      // 布尔类型：优先使用 displayOptions 翻译键（兼容数字0/1）
+      const isBooleanField = fieldMeta?.type === "boolean" || typeof rawValue === "boolean";
+      if (isBooleanField) {
+        const boolValue = rawValue === true || rawValue === 1 || rawValue === "1";
+        const displayOpts = ui?.displayOptions;
+        if (displayOpts) {
+          value = boolValue ? t(displayOpts.trueKey) : t(displayOpts.falseKey);
+        } else {
+          value = boolValue ? "是" : "否";
+        }
+      }
+
+      // 空值处理：使用 emptyTextKey 作为默认显示
+      const isEmpty = value === undefined || value === null || String(value).trim().length === 0;
+      if (isEmpty && ui?.emptyTextKey) {
+        value = t(ui.emptyTextKey);
+      }
+
+      const show = !isEmpty || !!ui?.emptyTextKey;
+
+      return {
+        key: fieldName,
+        label,
+        value,
+        show,
+      };
+    })
+    .filter((row) => row.show);
 };
 
 const storageTypeOptions = computed(() =>
@@ -133,9 +183,16 @@ const formatDate = (isoDate) => {
   return formatDateTimeWithSeconds(isoDate);
 };
 
-// 组件加载时获取列表
-onMounted(() => {
-  loadStorageConfigs();
+// 组件加载时获取存储类型元数据和配置列表
+onMounted(async () => {
+  try {
+    const resp = await api.mount.getStorageTypes();
+    storageTypesMeta.value = Array.isArray(resp?.data) ? resp.data : Array.isArray(resp) ? resp : [];
+  } catch (e) {
+    console.error("加载存储类型元数据失败:", e);
+    storageTypesMeta.value = [];
+  }
+  await loadStorageConfigs();
 });
 </script>
 
@@ -278,7 +335,10 @@ onMounted(() => {
                   </div>
 
                   <!-- 通用字段 -->
-                  <div class="grid grid-cols-1 gap-2 text-sm" :class="config.storage_type === 'S3' || config.storage_type === 'WEBDAV' ? 'mt-2 pt-2 border-t' : ''" :style="config.storage_type === 'S3' || config.storage_type === 'WEBDAV' ? (darkMode ? 'border-color: rgb(75, 85, 99)' : 'border-color: rgb(229, 231, 235)') : ''">
+                  <div
+                    class="grid grid-cols-1 gap-2 text-sm mt-2 pt-2 border-t"
+                    :class="darkMode ? 'border-gray-600' : 'border-gray-200'"
+                  >
 
                     <div class="flex justify-between">
                       <span class="font-medium">API密钥可见:</span>

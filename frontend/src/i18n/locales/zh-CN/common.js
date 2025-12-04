@@ -4,6 +4,8 @@ export default {
     loading: "加载中...",
     confirm: "确认",
     cancel: "取消",
+    enabled: "启用",
+    disabled: "禁用",
     back: "返回",
     close: "关闭",
     required: "请填写必填项",
@@ -13,6 +15,7 @@ export default {
     actions: "操作",
     reset: "重置",
     selectOption: "请选择",
+    pleaseSelect: "请选择",
     pagination: {
       previousPage: "上一页",
       nextPage: "下一页",

@@ -115,7 +115,7 @@ export class FileSystem {
    * @param {Request} request - 请求对象
    * @param {string|Object} userIdOrInfo - 用户ID或API密钥信息
    * @param {string} userType - 用户类型
-   * @returns {Promise<Response>} 文件响应
+   * @returns {Promise<import('../streaming/types.js').StorageStreamDescriptor>} 流描述对象
    */
   async downloadFile(path, fileName, request, userIdOrInfo, userType) {
     return await featureDownloadFile(this, path, fileName, request, userIdOrInfo, userType);

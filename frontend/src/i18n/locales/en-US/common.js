@@ -4,6 +4,8 @@ export default {
     loading: "Loading...",
     confirm: "Confirm",
     cancel: "Cancel",
+    enabled: "Enabled",
+    disabled: "Disabled",
     back: "Back",
     close: "Close",
     required: "Please fill in required fields",
@@ -11,6 +13,8 @@ export default {
     contactAdmin: "Contact Administrator",
     permissionDenied: "Permission Denied",
     actions: "Actions",
+    selectOption: "Please select",
+    pleaseSelect: "Please select",
     pagination: {
       previousPage: "Previous",
       nextPage: "Next",

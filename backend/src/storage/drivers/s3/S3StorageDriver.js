@@ -197,7 +197,7 @@ export class S3StorageDriver extends BaseDriver {
    * 下载文件
    * @param {string} path - 文件路径
    * @param {Object} options - 选项参数
-   * @returns {Promise<Response>} 文件内容响应
+   * @returns {Promise<import('../../streaming/types.js').StorageStreamDescriptor>} 流描述对象
    */
   async downloadFile(path, options = {}) {
     this._ensureInitialized();

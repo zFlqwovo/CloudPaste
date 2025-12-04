@@ -18,7 +18,12 @@
  * createDirectory: 返回 { success: boolean, path: string, alreadyExists?: boolean }
  * listDirectory: 返回 { path, type: "directory", isRoot, isVirtual, mount_id?, storage_type?, items: Array<FileInfo> }
  * getFileInfo: 返回 { path, name, isDirectory, size, modified, mimetype?, type, typeName, mount_id?, storage_type? }
- * downloadFile: 返回 Response 对象（带 body 流和适当的 headers）
+ * downloadFile: 返回 StorageStreamDescriptor 对象
+ * StreamHandle 结构：
+ * - stream: NodeReadable | ReadableStream  - 可读流（Node 环境用 NodeReadable，Worker 用 ReadableStream）
+ * - close(): Promise<void>                 - 显式关闭方法
+ * - Node 环境下优先使用 NodeReadable（避免 WebStreams 桥接问题）
+ * - getRange 为可选实现，未实现时 StorageStreaming 层会降级处理
  */
 
 import { BaseDriver } from "../../interfaces/capabilities/BaseDriver.js";
@@ -69,13 +74,17 @@ export class TemplateStorageDriver extends BaseDriver {
   }
 
   /**
-   * 下载文件，返回 Response/ReadableStream
+   * 下载文件，返回 StorageStreamDescriptor
+   * Node 环境下优先使用 NodeReadable（fs.createReadStream 等）
+   * Worker 环境下使用 Web ReadableStream
+   *
    * @param {string} path    挂载视图下的路径
    * @param {Object} options 上下文选项（mount/subPath/db/request 等）
+   * @returns {Promise<import('../../streaming/types.js').StorageStreamDescriptor>}
    */
   async downloadFile(path, options = {}) {
     this._ensureInitialized();
-    throw new Error("TemplateStorageDriver: 请在此实现 downloadFile 逻辑（参考 S3/WebDAV 驱动的下载实现）");
+    throw new Error("TemplateStorageDriver: 请在此实现 downloadFile 逻辑，返回 StorageStreamDescriptor（参考 LocalStorageDriver 的实现）");
   }
 
   // ========== WRITER 能力：uploadFile / createDirectory / rename / copy / remove ==========

@@ -211,8 +211,12 @@ async function copyBetweenDrivers(fs, sourceCtx, targetCtx, sourcePath, targetPa
     }
   }
 
+  // 用于在 finally 中关闭流
+  let streamHandle = null;
+
   try {
     // 1. 从源驱动以流方式下载
+    // downloadFile 返回 StorageStreamDescriptor
     const downloadResult = await sourceDriver.downloadFile(sourcePath, {
       mount: sourceMount,
       subPath: sourceSubPath,
@@ -222,25 +226,26 @@ async function copyBetweenDrivers(fs, sourceCtx, targetCtx, sourcePath, targetPa
       request: null,
     });
 
-    const body = downloadResult?.body ?? downloadResult;
+    // 所有驱动现在都返回 StorageStreamDescriptor
+    if (typeof downloadResult?.getStream !== "function") {
+      throw new DriverError("源存储驱动返回了无效的 StorageStreamDescriptor 结构", {
+        status: ApiStatus.INTERNAL_ERROR,
+        code: "DRIVER_ERROR.INVALID_STREAM_DESCRIPTOR",
+        expose: false,
+      });
+    }
+
+    streamHandle = await downloadResult.getStream();
+    const body = streamHandle.stream;
+    const contentType = downloadResult.contentType;
+    const contentLength = downloadResult.size;
+
     if (!body) {
       throw new DriverError("源存储驱动未返回可用的数据流", {
         status: ApiStatus.INTERNAL_ERROR,
         code: "DRIVER_ERROR.CROSS_STORAGE_NO_BODY",
         expose: false,
       });
-    }
-
-    let contentType = null;
-    let contentLength = null;
-    if (downloadResult?.headers && typeof downloadResult.headers.get === "function") {
-      try {
-        contentType = downloadResult.headers.get("content-type");
-        const len = downloadResult.headers.get("content-length");
-        contentLength = len != null ? Number.parseInt(len, 10) : null;
-      } catch {
-        // header 读取失败可以忽略，交由目标驱动自行处理
-      }
     }
 
     // 推导文件名：优先使用目标路径
@@ -295,6 +300,15 @@ async function copyBetweenDrivers(fs, sourceCtx, targetCtx, sourcePath, targetPa
         targetDriverType: targetDriver.getType?.() ?? targetDriver.type,
       },
     });
+  } finally {
+    // 确保关闭流句柄
+    if (streamHandle && typeof streamHandle.close === "function") {
+      try {
+        await streamHandle.close();
+      } catch (closeError) {
+        console.warn(`[copyBetweenDrivers] 关闭流句柄失败:`, closeError?.message || closeError);
+      }
+    }
   }
 }
 

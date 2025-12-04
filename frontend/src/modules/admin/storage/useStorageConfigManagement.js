@@ -237,15 +237,58 @@ export function useStorageConfigManagement(options = {}) {
    */
   class TestResultProcessor {
     constructor(result) {
-      this.result = result;
-      // 识别存储类型：WebDAV有info字段但没有cors/frontendSim，S3有cors/frontendSim但没有info
-      this.isWebDAV = !!(this.result.info && !this.result.cors && !this.result.frontendSim);
+      // 原始结果形态：后端返回 { success, result: {...} } 或 { success, data: { success, result: {...} } }
+      this.raw = result || {};
+
+      // 处理嵌套的 result 结构
+      // 如果有 result 字段，优先使用 result 内容
+      let inner = this.raw;
+      
+      // 检查是否有嵌套的 result 字段（S3/WebDAV 的情况）
+      if (this.raw.result && typeof this.raw.result === 'object') {
+        // LOCAL 测试：result 包含 pathExists/readPermission/writePermission
+        if (this.raw.result.pathExists || this.raw.result.readPermission || this.raw.result.writePermission) {
+          inner = this.raw.result;
+        }
+        // S3/WebDAV 测试：result 包含 read/write/cors/frontendSim/info
+        else if (this.raw.result.read || this.raw.result.write || this.raw.result.cors || 
+                 this.raw.result.frontendSim || this.raw.result.info) {
+          inner = this.raw.result;
+        }
+      }
+
+      this.result = inner || {};
+
+      // 识别存储类型：
+      // - LOCAL：有 pathExists/readPermission/writePermission 字段（本地存储特有）
+      // - WebDAV：有 info 字段但没有 cors/frontendSim
+      // - S3：有 cors 或 frontendSim 字段
+      this.isLocal = !!(this.result.pathExists || this.result.readPermission || this.result.writePermission);
+      this.isWebDAV = !this.isLocal && !!(this.result.info && !this.result.cors && !this.result.frontendSim);
     }
 
     /**
      * 计算测试状态
      */
     calculateStatus() {
+      // LOCAL：基于 pathExists / isDirectory / readPermission / writePermission 计算
+      if (this.isLocal) {
+        const pathOk = this.result.pathExists?.success === true;
+        const dirOk = this.result.isDirectory?.success === true;
+        const readOk = this.result.readPermission?.success === true;
+        const writeOk = this.result.writePermission?.success === true;
+
+        const isFullSuccess = pathOk && dirOk && readOk && writeOk;
+        const isPartialSuccess = pathOk && dirOk && readOk && !writeOk;
+        const isSuccess = isFullSuccess || isPartialSuccess;
+
+        return {
+          isFullSuccess,
+          isPartialSuccess,
+          isSuccess,
+        };
+      }
+
       const basicConnectSuccess = this.result.read?.success === true;
       const writeSuccess = this.result.write?.success === true;
 
@@ -281,15 +324,18 @@ export function useStorageConfigManagement(options = {}) {
      * 生成状态消息
      */
     generateStatusMessage() {
-      const status = this.calculateStatus();
-
-      if (status.isFullSuccess) {
-        return "连接测试完全成功";
-      } else if (status.isPartialSuccess) {
-        return "连接测试部分成功";
-      } else {
-        return "连接测试失败";
+      // 优先使用后端返回的 message，保持与各驱动 tester 的语义一致
+      const backendMessage =
+        this.raw && typeof this.raw.message === "string" ? this.raw.message.trim() : "";
+      if (backendMessage) {
+        return backendMessage;
       }
+
+      // 后端未提供 message 时，再根据本地计算状态给一个兜底提示
+      const status = this.calculateStatus();
+      if (status.isFullSuccess) return "连接测试成功";
+      if (status.isPartialSuccess) return "连接测试部分成功";
+      return "连接测试失败";
     }
 
     /**
@@ -297,6 +343,54 @@ export function useStorageConfigManagement(options = {}) {
      */
     generateDetailsMessage() {
       const details = [];
+
+      // LOCAL 测试详情
+      if (this.isLocal) {
+        // 路径与目录检查
+        if (this.result.pathExists?.success) {
+          details.push("✓ 根路径存在");
+        } else {
+          details.push("✗ 根路径不存在");
+          if (this.result.pathExists?.error) {
+            details.push(`  ${this.result.pathExists.error.split("\n")[0]}`);
+          }
+        }
+
+        if (this.result.isDirectory?.success) {
+          details.push("✓ 根路径是目录");
+        } else {
+          details.push("✗ 根路径不是目录");
+          if (this.result.isDirectory?.error) {
+            details.push(`  ${this.result.isDirectory.error.split("\n")[0]}`);
+          }
+        }
+
+        // 读权限
+        if (this.result.readPermission?.success) {
+          details.push("✓ 读权限正常");
+        } else {
+          details.push("✗ 读权限失败");
+          if (this.result.readPermission?.error) {
+            details.push(`  ${this.result.readPermission.error.split("\n")[0]}`);
+          }
+        }
+
+        // 写权限
+        if (this.result.writePermission?.success) {
+          if (this.result.writePermission?.note) {
+            details.push(`✓ 写权限正常（${this.result.writePermission.note}）`);
+          } else {
+            details.push("✓ 写权限正常");
+          }
+        } else {
+          details.push("✗ 写权限失败");
+          if (this.result.writePermission?.error) {
+            details.push(`  ${this.result.writePermission.error.split("\n")[0]}`);
+          }
+        }
+
+        return details.join("\n");
+      }
 
       // 读权限状态 - 简洁显示
       if (this.result.read?.success) {
