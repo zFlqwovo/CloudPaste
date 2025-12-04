@@ -228,12 +228,12 @@ export class WebDavStorageDriver extends BaseDriver {
         }
         throw this._wrapError(new Error(`HTTP ${headResp.status}`), "获取文件元数据失败", headResp.status);
       }
-      metadata = {
-        contentType: headResp.headers.get("content-type") || "application/octet-stream",
-        contentLength: headResp.headers.get("content-length"),
-        etag: headResp.headers.get("etag"),
-        lastModified: headResp.headers.get("last-modified"),
-      };
+        metadata = {
+          contentType: headResp.headers.get("content-type") || "application/octet-stream",
+          contentLength: headResp.headers.get("content-length"),
+          etag: headResp.headers.get("etag"),
+          lastModified: headResp.headers.get("last-modified"),
+        };
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -241,10 +241,41 @@ export class WebDavStorageDriver extends BaseDriver {
       throw this._wrapError(error, "获取文件元数据失败", this._statusFromError(error));
     }
 
-    const size = metadata.contentLength ? parseInt(metadata.contentLength, 10) : null;
-    const contentType = metadata.contentType;
-    const etag = metadata.etag || null;
-    const lastModified = metadata.lastModified ? new Date(metadata.lastModified) : null;
+    // 优先使用 HEAD 的 Content-Length；部分 WebDAV 服务不会返回该头，需降级为 stat
+    let size = metadata.contentLength ? parseInt(metadata.contentLength, 10) : null;
+    let contentType = metadata.contentType;
+    let etag = metadata.etag || null;
+    let lastModified = metadata.lastModified ? new Date(metadata.lastModified) : null;
+
+    // 当 HEAD 未返回 Content-Length 或返回值明显异常时，尝试通过 WebDAV stat 精准获取文件大小
+    if (size === null || !Number.isFinite(size) || size <= 0) {
+      try {
+        const stat = await this.client.stat(davPath);
+
+        if (stat && typeof stat.size === "number" && stat.size >= 0) {
+          size = stat.size;
+        }
+
+        // 仅在 HEAD 未提供对应元数据时，使用 stat 结果进行补全，避免覆盖上游更准确的 HTTP 头信息
+        if (!contentType) {
+          const rawMime = stat.mime || null;
+          if (rawMime && rawMime !== "httpd/unix-directory") {
+            contentType = rawMime;
+          }
+        }
+        if (!etag && stat.etag) {
+          etag = stat.etag;
+        }
+        if (!lastModified && stat.lastmod) {
+          lastModified = new Date(stat.lastmod);
+        }
+      } catch (error) {
+        // stat 404 统一视为文件不存在，其余错误仅记录，保持 HEAD 信息，由上层决定是否降级为 200
+        if (this._isNotFound(error)) {
+          throw new NotFoundError("文件不存在");
+        }
+      }
+    }
 
     // 保存 url 和 auth 供闭包使用
     const fileUrl = url;
@@ -309,7 +340,7 @@ export class WebDavStorageDriver extends BaseDriver {
        *
        * @param {{ start: number, end?: number }} range
        * @param {{ signal?: AbortSignal }} [streamOptions]
-       * @returns {Promise<{ stream: ReadableStream, close: () => Promise<void>, supportsRange: boolean, actualStart?: number, actualEnd?: number }>}
+       * @returns {Promise<{ stream: ReadableStream, close: () => Promise<void>, supportsRange: boolean }>}
        */
       async getRange(range, streamOptions = {}) {
         const { signal } = streamOptions;
@@ -344,29 +375,16 @@ export class WebDavStorageDriver extends BaseDriver {
           // 200 = 不支持 Range 或忽略了 Range 头，返回完整内容
           const supportsRange = resp.status === 206;
 
-          // 尝试从 Content-Range 头解析实际返回的范围
-          let actualStart = start;
-          let actualEnd = end;
-          const contentRange = resp.headers.get("content-range");
-          if (contentRange && supportsRange) {
-            // Content-Range: bytes 0-1023/146515
-            const rangeMatch = contentRange.match(/bytes\s+(\d+)-(\d+)\/(\d+|\*)/);
-            if (rangeMatch) {
-              actualStart = parseInt(rangeMatch[1], 10);
-              actualEnd = parseInt(rangeMatch[2], 10);
-            }
-          }
-
-          // 如果服务器返回 200，记录警告日志
+          // 如果服务器返回 200，记录警告日志，由上层通过 ByteSliceStream 做软件切片
           if (!supportsRange) {
-            console.warn(`[WebDAV] 服务器不支持 Range 请求，返回 ${resp.status}，将在上层使用 ByteSliceStream 切片`);
+            console.warn(
+              `[WebDAV] 服务器不支持 Range 请求，返回 ${resp.status}，将在上层使用 ByteSliceStream 切片`,
+            );
           }
 
           return {
             stream,
             supportsRange,
-            actualStart,
-            actualEnd,
             async close() {
               if (stream && typeof stream.cancel === "function") {
                 try {

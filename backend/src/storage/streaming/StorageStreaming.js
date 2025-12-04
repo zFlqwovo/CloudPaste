@@ -280,20 +280,9 @@ export class StorageStreaming {
     let closed = false;
     const { start, end } = range;
 
-    // 计算实际的 end 值（处理 Infinity 情况）
-    let actualEnd = end;
-    if (end === Infinity && descriptor.size !== null && descriptor.size > 0) {
-      actualEnd = descriptor.size - 1;
-    } else if (end === Infinity) {
-      // 文件大小未知且 end 为 Infinity，使用一个足够大的值
-      // 实际会读取到流结束
-      actualEnd = Number.MAX_SAFE_INTEGER;
-    }
-
-    // 创建修正后的 range 对象用于响应头
-    // 确保 Content-Range 和 Content-Length 头包含有效的数字值
-    const correctedRange = { start, end: actualEnd };
-    const headers = buildResponseHeaders(descriptor, correctedRange, channel);
+    // 这里 range 已由 parseRangeHeader 基于 descriptor.size 解析并校验，
+    // start/end 均为有限整数且在文件范围内，可直接用于构造响应头与字节切片。
+    const headers = buildResponseHeaders(descriptor, range, channel);
 
     return {
       status: 206,
@@ -311,13 +300,15 @@ export class StorageStreaming {
 
           if (!supportsRange) {
             // 驱动返回了完整流（200），需要在此层进行软件字节切片
-            console.log(`[StorageStreaming] 检测到驱动不支持 Range，使用 ByteSliceStream 切片: ${start}-${actualEnd}`);
+            console.log(
+              `[StorageStreaming] 检测到驱动不支持 Range，使用 ByteSliceStream 切片: ${start}-${end}`,
+            );
 
             const originalStream = streamHandle.stream;
             const originalClose = streamHandle.close;
 
             // 使用 ByteSliceStream 包装
-            const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, actualEnd);
+            const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, end);
 
             return {
               stream: slicedStream,
@@ -335,14 +326,16 @@ export class StorageStreaming {
         }
 
         // 驱动不支持 getRange 方法，降级使用 ByteSliceStream
-        console.log(`[StorageStreaming] 驱动不支持 getRange 方法，使用 ByteSliceStream 切片: ${start}-${actualEnd}`);
+        console.log(
+          `[StorageStreaming] 驱动不支持 getRange 方法，使用 ByteSliceStream 切片: ${start}-${end}`,
+        );
 
         streamHandle = await descriptor.getStream();
         const originalStream = streamHandle.stream;
         const originalClose = streamHandle.close;
 
-        // 使用 ByteSliceStream 包装完整流（使用已修正的 actualEnd）
-        const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, actualEnd);
+        // 使用 ByteSliceStream 包装完整流
+        const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, end);
 
         return {
           stream: slicedStream,
