@@ -81,6 +81,13 @@ export class StorageStreaming {
       // 4. 解析 Range 请求
       const range = parseRangeHeader(rangeHeader, descriptor.size);
 
+      // 文件大小未知（例如 WebDAV HEAD 未返回 Content-Length）时，
+      // 无法构造符合规范的 206/416（缺少 Content-Range），统一降级为 200 全量响应。
+      if (range && range.unknownSize) {
+        console.log(`${logPrefix} 文件大小未知，忽略 Range，返回 200 OK: ${range.start}-${range.end}`);
+        return this._create200Reader(descriptor, channel);
+      }
+
       if (range && !range.isValid) {
         console.log(`${logPrefix} Range 格式无效`);
         return this._create200Reader(descriptor, channel);
@@ -269,10 +276,24 @@ export class StorageStreaming {
    * @private
    */
   _create206Reader(descriptor, range, channel) {
-    const headers = buildResponseHeaders(descriptor, range, channel);
     let streamHandle = null;
     let closed = false;
     const { start, end } = range;
+
+    // 计算实际的 end 值（处理 Infinity 情况）
+    let actualEnd = end;
+    if (end === Infinity && descriptor.size !== null && descriptor.size > 0) {
+      actualEnd = descriptor.size - 1;
+    } else if (end === Infinity) {
+      // 文件大小未知且 end 为 Infinity，使用一个足够大的值
+      // 实际会读取到流结束
+      actualEnd = Number.MAX_SAFE_INTEGER;
+    }
+
+    // 创建修正后的 range 对象用于响应头
+    // 确保 Content-Range 和 Content-Length 头包含有效的数字值
+    const correctedRange = { start, end: actualEnd };
+    const headers = buildResponseHeaders(descriptor, correctedRange, channel);
 
     return {
       status: 206,
@@ -290,20 +311,10 @@ export class StorageStreaming {
 
           if (!supportsRange) {
             // 驱动返回了完整流（200），需要在此层进行软件字节切片
-            console.log(`[StorageStreaming] 检测到驱动不支持 Range，使用 ByteSliceStream 切片: ${start}-${end}`);
+            console.log(`[StorageStreaming] 检测到驱动不支持 Range，使用 ByteSliceStream 切片: ${start}-${actualEnd}`);
 
             const originalStream = streamHandle.stream;
             const originalClose = streamHandle.close;
-
-            // 计算实际的 end 值（处理 Infinity 和 unknownSize 情况）
-            let actualEnd = end;
-            if (end === Infinity && descriptor.size !== null && descriptor.size > 0) {
-              actualEnd = descriptor.size - 1;
-            } else if (end === Infinity) {
-              // 文件大小未知且 end 为 Infinity，使用一个足够大的值
-              // 实际会读取到流结束
-              actualEnd = Number.MAX_SAFE_INTEGER;
-            }
 
             // 使用 ByteSliceStream 包装
             const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, actualEnd);
@@ -324,21 +335,13 @@ export class StorageStreaming {
         }
 
         // 驱动不支持 getRange 方法，降级使用 ByteSliceStream
-        console.log(`[StorageStreaming] 驱动不支持 getRange 方法，使用 ByteSliceStream 切片: ${start}-${end}`);
+        console.log(`[StorageStreaming] 驱动不支持 getRange 方法，使用 ByteSliceStream 切片: ${start}-${actualEnd}`);
 
         streamHandle = await descriptor.getStream();
         const originalStream = streamHandle.stream;
         const originalClose = streamHandle.close;
 
-        // 计算实际的 end 值
-        let actualEnd = end;
-        if (end === Infinity && descriptor.size !== null && descriptor.size > 0) {
-          actualEnd = descriptor.size - 1;
-        } else if (end === Infinity) {
-          actualEnd = Number.MAX_SAFE_INTEGER;
-        }
-
-        // 使用 ByteSliceStream 包装完整流
+        // 使用 ByteSliceStream 包装完整流（使用已修正的 actualEnd）
         const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, actualEnd);
 
         return {

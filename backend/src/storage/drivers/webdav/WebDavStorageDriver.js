@@ -15,6 +15,7 @@ import { ApiStatus, FILE_TYPES } from "../../../constants/index.js";
 import { DriverError, NotFoundError, AppError } from "../../../http/errors.js";
 import { decryptValue } from "../../../utils/crypto.js";
 import { getFileTypeName, GetFileType } from "../../../utils/fileTypeDetector.js";
+import { getMimeTypeFromFilename } from "../../../utils/fileUtils.js";
 import { buildFullProxyUrl } from "../../../constants/proxy.js";
 import { createClient } from "webdav";
 import { Buffer } from "buffer";
@@ -81,6 +82,18 @@ export class WebDavStorageDriver extends BaseDriver {
           const type = isDirectory ? FILE_TYPES.FOLDER : await GetFileType(name, db);
           const typeName = isDirectory ? "folder" : await getFileTypeName(name, db);
 
+          // 无 MIME 时根据文件名推断
+          const rawMime = item.mime || null;
+          let mimetype = null;
+          if (isDirectory) {
+            mimetype = "application/x-directory";
+          } else if (rawMime && rawMime !== "httpd/unix-directory") {
+            mimetype = rawMime;
+          } else {
+            // WebDAV 服务器未返回有效 MIME，根据文件名推断
+            mimetype = getMimeTypeFromFilename(name);
+          }
+
           let size = 0;
           let modified = new Date().toISOString();
 
@@ -124,6 +137,7 @@ export class WebDavStorageDriver extends BaseDriver {
             isVirtual: false,
             size,
             modified,
+            mimetype,
             type,
             typeName,
           };
@@ -158,14 +172,23 @@ export class WebDavStorageDriver extends BaseDriver {
       const type = isDirectory ? FILE_TYPES.FOLDER : await GetFileType(name, db);
       const typeName = isDirectory ? "folder" : await getFileTypeName(name, db);
       const rawMime = stat.mime || null;
-      const mime = !isDirectory && rawMime === "httpd/unix-directory" ? null : rawMime;
+      // 处理 WebDAV 常见的错误 MIME 类型，并在无 MIME 时根据文件名推断
+      let effectiveMime = null;
+      if (isDirectory) {
+        effectiveMime = "application/x-directory";
+      } else if (rawMime && rawMime !== "httpd/unix-directory") {
+        effectiveMime = rawMime;
+      } else {
+        // WebDAV 服务器未返回有效 MIME，根据文件名推断
+        effectiveMime = getMimeTypeFromFilename(name);
+      }
       const result = {
         path,
         name,
         isDirectory,
         size: isDirectory ? 0 : stat.size || 0,
         modified: stat.lastmod ? new Date(stat.lastmod).toISOString() : new Date().toISOString(),
-        mimetype: mime || (isDirectory ? "application/x-directory" : undefined),
+        mimetype: effectiveMime,
         etag: stat.etag || undefined,
         mount_id: mount?.id,
         storage_type: mount?.storage_type,
