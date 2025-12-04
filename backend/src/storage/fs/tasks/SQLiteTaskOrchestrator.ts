@@ -266,17 +266,26 @@ export class SQLiteTaskOrchestrator implements TaskOrchestratorAdapter {
 
   /**
    * Worker 循环 (持续运行直到 orchestrator 停止)
+   * 使用指数退避策略优化空闲轮询：初始 500ms，每次空闲翻倍，最大 8 秒
    */
   private async workerLoop(): Promise<void> {
+    const MIN_POLL_INTERVAL = 500;   // 初始轮询间隔 500ms
+    const MAX_POLL_INTERVAL = 8000; // 最大轮询间隔 8 秒
+    let currentInterval = MIN_POLL_INTERVAL;
+
     while (this.running) {
       // 原子获取下一个待执行作业
       const job = this.getNextJob();
 
       if (job) {
+        // 有作业时重置轮询间隔
+        currentInterval = MIN_POLL_INTERVAL;
         await this.processJob(job);
       } else {
-        // 无待处理作业,休眠 1 秒 (避免 CPU 空转)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // 无待处理作业，使用指数退避休眠
+        await new Promise(resolve => setTimeout(resolve, currentInterval));
+        // 指数增长，但不超过最大值
+        currentInterval = Math.min(currentInterval * 2, MAX_POLL_INTERVAL);
       }
     }
   }

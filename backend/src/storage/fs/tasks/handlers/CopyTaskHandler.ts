@@ -14,6 +14,15 @@ import {
 const MAX_PROGRESS_UPDATES_PER_ITEM = 5;
 const DEFAULT_PROGRESS_BYTES_STEP = 5 * 1024 * 1024; // 默认按 5MB 步长上报
 
+// Docker 环境进度节流：按时间间隔限制进度上报频率，减少数据库写入压力
+const DOCKER_PROGRESS_INTERVAL_MS = 500; // Docker 环境最小进度上报间隔 500ms
+
+// 预扫描并发数：
+// - Workers: 6 个并发连接是每次 invocation 独立的配额
+// - Docker: 无硬限制
+const PRESCAN_CONCURRENCY_WORKERS = 6;
+const PRESCAN_CONCURRENCY_DOCKER = 10;
+
 /**
  * 复制任务处理器 - 支持同存储原子复制和跨存储流式复制
  * - 同存储: 驱动层原子复制 (S3 自动使用 CopyObject API)
@@ -74,33 +83,49 @@ export class CopyTaskHandler implements TaskHandler {
       `[CopyTaskHandler] 开始执行作业 ${job.jobId}, 共 ${payload.items.length} 项`
     );
 
-    // 预扫描所有源文件，获取 totalBytes 和每个文件大小
-    let totalBytes = 0;
-    const fileSizes: number[] = [];
+    // 预扫描所有源文件，获取 totalBytes 和每个文件大小（并发执行）
+    const prescanConcurrency = isWorkersEnv
+      ? PRESCAN_CONCURRENCY_WORKERS
+      : PRESCAN_CONCURRENCY_DOCKER;
 
-    for (const item of payload.items) {
-      try {
+    const fileSizes: number[] = new Array(payload.items.length).fill(0);
+
+    // 批量并发预扫描
+    for (let batchStart = 0; batchStart < payload.items.length; batchStart += prescanConcurrency) {
+      const batchEnd = Math.min(batchStart + prescanConcurrency, payload.items.length);
+      const batchPromises: Promise<void>[] = [];
+
+      for (let i = batchStart; i < batchEnd; i++) {
+        const item = payload.items[i];
+
+        // 目录跳过
         if (item.sourcePath.endsWith('/')) {
-          fileSizes.push(0);
           continue;
         }
 
-        const fileInfo = await fileSystem.getFileInfo(
-          item.sourcePath,
-          job.userId,
-          job.userType
-        );
-        const size = fileInfo?.size || 0;
-        totalBytes += size;
-        fileSizes.push(size);
-      } catch (error) {
-        fileSizes.push(0);
-        console.warn(
-          `[CopyTaskHandler] 无法获取文件大小: ${item.sourcePath}`,
-          error
-        );
+        const scanPromise = (async () => {
+          try {
+            const fileInfo = await fileSystem.getFileInfo(
+              item.sourcePath,
+              job.userId,
+              job.userType
+            );
+            fileSizes[i] = fileInfo?.size || 0;
+          } catch (error) {
+            console.warn(
+              `[CopyTaskHandler] 无法获取文件大小: ${item.sourcePath}`,
+              error
+            );
+          }
+        })();
+
+        batchPromises.push(scanPromise);
       }
+
+      await Promise.all(batchPromises);
     }
+
+    const totalBytes = fileSizes.reduce((sum, size) => sum + size, 0);
 
     // 初始化每个文件的状态跟踪数组（包含文件大小）
     const itemResults: ItemResult[] = payload.items.map((item, index) => ({
@@ -131,6 +156,9 @@ export class CopyTaskHandler implements TaskHandler {
       const step = Math.ceil(size / MAX_PROGRESS_UPDATES_PER_ITEM);
       return Math.max(step, DEFAULT_PROGRESS_BYTES_STEP);
     });
+
+    // Docker 环境：基于时间间隔的进度节流，避免高频写入 SQLite
+    let lastDockerProgressTime = 0;
 
     for (let i = 0; i < payload.items.length; i++) {
       const item = payload.items[i];
@@ -197,14 +225,18 @@ export class CopyTaskHandler implements TaskHandler {
                 itemResults[i].bytesTransferred = bytesTransferred;
                 const absoluteBytes = totalBytesTransferred + currentFileBytes;
 
-                // Docker/Node.js 环境：无 Cloudflare 子请求上限，保持细粒度进度反馈
+                // Docker/Node.js 环境：按时间间隔节流
                 if (!isWorkersEnv) {
-                  context
-                    .updateProgress(job.jobId, {
-                      bytesTransferred: absoluteBytes,
-                      itemResults,
-                    })
-                    .catch(() => {});
+                  const now = Date.now();
+                  if (now - lastDockerProgressTime >= DOCKER_PROGRESS_INTERVAL_MS) {
+                    lastDockerProgressTime = now;
+                    context
+                      .updateProgress(job.jobId, {
+                        bytesTransferred: absoluteBytes,
+                        itemResults,
+                      })
+                      .catch(() => {});
+                  }
                   return;
                 }
 

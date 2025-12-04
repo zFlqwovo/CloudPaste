@@ -11,11 +11,12 @@ import { ApiStatus } from "../../constants/index.js";
 /**
  * 解析 HTTP Range 头
  * @param {string | null} rangeHeader - Range 头值（如 "bytes=0-1023"）
- * @param {number | null} fileSize - 文件总大小
- * @returns {{ start: number, end: number, isValid: boolean, isSatisfiable: boolean } | null}
+ * @param {number | null} fileSize - 文件总大小（可为 null，此时无法计算后缀范围和满足性）
+ * @returns {{ start: number, end: number, isValid: boolean, isSatisfiable: boolean, unknownSize?: boolean } | null}
  */
 export function parseRangeHeader(rangeHeader, fileSize) {
-  if (!rangeHeader || fileSize === null || fileSize <= 0) {
+  // 没有 Range 头，返回 null
+  if (!rangeHeader) {
     return null;
   }
 
@@ -27,29 +28,50 @@ export function parseRangeHeader(rangeHeader, fileSize) {
   const [, startStr, endStr] = match;
   let start, end;
 
+  // 文件大小未知的情况（WebDAV HEAD 可能不返回 Content-Length）
+  const sizeUnknown = fileSize === null || fileSize <= 0;
+
   if (startStr === "" && endStr !== "") {
     // 后缀范围：bytes=-500 表示最后 500 字节
+    // 需要知道文件大小才能计算
+    if (sizeUnknown) {
+      // 无法计算后缀范围，但语法有效
+      return { start: 0, end: 0, isValid: true, isSatisfiable: false, unknownSize: true };
+    }
     const suffixLength = parseInt(endStr, 10);
     start = Math.max(0, fileSize - suffixLength);
     end = fileSize - 1;
   } else if (startStr !== "" && endStr === "") {
     // 开放范围：bytes=500- 表示从 500 到末尾
     start = parseInt(startStr, 10);
+    if (sizeUnknown) {
+      // 文件大小未知，无法确定 end，但可以尝试请求
+      // 标记为 unknownSize，让上层决定如何处理
+      return { start, end: Infinity, isValid: true, isSatisfiable: true, unknownSize: true };
+    }
     end = fileSize - 1;
   } else if (startStr !== "" && endStr !== "") {
     // 完整范围：bytes=0-1023
     start = parseInt(startStr, 10);
-    end = Math.min(parseInt(endStr, 10), fileSize - 1);
+    end = parseInt(endStr, 10);
+    if (!sizeUnknown) {
+      end = Math.min(end, fileSize - 1);
+    }
   } else {
     return { start: 0, end: 0, isValid: false, isSatisfiable: false };
   }
 
-  // 检查范围是否可满足
-  if (start > end || start >= fileSize) {
+  // 基本语法检查
+  if (start > end && end !== Infinity) {
+    return { start, end, isValid: true, isSatisfiable: false, unknownSize: sizeUnknown };
+  }
+
+  // 如果知道文件大小，检查范围是否可满足
+  if (!sizeUnknown && start >= fileSize) {
     return { start, end, isValid: true, isSatisfiable: false };
   }
 
-  return { start, end, isValid: true, isSatisfiable: true };
+  return { start, end, isValid: true, isSatisfiable: true, unknownSize: sizeUnknown };
 }
 
 /**

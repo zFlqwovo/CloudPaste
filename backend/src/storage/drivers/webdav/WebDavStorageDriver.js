@@ -279,16 +279,21 @@ export class WebDavStorageDriver extends BaseDriver {
 
       /**
        * 获取指定范围的流（WebDAV 原生支持 Range）
+       *
+       * 重要：部分 WebDAV 服务器不支持 Range 请求，会返回 200 而非 206。
+       * 此方法会检测响应状态码，并通过 `supportsRange` 标记告知上层是否获得了真正的部分内容。
+       * 如果服务器返回 200，上层需要使用 ByteSliceStream 进行软件切片。
+       *
        * @param {{ start: number, end?: number }} range
        * @param {{ signal?: AbortSignal }} [streamOptions]
-       * @returns {Promise<{ stream: ReadableStream, close: () => Promise<void> }>}
+       * @returns {Promise<{ stream: ReadableStream, close: () => Promise<void>, supportsRange: boolean, actualStart?: number, actualEnd?: number }>}
        */
       async getRange(range, streamOptions = {}) {
         const { signal } = streamOptions;
         const { start, end } = range;
 
         // 构建 Range 头
-        const rangeHeader = end !== undefined ? `bytes=${start}-${end}` : `bytes=${start}-`;
+        const rangeHeader = end !== undefined && end !== Infinity ? `bytes=${start}-${end}` : `bytes=${start}-`;
 
         try {
           const resp = await fetch(fileUrl, {
@@ -298,17 +303,47 @@ export class WebDavStorageDriver extends BaseDriver {
             },
             signal,
           });
+
+          // 404 错误
+          if (resp.status === 404) {
+            throw new NotFoundError("文件不存在");
+          }
+
+          // 其他非成功状态码（排除 200 和 206）
           if (!resp.ok && resp.status !== 206) {
-            if (resp.status === 404) {
-              throw new NotFoundError("文件不存在");
-            }
             throw wrapError(new Error(`HTTP ${resp.status}`), "下载失败", resp.status);
           }
 
           const stream = resp.body;
 
+          // 关键检测：服务器是否真正支持 Range 请求
+          // 206 = 支持 Range，返回部分内容
+          // 200 = 不支持 Range 或忽略了 Range 头，返回完整内容
+          const supportsRange = resp.status === 206;
+
+          // 尝试从 Content-Range 头解析实际返回的范围
+          let actualStart = start;
+          let actualEnd = end;
+          const contentRange = resp.headers.get("content-range");
+          if (contentRange && supportsRange) {
+            // Content-Range: bytes 0-1023/146515
+            const rangeMatch = contentRange.match(/bytes\s+(\d+)-(\d+)\/(\d+|\*)/);
+            if (rangeMatch) {
+              actualStart = parseInt(rangeMatch[1], 10);
+              actualEnd = parseInt(rangeMatch[2], 10);
+            }
+          }
+
+          // 如果服务器返回 200，记录警告日志
+          if (!supportsRange) {
+            console.warn(`[WebDAV] 服务器不支持 Range 请求，返回 ${resp.status}，将在上层使用 ByteSliceStream 切片`);
+          }
+
           return {
             stream,
+            supportsRange,
+            actualStart,
+            actualEnd,
             async close() {
               if (stream && typeof stream.cancel === "function") {
                 try {

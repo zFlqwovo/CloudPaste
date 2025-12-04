@@ -14,6 +14,7 @@ import { parseRangeHeader, evaluateConditionalHeaders, buildResponseHeaders, map
 import { STREAMING_CHANNELS } from "./types.js";
 import { NotFoundError, DriverError } from "../../http/errors.js";
 import { ApiStatus } from "../../constants/index.js";
+import { smartWrapStreamWithByteSlice } from "./ByteSliceStream.js";
 
 /**
  * @typedef {import('./types.js').StorageStreamDescriptor} StorageStreamDescriptor
@@ -258,12 +259,20 @@ export class StorageStreaming {
 
   /**
    * 创建 206 Partial Content RangeReader
+   *
+   * 核心逻辑：
+   * 1. 优先使用驱动原生 getRange 方法
+   * 2. 检测驱动是否真正返回了部分内容（supportsRange 标记）
+   * 3. 如果驱动返回完整流（200 而非 206），使用 ByteSliceStream 进行软件切片
+   * 4. 如果驱动不支持 getRange，直接使用 ByteSliceStream 包装完整流
+   *
    * @private
    */
   _create206Reader(descriptor, range, channel) {
     const headers = buildResponseHeaders(descriptor, range, channel);
     let streamHandle = null;
     let closed = false;
+    const { start, end } = range;
 
     return {
       status: 206,
@@ -274,14 +283,72 @@ export class StorageStreaming {
         // 优先使用驱动原生 Range 支持
         if (typeof descriptor.getRange === "function") {
           streamHandle = await descriptor.getRange(range);
-        } else {
-          // 降级：读取完整流并跳过/限制字节
-          // 注意：这对大文件效率较低，但保证兼容性
-          streamHandle = await descriptor.getStream();
-          // TODO: 实现流的 skip/limit 包装
-          console.warn("[StorageStreaming] 驱动不支持原生 Range，使用完整流");
+
+          // 关键检测：驱动是否真正支持 Range 请求
+          // 部分 WebDAV 服务器会忽略 Range 头，返回完整内容
+          const supportsRange = streamHandle.supportsRange !== false;
+
+          if (!supportsRange) {
+            // 驱动返回了完整流（200），需要在此层进行软件字节切片
+            console.log(`[StorageStreaming] 检测到驱动不支持 Range，使用 ByteSliceStream 切片: ${start}-${end}`);
+
+            const originalStream = streamHandle.stream;
+            const originalClose = streamHandle.close;
+
+            // 计算实际的 end 值（处理 Infinity 和 unknownSize 情况）
+            let actualEnd = end;
+            if (end === Infinity && descriptor.size !== null && descriptor.size > 0) {
+              actualEnd = descriptor.size - 1;
+            } else if (end === Infinity) {
+              // 文件大小未知且 end 为 Infinity，使用一个足够大的值
+              // 实际会读取到流结束
+              actualEnd = Number.MAX_SAFE_INTEGER;
+            }
+
+            // 使用 ByteSliceStream 包装
+            const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, actualEnd);
+
+            return {
+              stream: slicedStream,
+              async close() {
+                // 关闭原始流
+                if (originalClose) {
+                  await originalClose();
+                }
+              },
+            };
+          }
+
+          // 驱动原生支持 Range，直接返回
+          return streamHandle;
         }
-        return streamHandle;
+
+        // 驱动不支持 getRange 方法，降级使用 ByteSliceStream
+        console.log(`[StorageStreaming] 驱动不支持 getRange 方法，使用 ByteSliceStream 切片: ${start}-${end}`);
+
+        streamHandle = await descriptor.getStream();
+        const originalStream = streamHandle.stream;
+        const originalClose = streamHandle.close;
+
+        // 计算实际的 end 值
+        let actualEnd = end;
+        if (end === Infinity && descriptor.size !== null && descriptor.size > 0) {
+          actualEnd = descriptor.size - 1;
+        } else if (end === Infinity) {
+          actualEnd = Number.MAX_SAFE_INTEGER;
+        }
+
+        // 使用 ByteSliceStream 包装完整流
+        const slicedStream = smartWrapStreamWithByteSlice(originalStream, start, actualEnd);
+
+        return {
+          stream: slicedStream,
+          async close() {
+            if (originalClose) {
+              await originalClose();
+            }
+          },
+        };
       },
       async close() {
         if (closed) return;
