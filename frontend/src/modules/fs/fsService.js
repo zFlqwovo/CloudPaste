@@ -128,13 +128,16 @@ export function useFsService() {
    * @returns {Promise<{ success: true; raw: any }>}
    */
   const batchDeleteItems = async (paths) => {
-    const result = await api.fs.batchDeleteItems(paths);
-    if (result.failed && result.failed.length > 0) {
-      throw new Error(result.failed[0].error || "批量删除失败");
+    const response = await api.fs.batchDeleteItems(paths);
+    const payload = response && typeof response === "object" && "data" in response ? response.data : response;
+
+    if (payload && Array.isArray(payload.failed) && payload.failed.length > 0) {
+      throw new Error(payload.failed[0].error || "批量删除失败");
     }
+
     return {
       success: true,
-      raw: result,
+      raw: payload,
     };
   };
 

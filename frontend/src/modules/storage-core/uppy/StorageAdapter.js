@@ -588,24 +588,31 @@ export class StorageAdapter {
         throw new Error(response.message || "获取预签名URL失败");
       }
 
+      const data = response.data || {};
+
       // 缓存上传信息，供commit使用
       this.uploadSessions.set(file.id, {
-        targetPath: response.data.targetPath,
-        mountId: response.data.mountId,
-        fileId: response.data.fileId,
-        storagePath: response.data.storagePath,
-        publicUrl: response.data.publicUrl,
-        storageConfigId: response.data.storageConfigId,
-        contentType: response.data.contentType,
+        targetPath: data.targetPath,
+        mountId: data.mountId,
+        fileId: data.fileId,
+        storagePath: data.storagePath,
+        publicUrl: data.publicUrl,
+        storageConfigId: data.storageConfigId,
+        contentType: data.contentType,
+        storageType: data.storageType || data.storage_type || null,
       });
+
+      const baseHeaders = data.headers || {};
+      const headers = {
+        "Content-Type": baseHeaders["Content-Type"] || file.type || "application/octet-stream",
+        ...baseHeaders,
+      };
 
       return {
         method: "PUT",
-        url: response.data.presignedUrl,
+        url: data.presignedUrl,
         fields: {},
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
+        headers,
       };
     } catch (error) {
       console.error("[StorageAdapter] 获取预签名URL上传参数失败:", error);
@@ -1012,6 +1019,17 @@ export class StorageAdapter {
           const target = ev.target;
 
           if (target.status < 200 || target.status >= 300) {
+            // 记录底层返回的详细错误信息，便于调试 OneDrive 等后端预签名直传问题
+            try {
+              console.error(
+                "[StorageAdapter] uploadSingleFile HTTP error",
+                {
+                  status: target.status,
+                  statusText: target.statusText,
+                  responseText: target.responseText,
+                },
+              );
+            } catch {}
             const error = new Error(`HTTP ${target.status}: ${target.statusText}`);
             error.source = target;
             reject(error);

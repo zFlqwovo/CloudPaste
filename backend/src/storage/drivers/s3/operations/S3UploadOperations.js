@@ -59,7 +59,7 @@ export class S3UploadOperations {
         const { Upload } = await import("@aws-sdk/lib-storage");
         const uploadConfig = getEnvironmentOptimizedUploadConfig();
         console.log(
-          `S3 流式分片 - 环境: ${uploadConfig.environment}, 分片: ${uploadConfig.partSize / 1024 / 1024}MB, 并发: ${uploadConfig.queueSize}`
+          `[StorageUpload] type=S3 mode=流式分片 status=开始 路径=${finalS3Path}`
         );
 
         /** @type {any} */
@@ -103,7 +103,9 @@ export class S3UploadOperations {
             const progressMB = (loaded / (1024 * 1024)).toFixed(2);
             const totalMB = total > 0 ? (total / (1024 * 1024)).toFixed(2) : "未知";
             const percentage = total > 0 ? ((loaded / total) * 100).toFixed(1) : "未知";
-            console.log(`S3 流式上传 进度: ${progressMB}MB / ${totalMB}MB (${percentage}%) -> ${finalS3Path}`);
+            console.log(
+              `[StorageUpload] type=S3 mode=流式分片 status=进度 已传=${progressMB}MB 总=${totalMB}MB 进度=${percentage}% 路径=${finalS3Path}`
+            );
             lastProgressLog = loaded;
           }
 
@@ -123,7 +125,9 @@ export class S3UploadOperations {
         const duration = Date.now() - startTime;
         const speedMBps = contentLength > 0 ? (contentLength / 1024 / 1024 / (duration / 1000)).toFixed(2) : "未知";
 
-        console.log(`S3 StreamUpload 完成，用时: ${duration}ms，平均速度: ${speedMBps}MB/s -> ${finalS3Path}`);
+        console.log(
+          `[StorageUpload] type=S3 mode=流式分片 status=完成 用时=${duration}ms 速度=${speedMBps}MB/s 路径=${finalS3Path}`
+        );
         etag = result.ETag ? result.ETag.replace(/"/g, "") : undefined;
 
         await updateParentDirectoriesModifiedTime(this.s3Client, this.config.bucket_name, finalS3Path);
@@ -133,7 +137,9 @@ export class S3UploadOperations {
 
         const s3Url = buildS3Url(this.config, finalS3Path);
 
-        console.log(`S3 流式直传成功[StreamUpload]: ${finalS3Path}`);
+        console.log(
+          `[StorageUpload] type=S3 mode=流式分片 status=成功 路径=${finalS3Path}`
+        );
         return {
           success: true,
           message: "S3_STREAM_UPLOAD",
@@ -219,7 +225,9 @@ export class S3UploadOperations {
 
         const s3Url = buildS3Url(this.config, finalS3Path);
 
-        console.log(`S3 表单上传成功: ${finalS3Path}`);
+        console.log(
+          `[StorageUpload] type=S3 mode=表单上传 status=成功 路径=${finalS3Path} 大小=${size}`
+        );
         return {
           success: true,
           message: "S3_FORM_UPLOAD",

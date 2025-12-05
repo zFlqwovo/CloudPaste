@@ -19,7 +19,8 @@ export function useStorageConfigManagement(options = {}) {
   // 继承基础功能，使用独立的页面标识符
   const base = useAdminBase("storage");
   const storageConfigsStore = useStorageConfigsStore();
-  const { getStorageConfigs, deleteStorageConfig, setDefaultStorageConfig, testStorageConfig } = useAdminStorageConfigService();
+  const { getStorageConfigs, getStorageConfigReveal, deleteStorageConfig, setDefaultStorageConfig, testStorageConfig } =
+    useAdminStorageConfigService();
 
   const STORAGE_TYPE_UNKNOWN = "__UNSPECIFIED__";
 
@@ -188,12 +189,35 @@ export function useStorageConfigManagement(options = {}) {
   };
 
   /**
-   * 编辑配置
+   * 编辑配置（使用 masked 模式加载密钥字段）
    */
-  const editConfig = (config) => {
-    currentConfig.value = { ...config };
-    showEditForm.value = true;
-    showAddForm.value = false;
+  const editConfig = async (config) => {
+    try {
+      // 使用 masked 模式重新加载配置，显示掩码占位符
+      const maskedConfig = await getStorageConfigReveal(config.id, "masked");
+      const finalConfig = maskedConfig?.data || maskedConfig || { ...config };
+      
+      // 调试日志：查看掩码字段
+      console.log("编辑配置 - 掩码数据:", {
+        id: finalConfig.id,
+        storage_type: finalConfig.storage_type,
+        access_key_id: finalConfig.access_key_id,
+        secret_access_key: finalConfig.secret_access_key,
+        password: finalConfig.password,
+        client_secret: finalConfig.client_secret,
+        refresh_token: finalConfig.refresh_token,
+      });
+      
+      currentConfig.value = finalConfig;
+      showEditForm.value = true;
+      showAddForm.value = false;
+    } catch (err) {
+      console.error("加载配置失败:", err);
+      // 降级：使用原始配置
+      currentConfig.value = { ...config };
+      showEditForm.value = true;
+      showAddForm.value = false;
+    }
   };
 
   /**
@@ -260,17 +284,38 @@ export function useStorageConfigManagement(options = {}) {
       this.result = inner || {};
 
       // 识别存储类型：
+      // - OneDrive：result.info 中包含 driveName/driveType 等 OneDrive 特有字段，且不存在 cors/frontendSim
       // - LOCAL：有 pathExists/readPermission/writePermission 字段（本地存储特有）
       // - WebDAV：有 info 字段但没有 cors/frontendSim
       // - S3：有 cors 或 frontendSim 字段
+      this.isOneDrive = !!(
+        this.result.info &&
+        (this.result.info.driveName || this.result.info.driveType || this.result.info.region) &&
+        !this.result.cors &&
+        !this.result.frontendSim
+      );
       this.isLocal = !!(this.result.pathExists || this.result.readPermission || this.result.writePermission);
-      this.isWebDAV = !this.isLocal && !!(this.result.info && !this.result.cors && !this.result.frontendSim);
+      this.isWebDAV = !this.isOneDrive && !this.isLocal && !!(this.result.info && !this.result.cors && !this.result.frontendSim);
     }
 
     /**
      * 计算测试状态
      */
     calculateStatus() {
+      // OneDrive：只检查读写权限
+      if (this.isOneDrive) {
+        const basicConnectSuccess = this.result.read?.success === true;
+        const writeSuccess = this.result.write?.success === true;
+        const isFullSuccess = basicConnectSuccess && writeSuccess;
+        const isPartialSuccess = basicConnectSuccess && !writeSuccess;
+        const isSuccess = basicConnectSuccess;
+        return {
+          isFullSuccess,
+          isPartialSuccess,
+          isSuccess,
+        };
+      }
+
       // LOCAL：基于 pathExists / isDirectory / readPermission / writePermission 计算
       if (this.isLocal) {
         const pathOk = this.result.pathExists?.success === true;
@@ -343,6 +388,41 @@ export function useStorageConfigManagement(options = {}) {
      */
     generateDetailsMessage() {
       const details = [];
+
+      // OneDrive 测试详情
+      if (this.isOneDrive) {
+        // 读权限
+        if (this.result.read?.success) {
+          details.push("✓ 读权限正常");
+        } else {
+          details.push("✗ 读权限失败");
+          if (this.result.read?.error) {
+            details.push(`  ${this.result.read.error.split("\n")[0]}`);
+          }
+        }
+
+        // 写权限
+        if (this.result.write?.success) {
+          details.push("✓ 写权限正常");
+        } else {
+          details.push("✗ 写权限失败");
+          if (this.result.write?.error) {
+            details.push(`  ${this.result.write.error.split("\n")[0]}`);
+          }
+        }
+
+        const d = this.result.info || {};
+        if (d.defaultFolder) {
+          details.push(`✓ 默认上传目录: ${d.defaultFolder}`);
+        }
+        if (d.driveName) {
+          details.push(`✓ 驱动器: ${d.driveName}`);
+        }
+        if (d.responseTime) {
+          details.push(`✓ 响应时间: ${d.responseTime}`);
+        }
+        return details.join("\n");
+      }
 
       // LOCAL 测试详情
       if (this.isLocal) {
