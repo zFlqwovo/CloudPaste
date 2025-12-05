@@ -276,8 +276,8 @@ onMounted(async () => {
       <!-- 存储配置列表 -->
       <template v-else-if="hasAnyConfig">
         <!-- 有筛选结果时显示配置列表 -->
-        <div v-if="hasFilteredResult" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-3">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+        <div v-if="hasFilteredResult" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-0 sm:p-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4">
             <div
               v-for="config in filteredConfigs"
               :key="config.id"
@@ -287,9 +287,9 @@ onMounted(async () => {
                 config.is_default ? (darkMode ? 'ring-3 ring-primary-500 border-primary-500 shadow-lg' : 'ring-3 ring-primary-500 border-primary-500 shadow-lg') : '',
               ]"
             >
-              <div class="px-4 py-3 flex justify-between items-center border-b" :class="darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'">
-                <div class="flex items-center">
-                  <svg class="h-5 w-5 mr-2 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="px-2 py-2 sm:px-3 sm:py-2.5 flex flex-wrap justify-between items-center gap-2 border-b" :class="darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'">
+                <div class="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
+                  <svg class="h-4 w-4 sm:h-5 sm:w-5 text-primary-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getProviderIcon(config.provider_type)" />
                   </svg>
                   <h3 class="font-medium text-sm" :class="[darkMode ? 'text-gray-100' : 'text-gray-900', config.is_default ? 'font-semibold' : '']">
@@ -297,23 +297,34 @@ onMounted(async () => {
                   </h3>
                   <span
                     v-if="config.is_default"
-                    class="ml-2 text-xs px-2 py-0.5 rounded-full font-medium"
+                    class="text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium flex-shrink-0"
                     :class="darkMode ? 'bg-primary-600 text-white' : 'bg-primary-500 text-white'"
                   >
                     默认
                   </span>
+                  <span
+                    v-if="config.url_proxy"
+                    class="text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium flex items-center gap-0.5 sm:gap-1 flex-shrink-0"
+                    :class="darkMode ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30' : 'bg-blue-100 text-blue-700 border border-blue-200'"
+                    :title="`代理URL: ${config.url_proxy}`"
+                  >
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span class="hidden sm:inline">代理</span>
+                  </span>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span v-if="config.storage_type === 'S3'" class="text-xs px-2 py-1 rounded-full font-medium" :class="darkMode ? 'bg-primary-900/40 text-primary-200' : 'bg-primary-100 text-primary-800'">
+                <div class="flex items-center gap-1 sm:gap-2 flex-wrap flex-shrink-0">
+                  <span v-if="config.storage_type === 'S3'" class="text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium whitespace-nowrap" :class="darkMode ? 'bg-primary-900/40 text-primary-200' : 'bg-primary-100 text-primary-800'">
                     {{ config.provider_type || '未指定' }}
                   </span>
-                  <span class="text-xs px-2 py-1 rounded-full font-medium" :class="darkMode ? 'bg-gray-800 text-gray-200 border border-gray-600' : 'bg-gray-100 text-gray-700 border border-gray-200'">
+                  <span class="text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium whitespace-nowrap" :class="darkMode ? 'bg-gray-800 text-gray-200 border border-gray-600' : 'bg-gray-100 text-gray-700 border border-gray-200'">
                     {{ formatStorageTypeLabel(config.storage_type) }}
                   </span>
                 </div>
               </div>
 
-              <div class="p-4">
+              <div class="p-3 sm:p-4">
                 <div :class="darkMode ? 'text-gray-300' : 'text-gray-600'">
                   <!-- 类型特定字段：使用策略生成摘要 -->
                   <div v-if="getConfigSummaryRows(config).length" class="grid grid-cols-1 gap-2 text-sm">
