@@ -369,8 +369,14 @@ export async function fetchApi(endpoint, options = {}) {
   } catch (error) {
     // 处理不同类型的错误
     if (error.name === "AbortError") {
-      console.warn(`⏹️ API请求被取消(${url}):`, error.message);
-      throw new Error("请求被取消或超时");
+      // 请求被主动取消时，静默处理，不抛出错误
+      console.log(`⏹️ API请求被取消(${url})`);
+      // 创建一个特殊的 AbortError 对象，让调用方可以识别
+      const abortError = new Error("请求已取消");
+      abortError.name = "AbortError";
+      abortError.__aborted = true;
+      abortError.__logged = true;
+      throw abortError;
     } else if (error.name === "TimeoutError") {
       console.error(`⏰ API请求超时(${url}):`, error.message);
       throw new Error("请求超时，服务器响应时间过长");

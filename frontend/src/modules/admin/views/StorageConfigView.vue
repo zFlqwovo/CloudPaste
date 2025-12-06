@@ -277,8 +277,8 @@ onMounted(async () => {
             >
               <div class="px-2 py-2 sm:px-3 sm:py-2.5 flex flex-wrap justify-between items-center gap-2 border-b" :class="darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'">
                 <div class="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
-                  <svg class="h-4 w-4 sm:h-5 sm:w-5 text-primary-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getProviderIcon(config.provider_type)" />
+                  <svg class="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" :class="getProviderIcon(config.storage_type, config.provider_type).color" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getProviderIcon(config.storage_type, config.provider_type).path" />
                   </svg>
                   <h3 class="font-medium text-sm" :class="[darkMode ? 'text-gray-100' : 'text-gray-900', config.is_default ? 'font-semibold' : '']">
                     {{ config.name }}
