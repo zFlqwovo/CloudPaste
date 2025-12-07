@@ -247,6 +247,37 @@ export class OneDriveGraphClient {
     };
   }
 
+  /**
+   * 获取上传会话信息（用于断点续传场景）
+   * - 基于 uploadSession 返回的 uploadUrl 直接请求
+   * - 返回 expirationDateTime 与 nextExpectedRanges
+   * @param {string} uploadUrl 上传会话返回的 uploadUrl
+   * @returns {Promise<{ expirationDateTime: string|null, nextExpectedRanges: string[]|null, raw: any }>}
+   */
+  async getUploadSessionInfo(uploadUrl) {
+    if (!uploadUrl) {
+      throw new DriverError("OneDrive getUploadSessionInfo 需要有效的 uploadUrl", {
+        status: 400,
+      });
+    }
+
+    const response = await fetch(uploadUrl, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      await this._handleErrorResponse(response, uploadUrl);
+    }
+
+    const json = await response.json();
+
+    return {
+      expirationDateTime: json.expirationDateTime || null,
+      nextExpectedRanges: json.nextExpectedRanges || null,
+      raw: json,
+    };
+  }
+
   // ========== 目录创建 ==========
 
   /**

@@ -25,17 +25,6 @@ const OAUTH_ENDPOINTS = {
   de: "https://login.microsoftonline.de/common/oauth2/v2.0/token",
 };
 
-/**
- * 区域到 Graph API scope 的映射
- * - 仅供 OneDriveAuthManager 内部使用
- */
-const GRAPH_SCOPES = {
-  global: "https://graph.microsoft.com/.default offline_access",
-  cn: "https://microsoftgraph.chinacloudapi.cn/.default offline_access",
-  us: "https://graph.microsoft.us/.default offline_access",
-  de: "https://graph.microsoft.de/.default offline_access",
-};
-
 export class OneDriveAuthManager {
   /**
    * @param {Object} config 认证配置
@@ -62,14 +51,17 @@ export class OneDriveAuthManager {
 
     // 验证必填配置：
     // - 至少需要 refreshToken
-    // - 当未配置 tokenRenewEndpoint 时，必须提供 clientId 以便直接调用微软 OAuth 端点
+    // - 当未配置 tokenRenewEndpoint 时，必须提供 clientId 和 clientSecret 以便直接调用微软 OAuth 端点
     if (!this.refreshToken && !this.tokenRenewEndpoint) {
       throw new DriverError("OneDrive 认证配置缺少 refreshToken 或 tokenRenewEndpoint", { status: 400 });
     }
-    if (!this.tokenRenewEndpoint && !this.clientId) {
-      throw new DriverError("OneDrive 认证配置缺少 clientId（未配置 tokenRenewEndpoint 时必填）", {
-        status: 400,
-      });
+    if (!this.tokenRenewEndpoint && (!this.clientId || !this.clientSecret)) {
+      throw new DriverError(
+        "OneDrive 认证配置缺少 clientId 或 clientSecret（未配置 tokenRenewEndpoint 时必填）",
+        {
+          status: 400,
+        },
+      );
     }
   }
 
@@ -101,8 +93,11 @@ export class OneDriveAuthManager {
     try {
       let tokenResponse;
 
-      if (this.tokenRenewEndpoint) {
-        // 使用外部 token 续期端点
+      // 分支策略：
+      // - 当显式启用 useOnlineApi 且配置了 tokenRenewEndpoint 时，走外部 Online API 续期端点（与 OpenList 行为保持一致）
+      // - 其他情况一律走微软官方 OAuth 端点（即便仍然配置了 tokenRenewEndpoint，也不使用）
+      if (this.useOnlineApi && this.tokenRenewEndpoint) {
+        // 使用外部 token 续期端点（Online API 协议）
         tokenResponse = await this._fetchFromCustomEndpoint();
       } else {
         // 使用微软 OAuth 端点
@@ -138,14 +133,12 @@ export class OneDriveAuthManager {
    */
   async _fetchFromMicrosoftEndpoint() {
     const tokenUrl = OAUTH_ENDPOINTS[this.region] || OAUTH_ENDPOINTS.global;
-    const scope = GRAPH_SCOPES[this.region] || GRAPH_SCOPES.global;
 
     const body = new URLSearchParams({
+      grant_type: "refresh_token",
       client_id: this.clientId,
       client_secret: this.clientSecret || "",
       refresh_token: this.refreshToken,
-      grant_type: "refresh_token",
-      scope: scope,
     });
 
     if (this.redirectUri) {

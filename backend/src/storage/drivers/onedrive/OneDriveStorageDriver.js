@@ -28,6 +28,12 @@ import { buildFullProxyUrl } from "../../../constants/proxy.js";
 import { getMimeTypeFromFilename } from "../../../utils/fileUtils.js";
 import { FILE_TYPES, FILE_TYPE_NAMES } from "../../../constants/index.js";
 import { GetFileType } from "../../../utils/fileTypeDetector.js";
+import {
+  createUploadSessionRecord,
+  listActiveUploadSessions,
+  updateUploadSessionStatusByFingerprint,
+  findUploadSessionByUploadUrl,
+} from "../../../utils/uploadSessions.js";
 
 // 简单上传（Simple Upload）上限：4MB
 const SIMPLE_UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
@@ -42,8 +48,7 @@ export class OneDriveStorageDriver extends BaseDriver {
     this.type = "ONEDRIVE";
     this.encryptionSecret = encryptionSecret;
 
-    // 能力：READER/WRITER/ATOMIC/PROXY/SEARCH/DIRECT_LINK
-    // MULTIPART 作为可选扩展，在后续版本中实现
+    // 能力：READER/WRITER/ATOMIC/PROXY/SEARCH/DIRECT_LINK/MULTIPART
     this.capabilities = [
       CAPABILITIES.READER,
       CAPABILITIES.WRITER,
@@ -51,6 +56,7 @@ export class OneDriveStorageDriver extends BaseDriver {
       CAPABILITIES.PROXY,
       CAPABILITIES.SEARCH,
       CAPABILITIES.DIRECT_LINK,
+      CAPABILITIES.MULTIPART,
     ];
 
     // 配置字段
@@ -94,7 +100,8 @@ export class OneDriveStorageDriver extends BaseDriver {
     try {
       await this.authManager.getAccessToken();
     } catch (error) {
-      throw new DriverError("OneDrive 驱动初始化失败：无法获取访问令牌", {
+      const reason = error?.message || "未知错误";
+      throw new DriverError(`OneDrive 驱动初始化失败：无法获取访问令牌（${reason}）`, {
         status: 500,
         cause: error,
         details: { region: this.region },
@@ -801,6 +808,618 @@ export class OneDriveStorageDriver extends BaseDriver {
       url,
       type: "proxy",
       channel,
+    };
+  }
+
+  // ========== MULTIPART 能力：前端分片上传（单会话 uploadUrl + Content-Range） ==========
+
+  /**
+   * 初始化前端分片上传（基于 OneDrive Upload Session）
+   * - 策略：single_session
+   * - 由前端负责将文件切分为多个 chunk，并对同一个 uploadUrl 连续发送带 Content-Range 的 PUT 请求
+   *
+   * @param {string} subPath 挂载视图下的子路径（目录或完整相对路径）
+   * @param {Object} options 选项参数
+   * @returns {Promise<Object>} 初始化结果（InitResult）
+   */
+  async initializeFrontendMultipartUpload(subPath, options = {}) {
+    this._ensureInitialized();
+
+    const {
+      fileName,
+      fileSize,
+      partSize = 5 * 1024 * 1024,
+      partCount,
+      mount,
+      db,
+      userIdOrInfo,
+      userType,
+    } = options;
+
+    if (!fileName || typeof fileSize !== "number" || !Number.isFinite(fileSize) || fileSize <= 0) {
+      throw new DriverError("OneDrive 分片上传初始化失败：缺少有效的 fileName 或 fileSize", {
+        status: 400,
+      });
+    }
+
+    // 规范化远端文件路径：目录(subPath) + 文件名
+    const base =
+      typeof subPath === "string"
+        ? subPath.replace(/^[/\\]+|[/\\]+$/g, "").replace(/[\\/]+/g, "/")
+        : "";
+
+    let remotePath;
+    if (!base) {
+      remotePath = fileName;
+    } else {
+      const segments = base.split("/").filter(Boolean);
+      const lastSegment = segments[segments.length - 1] || "";
+      if (lastSegment.toLowerCase() === fileName.toLowerCase()) {
+        remotePath = base;
+      } else {
+        remotePath = `${base}/${fileName}`;
+      }
+    }
+
+    try {
+      const session = await this.graphClient.createUploadSession(remotePath || "", {
+        conflictBehavior: "replace",
+      });
+
+      const effectivePartSize = partSize || 5 * 1024 * 1024;
+      const calculatedPartCount =
+        partCount || Math.max(1, Math.ceil(fileSize / effectivePartSize));
+
+      // 这里不维护服务器端的 uploadId 状态，直接使用 uploadUrl 作为前端会话标识
+      const uploadId = session.uploadUrl;
+
+      // 规范化 FS 视图路径：mount_path + "/" + remotePath
+      let fsPath = remotePath || "";
+      if (mount?.mount_path) {
+        const basePath = (mount.mount_path || "").replace(/\/+$/g, "") || "/";
+        const rel = (remotePath || "").replace(/^\/+/g, "");
+        fsPath = rel ? `${basePath}/${rel}` : basePath;
+      }
+      if (!fsPath.startsWith("/")) {
+        fsPath = `/${fsPath}`;
+      }
+
+      // 将会话写入通用 upload_sessions 表，便于后续服务器端断点续传/可视化管理
+      if (db && mount?.storage_config_id) {
+        try {
+          await createUploadSessionRecord(db, {
+            userIdOrInfo,
+            userType: userType || null,
+            storageType: this.type,
+            storageConfigId: mount.storage_config_id,
+            mountId: mount.id ?? null,
+            fsPath,
+            source: "FS",
+            fileName,
+            fileSize,
+            mimeType: getMimeTypeFromFilename(fileName) || null,
+            checksum: null,
+            strategy: "single_session",
+            partSize: effectivePartSize,
+            totalParts: calculatedPartCount,
+            bytesUploaded: 0,
+            uploadedParts: 0,
+            nextExpectedRange:
+              Array.isArray(session.nextExpectedRanges) && session.nextExpectedRanges.length > 0
+                ? session.nextExpectedRanges[0]
+                : "0-",
+            providerUploadId: null,
+            providerUploadUrl: session.uploadUrl,
+            providerMeta: null,
+            status: "active",
+            expiresAt: session.expirationDateTime || null,
+          });
+        } catch (e) {
+          console.warn(
+            "[OneDriveStorageDriver] 创建 upload_sessions 记录失败，将不影响分片上传流程:",
+            e,
+          );
+        }
+      }
+
+      return {
+        uploadId,
+        strategy: "single_session",
+        fileName,
+        fileSize,
+        partSize: effectivePartSize,
+        partCount: calculatedPartCount,
+        session: {
+          uploadUrl: session.uploadUrl,
+          expirationDateTime: session.expirationDateTime || null,
+          nextExpectedRanges: session.nextExpectedRanges || null,
+        },
+        mount_id: mount?.id ?? null,
+        path: fsPath,
+        storage_type: this.type,
+        userType: userType || null,
+        userIdOrInfo: userIdOrInfo || null,
+      };
+    } catch (error) {
+      throw new DriverError(`初始化 OneDrive 分片上传失败: ${error.message}`, {
+        status: error.status || 500,
+        cause: error,
+        details: { subPath, fileName },
+      });
+    }
+  }
+
+  /**
+   * 完成前端分片上传
+   * - 对 OneDrive 而言，最后一个 chunk PUT 成功即视为完成
+   * - 这里主要用于对齐 FS 层行为并返回统一结果结构
+   *
+   * @param {string} subPath 挂载视图下的子路径
+   * @param {Object} options 选项参数
+   * @returns {Promise<Object>} 完成结果（CompleteResult）
+   */
+  async completeFrontendMultipartUpload(subPath, options = {}) {
+    this._ensureInitialized();
+
+    const { uploadId, fileName, fileSize, mount, db, userIdOrInfo, userType, parts } = options;
+
+    // 规范化远端路径（与 initialize 保持一致）
+    const base =
+      typeof subPath === "string"
+        ? subPath.replace(/^[/\\]+|[/\\]+$/g, "").replace(/[\\/]+/g, "/")
+        : "";
+
+    let remotePath;
+    if (fileName) {
+      if (!base) {
+        remotePath = fileName;
+      } else {
+        const segments = base.split("/").filter(Boolean);
+        const lastSegment = segments[segments.length - 1] || "";
+        remotePath =
+          lastSegment.toLowerCase() === fileName.toLowerCase() ? base : `${base}/${fileName}`;
+      }
+    } else {
+      remotePath = base;
+    }
+
+    try {
+      // 尝试获取最终文件信息（非严格必要，仅用于返回更完整的元数据）
+      let item = null;
+      try {
+        item = await this.graphClient.getItem(remotePath || "");
+      } catch {
+        // 如果获取失败，不影响整体完成逻辑
+      }
+
+      const contentType =
+        item?.file?.mimeType || (fileName ? getMimeTypeFromFilename(fileName) : null);
+
+      if (db && mount?.storage_config_id && uploadId) {
+        try {
+          // 与初始化阶段保持一致的 FS 视图路径（mount_path + remotePath）
+          let fsPath = remotePath || "";
+          if (mount?.mount_path) {
+            const basePath = (mount.mount_path || "").replace(/\/+$/g, "") || "/";
+            const rel = (remotePath || "").replace(/^\/+/g, "");
+            fsPath = rel ? `${basePath}/${rel}` : basePath;
+          }
+          if (!fsPath.startsWith("/")) {
+            fsPath = `/${fsPath}`;
+          }
+
+          const effectiveSize =
+            typeof fileSize === "number" && Number.isFinite(fileSize)
+              ? fileSize
+              : item?.size ?? null;
+
+          await updateUploadSessionStatusByFingerprint(db, {
+            userIdOrInfo,
+            userType,
+            storageType: this.type,
+            storageConfigId: mount.storage_config_id,
+            mountId: mount.id ?? null,
+            fsPath,
+            fileName: fileName || (remotePath ? remotePath.split("/").pop() : null),
+            fileSize: effectiveSize,
+            status: "completed",
+            bytesUploaded: effectiveSize,
+            uploadedParts: Array.isArray(parts) ? parts.length : null,
+            nextExpectedRange: null,
+            errorCode: null,
+            errorMessage: null,
+          });
+        } catch (e) {
+          console.warn(
+            "[OneDriveStorageDriver] 更新 upload_sessions 状态为 completed 失败:",
+            e,
+          );
+        }
+      }
+
+      return {
+        success: true,
+        fileName: fileName || (remotePath ? remotePath.split("/").pop() : null),
+        size: typeof fileSize === "number" ? fileSize : item?.size ?? null,
+        contentType: contentType || null,
+        storagePath: remotePath || "",
+        publicUrl: null,
+        etag: item?.eTag || null,
+        uploadId: uploadId || null,
+        message: "OneDrive 分片上传完成",
+      };
+    } catch (error) {
+      throw new DriverError(`完成 OneDrive 分片上传失败: ${error.message}`, {
+        status: error.status || 500,
+        cause: error,
+        details: { subPath, uploadId, fileName },
+      });
+    }
+  }
+
+  /**
+   * 中止前端分片上传
+   * - 当前实现不主动调用 Graph 的会话中止接口，依赖 OneDrive 上传会话的过期机制
+   * - 若后续需要严格释放资源，可在此处补充调用
+   */
+  async abortFrontendMultipartUpload(_subPath, options = {}) {
+    this._ensureInitialized();
+
+    const { uploadId, db, userIdOrInfo, userType, mount } = options;
+
+    if (db && mount?.storage_config_id && uploadId) {
+      try {
+        // 通过 uploadUrl 查找会话记录，再按指纹统一更新状态
+        const sessionRow = await findUploadSessionByUploadUrl(db, {
+          uploadUrl: uploadId,
+          storageType: this.type,
+          userIdOrInfo,
+          userType,
+        });
+
+        if (sessionRow) {
+          await updateUploadSessionStatusByFingerprint(db, {
+            userIdOrInfo,
+            userType,
+            storageType: this.type,
+            storageConfigId: sessionRow.storage_config_id,
+            mountId: sessionRow.mount_id ?? mount.id ?? null,
+            fsPath: sessionRow.fs_path,
+            fileName: sessionRow.file_name,
+            fileSize: sessionRow.file_size,
+            status: "aborted",
+            errorCode: null,
+            errorMessage: "aborted_by_client",
+          });
+        } else {
+          console.warn(
+            "[OneDriveStorageDriver] 未找到对应的 upload_sessions 记录（abort），uploadUrl:",
+            uploadId,
+          );
+        }
+      } catch (e) {
+        console.warn(
+          "[OneDriveStorageDriver] 更新 upload_sessions 状态为 aborted 失败:",
+          e,
+        );
+      }
+    }
+
+    // 目前仅返回成功标记，表示后续不再使用该 uploadId
+    return {
+      success: true,
+      uploadId: uploadId || null,
+      message: "OneDrive 分片上传已标记为中止（会话将自然过期）",
+    };
+  }
+
+  /**
+   * 列出进行中的分片上传
+   */
+  async listMultipartUploads(_subPath = "", _options = {}) {
+    this._ensureInitialized();
+
+    const { mount, db, userIdOrInfo, userType } = _options || {};
+
+    if (!db || !mount?.id) {
+      return {
+        success: true,
+        uploads: [],
+      };
+    }
+
+    // 计算 FS 视图下的前缀路径（与 initializeFrontendMultipartUpload 中 fsPath 的计算方式保持一致）
+    let fsPathPrefix = mount.mount_path || "/";
+    if (typeof _subPath === "string" && _subPath.trim() !== "") {
+      const rel = _subPath.replace(/^\/+/g, "");
+      const basePath = (fsPathPrefix || "/").replace(/\/+$/g, "") || "/";
+      fsPathPrefix = rel ? `${basePath}/${rel}` : basePath;
+    }
+    if (!fsPathPrefix.startsWith("/")) {
+      fsPathPrefix = `/${fsPathPrefix}`;
+    }
+
+    const sessions = await listActiveUploadSessions(db, {
+      userIdOrInfo,
+      userType,
+      storageType: this.type,
+      mountId: mount.id,
+      fsPathPrefix,
+      limit: 100,
+    });
+
+    const uploads = sessions.map((row) => ({
+      key: (row.fs_path || "/").replace(/^\/+/, ""),
+      uploadId: row.provider_upload_url || row.provider_upload_id || row.id,
+      initiated: row.created_at,
+      storageClass: null,
+      owner: null,
+      // 额外元数据（当前前端不会直接使用，但便于以后扩展）
+      fileName: row.file_name,
+      fileSize: row.file_size,
+      partSize: row.part_size,
+      strategy: row.strategy,
+      sessionId: row.id,
+    }));
+
+    return {
+      success: true,
+      uploads,
+    };
+  }
+
+  /**
+   * 列出指定上传任务的已上传分片
+   * - 由于 OneDrive uploadSession 不暴露 per-part 列表，这里根据 upload_sessions 记录和
+   *   Graph uploadSession 的 nextExpectedRanges 估算“已上传的完整分片”数量。
+   * - 用于配合 Uppy 的恢复逻辑：仅在存在至少一个完整分片时返回分片信息，最后一块可能是未对齐的部分数据，将始终由前端重新上传。
+   */
+  async listMultipartParts(_subPath, uploadId, _options = {}) {
+    this._ensureInitialized();
+
+    const { mount, db, userIdOrInfo, userType } = _options || {};
+
+    if (!uploadId || !db || !mount?.storage_config_id) {
+      return {
+        success: true,
+        uploadId: uploadId || null,
+        parts: [],
+      };
+    }
+
+    try {
+      // 从本地 upload_sessions 表中获取会话配置信息（文件大小与分片大小）
+      const sessionRow = await findUploadSessionByUploadUrl(db, {
+        uploadUrl: uploadId,
+        storageType: this.type,
+        userIdOrInfo,
+        userType,
+      });
+
+      if (!sessionRow) {
+        return {
+          success: true,
+          uploadId: uploadId || null,
+          parts: [],
+        };
+      }
+
+      const totalSize = Number(sessionRow.file_size) || null;
+      const partSize = Number(sessionRow.part_size) || 5 * 1024 * 1024;
+
+      if (!totalSize || !Number.isFinite(partSize) || partSize <= 0) {
+        return {
+          success: true,
+          uploadId: uploadId || null,
+          parts: [],
+        };
+      }
+
+      // 调用 Graph 获取最新的 nextExpectedRanges，以推导已上传字节数
+      let bytesUploaded = 0;
+      try {
+        const sessionInfo = await this.graphClient.getUploadSessionInfo(uploadId);
+        const ranges = Array.isArray(sessionInfo.nextExpectedRanges)
+          ? sessionInfo.nextExpectedRanges
+          : null;
+        const firstRange = ranges && ranges.length > 0 ? String(ranges[0]) : null;
+        if (firstRange) {
+          const startStr = firstRange.split("-")[0];
+          const parsed = Number.parseInt(startStr, 10);
+          if (Number.isFinite(parsed) && parsed >= 0) {
+            bytesUploaded = parsed;
+          }
+        }
+      } catch (error) {
+        console.warn(
+          "[OneDriveStorageDriver] listMultipartParts 获取 uploadSession 信息失败，将回退为空分片列表:",
+          error,
+        );
+        return {
+          success: true,
+          uploadId: uploadId || null,
+          parts: [],
+        };
+      }
+
+      // 若尚未上传任何字节，直接视为无可恢复分片
+      if (!Number.isFinite(bytesUploaded) || bytesUploaded <= 0) {
+        return {
+          success: true,
+          uploadId: uploadId || null,
+          parts: [],
+        };
+      }
+
+      // 取整计算“已完成的完整分片”数量，最后一块未对齐的数据将由前端重新上传
+      const completedParts = Math.floor(bytesUploaded / partSize);
+      if (completedParts <= 0) {
+        return {
+          success: true,
+          uploadId: uploadId || null,
+          parts: [],
+        };
+      }
+
+      const parts = [];
+      for (let partNumber = 1; partNumber <= completedParts; partNumber += 1) {
+        parts.push({
+          partNumber,
+          size: partSize,
+          etag: `onedrive-part-${partNumber}`,
+        });
+      }
+
+      return {
+        success: true,
+        uploadId: uploadId || null,
+        parts,
+      };
+    } catch (error) {
+      console.warn("[OneDriveStorageDriver] listMultipartParts 异常，回退为空分片列表:", error);
+      return {
+        success: true,
+        uploadId: uploadId || null,
+        parts: [],
+      };
+    }
+  }
+
+  /**
+   * 刷新分片上传端点
+   * - 对于 single_session 策略，通常直接复用原始 uploadUrl
+   * - 当前实现回传 uploadId 及最新的 nextExpectedRanges，调用方可将其视为 uploadUrl + 会话信息
+   */
+  async refreshMultipartUrls(_subPath, uploadId, _partNumbers, options = {}) {
+    this._ensureInitialized();
+
+    const { mount, db, userIdOrInfo, userType } = options || {};
+
+    let sessionInfo = null;
+    if (uploadId) {
+      try {
+        sessionInfo = await this.graphClient.getUploadSessionInfo(uploadId);
+      } catch (error) {
+        // 如果 uploadSession 已不存在（itemNotFound / 404），视为会话失效，标记数据库状态并让上层回退为新上传
+        if (error?.status === 404 || error?.details?.code === "itemNotFound") {
+          if (db && mount?.storage_config_id) {
+            try {
+              // 通过 uploadUrl 查找会话记录，再按指纹统一标记为 error
+              const sessionRow = await findUploadSessionByUploadUrl(db, {
+                uploadUrl: uploadId,
+                storageType: this.type,
+                userIdOrInfo,
+                userType,
+              });
+
+              if (sessionRow) {
+                await updateUploadSessionStatusByFingerprint(db, {
+                  userIdOrInfo,
+                  userType,
+                  storageType: this.type,
+                  storageConfigId: sessionRow.storage_config_id,
+                  mountId: sessionRow.mount_id ?? mount.id ?? null,
+                  fsPath: sessionRow.fs_path,
+                  fileName: sessionRow.file_name,
+                  fileSize: sessionRow.file_size,
+                  status: "error",
+                  errorCode: "UPLOAD_SESSION_NOT_FOUND",
+                  errorMessage: "OneDrive upload session not found or expired",
+                });
+              } else {
+                console.warn(
+                  "[OneDriveStorageDriver] 未找到对应的 upload_sessions 记录（refresh error），uploadUrl:",
+                  uploadId,
+                );
+              }
+            } catch (e) {
+              console.warn(
+                "[OneDriveStorageDriver] 标记 upload_sessions 会话为失效失败:",
+                e,
+              );
+            }
+          }
+
+          // 抛出明确错误，让调用方（/api/fs/multipart/refresh-urls）返回失败，前端据此放弃断点续传并创建新上传
+          throw new DriverError(
+            "OneDrive 上传会话不存在或已过期，无法继续断点续传",
+            {
+              status: 404,
+              code: "UPLOAD_SESSION_NOT_FOUND",
+              expose: true,
+            },
+          );
+        }
+
+        console.warn(
+          "[OneDriveStorageDriver] 获取 uploadSession 信息失败，将继续返回基础会话数据:",
+          error,
+        );
+      }
+
+      if (db && mount?.storage_config_id && sessionInfo) {
+        try {
+          const ranges = Array.isArray(sessionInfo.nextExpectedRanges)
+            ? sessionInfo.nextExpectedRanges
+            : null;
+          const firstRange = ranges && ranges.length > 0 ? String(ranges[0]) : null;
+          let bytesUploaded = null;
+
+          if (firstRange) {
+            const startStr = firstRange.split("-")[0];
+            const parsed = Number.parseInt(startStr, 10);
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              bytesUploaded = parsed;
+            }
+          }
+
+          const sessionRow = await findUploadSessionByUploadUrl(db, {
+            uploadUrl: uploadId,
+            storageType: this.type,
+            userIdOrInfo,
+            userType,
+          });
+
+          if (sessionRow) {
+            await updateUploadSessionStatusByFingerprint(db, {
+              userIdOrInfo,
+              userType,
+              storageType: this.type,
+              storageConfigId: sessionRow.storage_config_id,
+              mountId: sessionRow.mount_id ?? mount.id ?? null,
+              fsPath: sessionRow.fs_path,
+              fileName: sessionRow.file_name,
+              fileSize: sessionRow.file_size,
+              status: "active",
+              bytesUploaded,
+              nextExpectedRange: firstRange,
+            });
+          } else {
+            console.warn(
+              "[OneDriveStorageDriver] 未找到对应的 upload_sessions 记录（refresh active），uploadUrl:",
+              uploadId,
+            );
+          }
+        } catch (error) {
+          console.warn(
+            "[OneDriveStorageDriver] 刷新 upload_sessions 状态失败，将不影响分片上传流程:",
+            error,
+          );
+        }
+      }
+    }
+
+    return {
+      success: true,
+      uploadId: uploadId || null,
+      strategy: "single_session",
+      session: uploadId
+        ? {
+            uploadUrl: uploadId,
+            expirationDateTime: sessionInfo?.expirationDateTime || null,
+            nextExpectedRanges: sessionInfo?.nextExpectedRanges || null,
+          }
+        : null,
     };
   }
 

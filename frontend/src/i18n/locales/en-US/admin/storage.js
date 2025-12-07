@@ -81,7 +81,7 @@ export default {
         client_secret: "Azure app client secret",
         refresh_token: "Refresh token from external OAuth page",
         token_renew_endpoint: "e.g., https://your-token-service.com/renew",
-        redirect_uri: "e.g., https://api.oplist.org/onedrive/callback",
+        redirect_uri: "e.g., https://your-token-service.com/onedrive/callback",
       },
     },
 

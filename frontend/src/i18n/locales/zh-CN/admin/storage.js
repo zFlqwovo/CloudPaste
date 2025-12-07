@@ -86,7 +86,7 @@ export default {
         client_secret: "Azure 应用的客户端密钥",
         refresh_token: "在外部授权页面获取的刷新令牌",
         token_renew_endpoint: "例如：https://your-token-service.com/renew",
-        redirect_uri: "例如：https://api.oplist.org/onedrive/callback",
+        redirect_uri: "例如：https://your-token-service.com/onedrive/callback",
       },
     },
 

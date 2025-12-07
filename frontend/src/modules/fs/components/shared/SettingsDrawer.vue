@@ -1,5 +1,5 @@
 <template>
-  <!-- 设置抽屉 - AList 风格右侧滑出面板 -->
+  <!-- 设置抽屉 - 右侧滑出面板 -->
   <Teleport to="body">
     <!-- 遮罩层 -->
     <Transition name="fade">

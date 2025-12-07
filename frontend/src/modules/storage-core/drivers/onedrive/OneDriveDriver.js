@@ -24,7 +24,7 @@ export class OneDriveDriver {
         backendStream: true,
         backendForm: true,
         presignedSingle: true,
-        multipart: false,
+        multipart: true,
       },
     });
 
@@ -41,6 +41,9 @@ export class OneDriveDriver {
 
     this.fs = {
       applyFsUploader: this.applyFsUploader.bind(this),
+      // 供 ServerResumePlugin 使用的只读查询能力
+      listUploads: this.listUploads.bind(this),
+      listParts: this.listParts.bind(this),
     };
   }
 
@@ -325,27 +328,50 @@ export class OneDriveDriver {
 
   /**
    * OneDrive FS 上传：
-   * - 流式模式：通过 PUT /fs/upload 使用原始 body 直传（推荐）
-   * - 表单模式：通过 POST /fs/upload multipart/form-data（兼容模式）
+   * - 预签名单文件：通过 /fs/presign + 直传（PRESIGNED_SINGLE）
+   * - 预签名多分片：通过 /fs/multipart/* + Uppy AwsS3 分片（PRESIGNED_MULTIPART，Graph uploadSession）
+   * - 流式模式：通过 PUT /fs/upload 使用原始 body 直传（BACKEND_STREAM）
+   * - 表单模式：通过 POST /fs/upload multipart/form-data（BACKEND_FORM）
    */
   applyFsUploader(uppy, { strategy, path } = {}) {
     if (!uppy) {
       throw new Error("applyFsUploader 需要提供 Uppy 实例");
     }
 
-    // 预签名单文件直传：复用 StorageAdapter + AwsS3（仅使用 getUploadParameters + uploadSingleFile）
-    if (strategy === STORAGE_STRATEGIES.PRESIGNED_SINGLE) {
+    // 预签名直传：复用 StorageAdapter + AwsS3
+    // - PRESIGNED_SINGLE: 单请求 PUT（getUploadParameters + uploadSingleFile）
+    // - PRESIGNED_MULTIPART: Uppy 多分片（create/sign/uploadPartBytes/complete/abort/listParts）
+    if (
+      strategy === STORAGE_STRATEGIES.PRESIGNED_SINGLE ||
+      strategy === STORAGE_STRATEGIES.PRESIGNED_MULTIPART
+    ) {
       const adapter = new StorageAdapter(path || "/", uppy);
-      uppy.use(AwsS3, {
-        id: "OneDrivePresignedSingle",
-        limit: 3,
-        shouldUseMultipart: () => false,
-        getUploadParameters: adapter.getUploadParameters.bind(adapter),
-        uploadPartBytes: adapter.uploadSingleFile.bind(adapter),
-      });
+
+      const isMultipart = strategy === STORAGE_STRATEGIES.PRESIGNED_MULTIPART;
+      const awsS3Opts = {
+        id: "OneDriveFsPresigned",
+        // 对于 OneDrive 上传会话，强制串行上传，避免 Range 不一致问题
+        limit: 1,
+        shouldUseMultipart: () => isMultipart,
+      };
+
+      if (isMultipart) {
+        awsS3Opts.getUploadParameters = adapter.getUploadParameters.bind(adapter);
+        awsS3Opts.createMultipartUpload = adapter.createMultipartUpload.bind(adapter);
+        awsS3Opts.signPart = adapter.signPart.bind(adapter);
+        awsS3Opts.uploadPartBytes = adapter.uploadPartBytes.bind(adapter);
+        awsS3Opts.completeMultipartUpload = adapter.completeMultipartUpload.bind(adapter);
+        awsS3Opts.abortMultipartUpload = adapter.abortMultipartUpload.bind(adapter);
+        awsS3Opts.listParts = adapter.listParts.bind(adapter);
+      } else {
+        awsS3Opts.getUploadParameters = adapter.getUploadParameters.bind(adapter);
+        awsS3Opts.uploadPartBytes = adapter.uploadSingleFile.bind(adapter);
+      }
+
+      uppy.use(AwsS3, awsS3Opts);
       return {
         adapter,
-        mode: STORAGE_STRATEGIES.PRESIGNED_SINGLE,
+        mode: isMultipart ? STORAGE_STRATEGIES.PRESIGNED_MULTIPART : STORAGE_STRATEGIES.PRESIGNED_SINGLE,
       };
     }
 
@@ -426,5 +452,17 @@ export class OneDriveDriver {
       throw new Error("缺少 storage_config_id，可在 payload 中指定或配置默认值");
     }
     return { ...payload, storage_config_id: this.storageConfigId };
+  }
+
+  // Read-only helpers for resume plugin -------------------------------------
+
+  async listUploads({ path } = {}) {
+    // 后端接受目录或空字符串，返回该作用域下的未完成上传
+    return api.fs.listMultipartUploads(path || "");
+  }
+
+  async listParts({ path, uploadId, fileName }) {
+    // path 为文件完整路径，后端使用它定位资源；同时需要 uploadId 和 fileName
+    return api.fs.listMultipartParts(path, uploadId, fileName);
   }
 }
