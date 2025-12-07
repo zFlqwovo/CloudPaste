@@ -85,11 +85,11 @@ function validateDriverContract(driver, entryMeta, storageType) {
 
   const driverType = typeof driver.getType === "function" ? driver.getType() : driver.type;
   const rawCaps =
-    typeof driver.getCapabilities === "function"
-      ? driver.getCapabilities() || []
-      : Array.isArray(driver.capabilities)
-      ? driver.capabilities
-      : [];
+      typeof driver.getCapabilities === "function"
+          ? driver.getCapabilities() || []
+          : Array.isArray(driver.capabilities)
+              ? driver.capabilities
+              : [];
 
   const detectedCapabilities = getObjectCapabilities(driver);
   const driverCapabilities = Array.from(new Set(rawCaps.length ? rawCaps : detectedCapabilities));
@@ -156,18 +156,18 @@ export class StorageFactory {
 
   // 注册驱动
   static registerDriver(
-    type,
-    {
-      ctor,
-      tester = null,
-      displayName = null,
-      validate = null,
-      capabilities = [],
-      ui = null,
-      configSchema = null,
-      providerOptions = null,
-      configProjector = null,
-    } = {},
+      type,
+      {
+        ctor,
+        tester = null,
+        displayName = null,
+        validate = null,
+        capabilities = [],
+        ui = null,
+        configSchema = null,
+        providerOptions = null,
+        configProjector = null,
+      } = {},
   ) {
     if (!type || !ctor) throw new ValidationError("registerDriver 需要提供 type 和 ctor");
     registry.set(type, {
@@ -471,7 +471,7 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.S3, {
     i18nKey: "admin.storage.type.s3",
     badgeTheme: "s3",
   },
-   configProjector(cfg, { withSecrets = false } = {}) {
+  configProjector(cfg, { withSecrets = false } = {}) {
     const projected = {
       // 通用字段
       default_folder: cfg?.default_folder,
@@ -888,14 +888,7 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.ONEDRIVE, {
   tester: oneDriveTestConnection,
   displayName: "OneDrive 存储",
   validate: (cfg) => StorageFactory._validateOneDriveConfig(cfg),
-  capabilities: [
-    CAPABILITIES.READER,
-    CAPABILITIES.WRITER,
-    CAPABILITIES.ATOMIC,
-    CAPABILITIES.PROXY,
-    CAPABILITIES.SEARCH,
-    CAPABILITIES.DIRECT_LINK,
-  ],
+  capabilities: [CAPABILITIES.READER, CAPABILITIES.WRITER, CAPABILITIES.ATOMIC, CAPABILITIES.PROXY, CAPABILITIES.SEARCH, CAPABILITIES.DIRECT_LINK],
   ui: {
     icon: "storage-onedrive",
     i18nKey: "admin.storage.type.onedrive",
@@ -906,6 +899,7 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.ONEDRIVE, {
       // 通用字段
       default_folder: cfg?.default_folder ?? cfg?.root_folder ?? "",
       custom_host: cfg?.custom_host,
+      url_proxy: cfg?.url_proxy,
       signature_expires_in: cfg?.signature_expires_in,
       total_storage_bytes: cfg?.total_storage_bytes,
       // OneDrive 专用字段
@@ -985,6 +979,18 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.ONEDRIVE, {
         },
       },
       {
+        name: "url_proxy",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.url_proxy",
+        validation: { rule: "url" },
+        ui: {
+          fullWidth: true,
+          placeholderKey: "admin.storage.placeholder.url_proxy",
+          descriptionKey: "admin.storage.description.url_proxy",
+        },
+      },
+      {
         name: "token_renew_endpoint",
         type: "string",
         required: false,
@@ -1036,7 +1042,7 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.ONEDRIVE, {
         {
           name: "advanced",
           titleKey: "admin.storage.groups.advanced",
-          fields: ["redirect_uri", ["token_renew_endpoint", "use_online_api"]],
+          fields: ["redirect_uri", ["token_renew_endpoint", "use_online_api"], "url_proxy"],
         },
       ],
       summaryFields: ["region", "default_folder", "use_online_api"],
