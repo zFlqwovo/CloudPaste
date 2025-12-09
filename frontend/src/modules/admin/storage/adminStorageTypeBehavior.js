@@ -82,6 +82,19 @@ const STORAGE_TYPE_BEHAVIOR_DEF = {
       return false;
     },
   },
+  GOOGLE_DRIVE: {
+    secretFields: ["client_secret", "refresh_token"],
+    /**
+     * 字段禁用规则
+     * - api_address 仅在 use_online_api 启用时可编辑
+     */
+    isFieldDisabled(fieldName, formData) {
+      if (fieldName === "api_address") {
+        return !formData.value.use_online_api;
+      }
+      return false;
+    },
+  },
 };
 
 /**
@@ -108,6 +121,11 @@ export function useAdminStorageTypeBehavior(options) {
       loaded: ref(false),
     },
     ONEDRIVE: {
+      visible: ref(false),
+      revealing: ref(false),
+      loaded: ref(false),
+    },
+    GOOGLE_DRIVE: {
       visible: ref(false),
       revealing: ref(false),
       loaded: ref(false),
@@ -169,6 +187,9 @@ export function useAdminStorageTypeBehavior(options) {
           } else if (type === "ONEDRIVE") {
             formData.value.client_secret = data.client_secret || "";
             formData.value.refresh_token = data.refresh_token || "";
+          } else if (type === "GOOGLE_DRIVE") {
+            formData.value.client_secret = data.client_secret || "";
+            formData.value.refresh_token = data.refresh_token || "";
           }
           state.loaded.value = true;
         }
@@ -201,8 +222,11 @@ export function useAdminStorageTypeBehavior(options) {
     if (!meta) return false;
 
     const storageType = currentType.value;
-    // OneDrive 的 refresh_token 和 client_secret 通过授权获取，新建时遵循 schema 标记
-    if (storageType === "ONEDRIVE" && (fieldName === "refresh_token" || fieldName === "client_secret")) {
+    // OneDrive / GoogleDrive 的 refresh_token 和 client_secret 通过授权获取，新建时遵循 schema 标记
+    if (
+      (storageType === "ONEDRIVE" || storageType === "GOOGLE_DRIVE") &&
+      (fieldName === "refresh_token" || fieldName === "client_secret")
+    ) {
       return !!meta.required;
     }
 

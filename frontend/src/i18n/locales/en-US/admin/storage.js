@@ -9,6 +9,7 @@ export default {
       webdav: "WebDAV storage",
       local: "Local file system",
       onedrive: "OneDrive storage",
+      googledrive: "Google Drive storage",
     },
 
     // group titles
@@ -58,6 +59,18 @@ export default {
         use_online_api: "API Type",
         oauth_status: "OAuth Status",
       },
+
+      // Google Drive specific
+      googledrive: {
+        use_online_api: "API Type",
+        api_address: "Online API URL",
+        client_id: "Client ID",
+        client_secret: "Client secret",
+        refresh_token: "Refresh token / Service Account JSON remote URL",
+        root_id: "Root ID",
+        enable_disk_usage: "Enable quota reading",
+        enable_shared_view: "SharedWithMe view",
+      },
     },
 
     // placeholder texts
@@ -82,6 +95,15 @@ export default {
         refresh_token: "Refresh token from external OAuth page",
         token_renew_endpoint: "e.g., https://your-token-service.com/renew",
         redirect_uri: "e.g., https://your-token-service.com/onedrive/callback",
+      },
+
+      // Google Drive placeholders
+      googledrive: {
+        api_address: "e.g., https://your-online-api.example.com/refresh",
+        client_id: "Google OAuth client ID",
+        client_secret: "Google OAuth client secret",
+        refresh_token: "RefreshToken or remote URL to Service Account JSON",
+        root_id: "e.g., root or a specific Shared Drive ID",
       },
     },
 
@@ -108,6 +130,18 @@ export default {
         redirect_uri: "Callback address configured in the Azure application for the external authorization site, usually consistent with the authorization page documentation",
         use_online_api: "When enabled, CloudPaste will call the renewal endpoint to refresh the token according to the Online API protocol",
       },
+
+      // Google Drive descriptions
+      googledrive: {
+        use_online_api: "When enabled, use the Online API endpoint to obtain access tokens, suitable for centralized token services.",
+        api_address: "Online API refresh address, call to obtain access_token and refresh_token.",
+        client_id: "Client ID used in standard OAuth mode, created in GCP console.",
+        client_secret: "Client secret used together with refresh_token to refresh access_token in standard OAuth mode.",
+        refresh_token: "Supports two forms: 1) standard OAuth refresh_token; 2) remote Service Account JSON URL.",
+        root_id: "Google Drive root folder ID, defaults to root; set to driveId when mounting a Shared Drive.",
+        enable_disk_usage: "When enabled, get to fetch storage quota and usage information for display and quota analysis.",
+        enable_shared_view: 'When enabled, a "Shared with me" virtual directory will be displayed under the corresponding mount root directory for browsing files shared with me',
+      },
     },
 
     // card summary display values
@@ -127,6 +161,16 @@ export default {
         oauth_status: {
           authorized: "✅ Authorized",
           missing: "⚠️ Not configured",
+        },
+      },
+      googledrive: {
+        use_online_api: {
+          enabled: "Online API",
+          disabled: "Standard API",
+        },
+        enable_shared_view: {
+          enabled: "enabled",
+          disabled: "disabled",
         },
       },
     },

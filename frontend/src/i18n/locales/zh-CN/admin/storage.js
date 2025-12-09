@@ -9,6 +9,7 @@ export default {
       webdav: "WebDAV",
       local: "本机文件",
       onedrive: "OneDrive",
+      googledrive: "Google Drive",
     },
 
     // 分组标题
@@ -61,6 +62,18 @@ export default {
         use_online_api: "API 类型",
         oauth_status: "授权状态",
       },
+
+      // Google Drive 特有字段
+      googledrive: {
+        use_online_api: "API 类型",
+        api_address: "在线 API 地址",
+        client_id: "客户端 ID",
+        client_secret: "客户端密钥",
+        refresh_token: "刷新令牌 / Service Account JSON 远程 URL",
+        root_id: "根目录 ID",
+        enable_disk_usage: "启用配额读取",
+        enable_shared_view: "SharedWithMe视图",
+      },
     },
 
     // 占位符文本
@@ -87,6 +100,15 @@ export default {
         refresh_token: "在外部授权页面获取的刷新令牌",
         token_renew_endpoint: "例如：https://your-token-service.com/renew",
         redirect_uri: "例如：https://your-token-service.com/onedrive/callback",
+      },
+
+      // Google Drive 占位符
+      googledrive: {
+        api_address: "例如：https://your-online-api.example.com/refresh",
+        client_id: "Google OAuth 客户端 ID",
+        client_secret: "Google OAuth 客户端密钥",
+        refresh_token: "RefreshToken 或 Service Account JSON 的远程 URL",
+        root_id: "例如：root 或某个 Shared Drive ID",
       },
     },
 
@@ -116,6 +138,18 @@ export default {
         redirect_uri: "外部授权站点在 Azure 应用中配置的回调地址，通常与授权页面文档保持一致",
         use_online_api: "启用后，CloudPaste 将按照 Online API 协议调用续期端点刷新令牌",
       },
+
+      // Google Drive 描述
+      googledrive: {
+        use_online_api: "启用后，通过在线 API 地址获取访问令牌，适合托管在外部的统一 Token 服务。",
+        api_address: "在线 API 刷新地址，调用以获取 access_token 与 refresh_token。",
+        client_id: "标准 OAuth 模式下使用的 client_id，可在 GCP 控制台创建 OAuth 客户端后获取。",
+        client_secret: "标准 OAuth 模式下使用的 client_secret，用于配合 refresh_token 刷新 access_token。",
+        refresh_token: "可为两种形态：1) 标准 OAuth refresh_token；2) 远程 Service Account JSON URL。",
+        root_id: "Google Drive 根目录 ID，默认为 root；如需挂载 Shared Drive，请填写对应 driveId。",
+        enable_disk_usage: "启用后，读取存储配额信息，用于管理端展示和配额分析。",
+        enable_shared_view: "启用后，将在对应挂载根目录下展示 \"Shared with me\" 虚拟目录，用于浏览“与我共享”文件。",
+      },
     },
 
     // 卡片摘要显示值
@@ -131,6 +165,16 @@ export default {
         use_online_api: {
           enabled: "Online API",
           disabled: "标准 API",
+        },
+      },
+      googledrive: {
+        use_online_api: {
+          enabled: "Online API",
+          disabled: "标准 API",
+        },
+        enable_shared_view: {
+          enabled: "已启用",
+          disabled: "未启用",
         },
       },
     },

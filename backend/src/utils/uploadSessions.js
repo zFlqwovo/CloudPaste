@@ -346,8 +346,6 @@ export async function updateUploadSessionStatusByFingerprint(db, params) {
     userId,
   ];
 
-  console.log("[uploadSessions] 会话状态更新开始", { storageType, status });
-
   const stmt = db.prepare(sql);
   const result = await stmt.bind(...values).run();
 
@@ -417,6 +415,31 @@ export async function listActiveUploadSessions(db, params) {
 
   const result = await db.prepare(sql).bind(...values).all();
   return result?.results || [];
+}
+
+/**
+ * 按会话ID查询单个上传会话记录
+ *
+ * @param {D1Database} db
+ * @param {{ id: string }} params
+ * @returns {Promise<Object|null>}
+ */
+export async function findUploadSessionById(db, params) {
+  const { id } = params || {};
+  if (!id) {
+    return null;
+  }
+
+  const sql = `
+    SELECT *
+    FROM ${DbTables.UPLOAD_SESSIONS}
+    WHERE id = ?
+    LIMIT 1
+  `;
+
+  const result = await db.prepare(sql).bind(id).all();
+  const rows = result?.results || [];
+  return rows.length > 0 ? rows[0] : null;
 }
 
 /**

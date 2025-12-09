@@ -961,9 +961,13 @@ export class StorageAdapter {
           throw new Error("single_session 会话缺少有效的 uploadUrl");
         }
 
+        // 对于 single_session（OneDrive / GoogleDrive 后端中转），需要带上认证头，
+        const authHeaders = this.authProvider.getAuthHeaders() || {};
+
         return {
           url,
           headers: {
+            ...authHeaders,
             "Content-Type": "application/octet-stream",
             "Content-Range": `bytes ${start}-${end}/${totalSize}`,
           },

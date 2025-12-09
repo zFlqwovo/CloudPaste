@@ -256,11 +256,18 @@ export class CopyTaskHandler implements TaskHandler {
             }
           );
 
-          const isSkipped = copyResult?.status === 'skipped' || copyResult?.skipped === true;
+          const resultStatus = (copyResult?.status as string) || 'success';
+          const isSkipped = resultStatus === 'skipped' || copyResult?.skipped === true;
 
           if (isSkipped) {
+            // 驱动显式表示跳过：不计入失败，但标记为 skipped
             fileSkipped = true;
+          } else if (resultStatus === 'failed') {
+            // 驱动显式表示失败：抛出错误触发重试/失败分支，并保留 message 供上层使用
+            const reason = copyResult?.message || copyResult?.error || '复制失败';
+            throw new Error(reason);
           } else {
+            // 视为成功：累计字节数并记录传输进度
             const fileBytes = copyResult?.contentLength || currentFileBytes || 0;
             totalBytesTransferred += fileBytes;
             itemResults[i].bytesTransferred = fileBytes;

@@ -101,6 +101,7 @@ const {
 // 计算表单标题与类型辅助标志
 const isWebDavType = computed(() => formData.value.storage_type === "WEBDAV");
 const isOneDriveType = computed(() => currentType.value === "ONEDRIVE");
+const isGoogleDriveType = computed(() => currentType.value === "GOOGLE_DRIVE");
 
 const formTitle = computed(() => {
   return props.isEdit ? "编辑存储配置" : "添加存储配置";
@@ -378,7 +379,17 @@ watch(
     const config = props.config;
     if (config) {
       const type = config.storage_type || (storageTypes.value[0]?.value || "");
-      formData.value = { ...config, storage_type: type };
+      const next = { ...config, storage_type: type };
+
+      // Google Drive：如果未显式设置 root_id，则编辑表单中统一展示为 "root"
+      if (
+        next.storage_type === "GOOGLE_DRIVE" &&
+        (!next.root_id || String(next.root_id).trim().length === 0)
+      ) {
+        next.root_id = "root";
+      }
+
+      formData.value = next;
 
       const sizeState = { storageSize: "", storageUnit: storageUnit.value };
       setStorageSizeFromBytes(formData.value.total_storage_bytes, sizeState);
@@ -449,12 +460,18 @@ const submitForm = async () => {
         delete updateData.password;
       }
 
-      // OneDrive 密钥字段：空值或掩码值不提交（保留原值）
-      if (isOneDriveType.value && (!updateData.client_secret || updateData.client_secret.trim() === "" || isMaskedValue(updateData.client_secret))) {
+      // OneDrive / GoogleDrive 密钥字段：空值或掩码值不提交（保留原值）
+      if (
+        (isOneDriveType.value || isGoogleDriveType.value) &&
+        (!updateData.client_secret || updateData.client_secret.trim() === "" || isMaskedValue(updateData.client_secret))
+      ) {
         delete updateData.client_secret;
       }
 
-      if (isOneDriveType.value && (!updateData.refresh_token || updateData.refresh_token.trim() === "" || isMaskedValue(updateData.refresh_token))) {
+      if (
+        (isOneDriveType.value || isGoogleDriveType.value) &&
+        (!updateData.refresh_token || updateData.refresh_token.trim() === "" || isMaskedValue(updateData.refresh_token))
+      ) {
         delete updateData.refresh_token;
       }
 

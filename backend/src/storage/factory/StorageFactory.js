@@ -9,6 +9,8 @@ import { S3StorageDriver } from "../drivers/s3/S3StorageDriver.js";
 import { WebDavStorageDriver } from "../drivers/webdav/WebDavStorageDriver.js";
 import { LocalStorageDriver } from "../drivers/local/LocalStorageDriver.js";
 import { OneDriveStorageDriver } from "../drivers/onedrive/OneDriveStorageDriver.js";
+import { GoogleDriveStorageDriver } from "../drivers/googledrive/GoogleDriveStorageDriver.js";
+import { googleDriveTestConnection } from "../drivers/googledrive/tester/GoogleDriveTester.js";
 import {
   CAPABILITIES,
   REQUIRED_METHODS_BY_CAPABILITY,
@@ -85,11 +87,11 @@ function validateDriverContract(driver, entryMeta, storageType) {
 
   const driverType = typeof driver.getType === "function" ? driver.getType() : driver.type;
   const rawCaps =
-      typeof driver.getCapabilities === "function"
-          ? driver.getCapabilities() || []
-          : Array.isArray(driver.capabilities)
-              ? driver.capabilities
-              : [];
+    typeof driver.getCapabilities === "function"
+      ? driver.getCapabilities() || []
+      : Array.isArray(driver.capabilities)
+      ? driver.capabilities
+      : [];
 
   const detectedCapabilities = getObjectCapabilities(driver);
   const driverCapabilities = Array.from(new Set(rawCaps.length ? rawCaps : detectedCapabilities));
@@ -152,22 +154,23 @@ export class StorageFactory {
     WEBDAV: "WEBDAV",
     LOCAL: "LOCAL",
     ONEDRIVE: "ONEDRIVE",
+    GOOGLE_DRIVE: "GOOGLE_DRIVE",
   };
 
   // 注册驱动
   static registerDriver(
-      type,
-      {
-        ctor,
-        tester = null,
-        displayName = null,
-        validate = null,
-        capabilities = [],
-        ui = null,
-        configSchema = null,
-        providerOptions = null,
-        configProjector = null,
-      } = {},
+    type,
+    {
+      ctor,
+      tester = null,
+      displayName = null,
+      validate = null,
+      capabilities = [],
+      ui = null,
+      configSchema = null,
+      providerOptions = null,
+      configProjector = null,
+    } = {},
   ) {
     if (!type || !ctor) throw new ValidationError("registerDriver 需要提供 type 和 ctor");
     registry.set(type, {
@@ -448,6 +451,37 @@ export class StorageFactory {
 
     return { valid: errors.length === 0, errors };
   }
+
+  static _validateGoogleDriveConfig(config) {
+    const errors = [];
+
+    const useOnlineApi = Boolean(config.use_online_api);
+    const refreshToken = config.refresh_token;
+    const apiAddress = config.api_address;
+
+    // 公共必填：refresh_token
+    if (!refreshToken) {
+      errors.push("Google Drive 配置缺少必填字段: refresh_token");
+    }
+
+    // 在线 API 模式
+    if (useOnlineApi) {
+      if (!apiAddress) {
+        errors.push("启用 use_online_api 时必须配置 api_address");
+      } else {
+        try {
+          const parsed = new URL(apiAddress);
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            errors.push("api_address 必须以 http:// 或 https:// 开头");
+          }
+        } catch {
+          errors.push("api_address 格式无效");
+        }
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
 }
 
 // 默认注册 S3 驱动与 tester
@@ -471,7 +505,7 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.S3, {
     i18nKey: "admin.storage.type.s3",
     badgeTheme: "s3",
   },
-  configProjector(cfg, { withSecrets = false } = {}) {
+   configProjector(cfg, { withSecrets = false } = {}) {
     const projected = {
       // 通用字段
       default_folder: cfg?.default_folder,
@@ -899,7 +933,6 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.ONEDRIVE, {
       // 通用字段
       default_folder: cfg?.default_folder ?? cfg?.root_folder ?? "",
       custom_host: cfg?.custom_host,
-      url_proxy: cfg?.url_proxy,
       signature_expires_in: cfg?.signature_expires_in,
       total_storage_bytes: cfg?.total_storage_bytes,
       // OneDrive 专用字段
@@ -1052,4 +1085,183 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.ONEDRIVE, {
     { value: "global", labelKey: "admin.storage.onedrive.region.global" },
     { value: "cn", labelKey: "admin.storage.onedrive.region.cn" },
   ],
+});
+
+// 注册 Google Drive 驱动
+StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.GOOGLE_DRIVE, {
+  ctor: GoogleDriveStorageDriver,
+  tester: googleDriveTestConnection,
+  displayName: "Google Drive 存储",
+  validate: (cfg) => StorageFactory._validateGoogleDriveConfig(cfg),
+  capabilities: [
+    CAPABILITIES.READER,
+    CAPABILITIES.WRITER,
+    CAPABILITIES.ATOMIC,
+    CAPABILITIES.PROXY,
+    CAPABILITIES.SEARCH,
+    CAPABILITIES.MULTIPART,
+  ],
+  ui: {
+    icon: "storage-googledrive",
+    i18nKey: "admin.storage.type.googledrive",
+    badgeTheme: "googledrive",
+  },
+  configProjector(cfg, { withSecrets = false } = {}) {
+    const projected = {
+      default_folder: cfg?.default_folder ?? "",
+      root_id: cfg?.root_id ?? "root",
+      enable_disk_usage: !!cfg?.enable_disk_usage,
+      use_online_api: cfg?.use_online_api ?? false,
+      api_address: cfg?.api_address,
+      client_id: cfg?.client_id,
+      enable_shared_view: cfg?.enable_shared_view !== false,
+      has_refresh_token: !!(cfg?.refresh_token && String(cfg.refresh_token).trim().length > 0),
+    };
+
+    if (withSecrets) {
+      projected.client_secret = cfg?.client_secret;
+      projected.refresh_token = cfg?.refresh_token;
+    }
+
+    return projected;
+  },
+  configSchema: {
+    fields: [
+      {
+        name: "use_online_api",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.use_online_api",
+        ui: {
+          descriptionKey: "admin.storage.description.googledrive.use_online_api",
+          displayOptions: {
+            trueKey: "admin.storage.display.googledrive.use_online_api.enabled",
+            falseKey: "admin.storage.display.googledrive.use_online_api.disabled",
+          },
+        },
+      },
+      {
+        name: "api_address",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.api_address",
+        validation: { rule: "url" },
+        ui: {
+          fullWidth: true,
+          placeholderKey: "admin.storage.placeholder.googledrive.api_address",
+          descriptionKey: "admin.storage.description.googledrive.api_address",
+          // 与 OneDrive 行为对齐：仅在 use_online_api 启用时允许填写
+          disabledWhen: {
+            field: "use_online_api",
+            equals: false,
+          },
+        },
+      },
+      {
+        name: "client_id",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.client_id",
+        ui: {
+          placeholderKey: "admin.storage.placeholder.googledrive.client_id",
+          descriptionKey: "admin.storage.description.googledrive.client_id",
+        },
+      },
+      {
+        name: "client_secret",
+        type: "secret",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.client_secret",
+        ui: {
+          placeholderKey: "admin.storage.placeholder.googledrive.client_secret",
+          descriptionKey: "admin.storage.description.googledrive.client_secret",
+        },
+      },
+      {
+        name: "refresh_token",
+        type: "secret",
+        required: true,
+        labelKey: "admin.storage.fields.googledrive.refresh_token",
+        ui: {
+          fullWidth: true,
+          placeholderKey: "admin.storage.placeholder.googledrive.refresh_token",
+          descriptionKey: "admin.storage.description.googledrive.refresh_token",
+        },
+      },
+      {
+        name: "root_id",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.root_id",
+        ui: {
+          placeholderKey: "admin.storage.placeholder.googledrive.root_id",
+          descriptionKey: "admin.storage.description.googledrive.root_id",
+        },
+      },
+      {
+        name: "default_folder",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.default_folder",
+        ui: {
+          placeholderKey: "admin.storage.placeholder.default_folder",
+          emptyTextKey: "admin.storage.display.default_folder.root",
+        },
+      },
+      {
+        name: "enable_disk_usage",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.enable_disk_usage",
+        ui: {
+          descriptionKey: "admin.storage.description.googledrive.enable_disk_usage",
+        },
+      },
+      {
+        name: "enable_shared_view",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.googledrive.enable_shared_view",
+        ui: {
+          descriptionKey: "admin.storage.description.googledrive.enable_shared_view",
+          displayOptions: {
+            trueKey: "admin.storage.display.googledrive.enable_shared_view.enabled",
+            falseKey: "admin.storage.display.googledrive.enable_shared_view.disabled",
+          },
+        },
+      },
+      {
+        name: "url_proxy",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.url_proxy",
+        validation: { rule: "url" },
+        ui: {
+          fullWidth: true,
+          placeholderKey: "admin.storage.placeholder.url_proxy",
+          descriptionKey: "admin.storage.description.url_proxy",
+        },
+      },
+    ],
+    layout: {
+      groups: [
+        {
+          name: "basic",
+          titleKey: "admin.storage.groups.basic",
+          fields: [["root_id", "default_folder"]],
+        },
+        {
+          name: "credentials",
+          titleKey: "admin.storage.groups.credentials",
+          fields: [["client_id", "client_secret"], "refresh_token"],
+        },
+        {
+          name: "advanced",
+          titleKey: "admin.storage.groups.advanced",
+          fields: [["api_address", "use_online_api"], ["enable_disk_usage", "enable_shared_view"], "url_proxy"],
+        },
+      ],
+      summaryFields: ["root_id", "default_folder", "use_online_api", "enable_disk_usage", "enable_shared_view"],
+    },
+  },
 });
