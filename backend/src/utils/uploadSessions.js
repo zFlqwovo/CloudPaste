@@ -2,6 +2,8 @@
  * 通用上传会话表操作工具
  * - 面向各存储驱动的前端分片/断点续传会话管理（S3 / OneDrive / 其他）
  * - 仅负责持久化与查询，不承载业务逻辑，便于在不同驱动间复用
+ * - 不直接操作云端 Provider 的真实上传会话生命周期（如 S3 UploadId / OneDrive uploadSession），
+ *   仅维护应用侧的控制面视图，底层资源清理依赖各存储自身的生命周期策略或专用任务
  */
 
 import { DbTables, UserType } from "../constants/index.js";

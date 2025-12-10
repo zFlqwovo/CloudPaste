@@ -1499,7 +1499,6 @@ export class StorageAdapter {
         throw new Error(commitResponse.message || "提交预签名上传失败");
       }
 
-      // 清理上传会话
       this.uploadSessions.delete(file.id);
 
       console.log(`[StorageAdapter] 预签名上传commit成功: ${file.name}`);

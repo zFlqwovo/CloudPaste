@@ -152,6 +152,15 @@ const routes = [
         },
       },
       {
+        path: "scheduled-jobs",
+        name: "AdminScheduledJobs",
+        component: createOfflineAwareImport(() => import("../modules/admin/views/ScheduledJobsView.vue"), "定时任务管理"),
+        meta: {
+          title: "定时任务管理 - CloudPaste",
+          adminOnly: true, // 只有管理员可访问
+        },
+      },
+      {
         path: "account",
         name: "AdminAccountManagement",
         component: createOfflineAwareImport(() => import("../modules/admin/views/AccountManagementView.vue"), "账号管理"),

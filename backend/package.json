@@ -32,6 +32,8 @@
     "file-type": "^21.0.0",
     "hono": "^4.10.6",
     "mime-types": "^3.0.1",
+    "node-schedule": "^2.1.1",
+    "cron-parser": "^5.4.0",
     "webdav": "^5.8.0"
   },
   "devDependencies": {
