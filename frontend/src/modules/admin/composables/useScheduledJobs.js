@@ -24,9 +24,7 @@ export function useScheduledJobs() {
   const handlerTypes = ref([]);
   const handlerTypesLoading = ref(false);
 
-  // 表单状态
-  const showCreateDialog = ref(false);
-  const showEditDialog = ref(false);
+  // 详情对话框状态
   const showDetailDialog = ref(false);
 
   // 筛选状态
@@ -246,32 +244,6 @@ export function useScheduledJobs() {
   };
 
   /**
-   * 打开创建对话框
-   */
-  const openCreateDialog = () => {
-    currentJob.value = null;
-    showCreateDialog.value = true;
-  };
-
-  /**
-   * 打开编辑对话框
-   */
-  const openEditDialog = (job) => {
-    currentJob.value = { ...job };
-    showEditDialog.value = true;
-  };
-
-  /**
-   * 关闭所有对话框
-   */
-  const closeDialogs = () => {
-    showCreateDialog.value = false;
-    showEditDialog.value = false;
-    showDetailDialog.value = false;
-    currentJob.value = null;
-  };
-
-  /**
    * 格式化时间间隔为人类可读格式
    */
   const formatInterval = (seconds) => {
@@ -323,8 +295,6 @@ export function useScheduledJobs() {
     handlerTypesLoading,
 
     // 对话框状态
-    showCreateDialog,
-    showEditDialog,
     showDetailDialog,
 
     // 方法
@@ -342,11 +312,6 @@ export function useScheduledJobs() {
     loadHandlerTypes,
     loadHandlerType,
     getHandlerTypeById,
-
-    // 对话框操作
-    openCreateDialog,
-    openEditDialog,
-    closeDialogs,
 
     // 工具方法
     formatSchedule,

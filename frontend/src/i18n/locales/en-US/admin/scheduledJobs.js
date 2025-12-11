@@ -81,6 +81,8 @@ export default {
     form: {
       createTitle: "Create Scheduled Job",
       editTitle: "Edit Scheduled Job",
+      createDescription: "Configure and create a new scheduled job",
+      editDescription: "Modify the configuration of an existing scheduled job",
       name: "Job Name",
       namePlaceholder: "Display name for lists and timeline",
       nameHint: "Optional, will use task type name if not provided",
@@ -107,6 +109,7 @@ export default {
       cancel: "Cancel",
       create: "Create Job",
       save: "Save Changes",
+      backToList: "Back to List",
       // Step titles
       step1Title: "Select Type",
       step2Title: "Configure",
@@ -146,6 +149,14 @@ export default {
       noRuns: "No execution records",
       notScheduled: "Not Scheduled",
       totalSessions: "Total tables: {count}",
+    },
+
+    // Errors for form page
+    errors: {
+      jobNotFound: "Scheduled job not found",
+      loadFailed: "Failed to load scheduled job",
+      jobNotFoundHint:
+        "Please check if the task ID is correct, or go back to the list and select again.",
     },
 
     // Messages
@@ -196,6 +207,46 @@ export default {
       enabledJobs: "Enabled",
       pendingJobs: "Pending trigger",
       runningJobs: "Running",
+    },
+
+    // Sync task configuration (used by sync task form and path selector)
+    syncTask: {
+      // Path pair header
+      pairNumber: "Path Pair {n}",
+      collapsePair: "Collapse pair",
+      expandPair: "Expand pair",
+
+      // Source/target paths
+      sourcePath: "Source Path",
+      targetPath: "Target Path",
+      sourcePathHint: "Can be a file or folder path",
+      targetPathHint: "Must be a folder path",
+      quickInputPlaceholder: "Enter path and press Enter...",
+      copyPath: "Copy Path",
+      collapse: "Collapse",
+      expand: "Expand",
+      clearPath: "Clear",
+
+      // Path pair operations
+      addPathPair: "Add Path Pair",
+      advancedOptions: "Advanced Options",
+
+      // Sync options
+      skipExisting: "Skip existing files",
+      skipExistingHint:
+        "When enabled, only copy files that don't exist at target (incremental sync)",
+      maxConcurrency: "Copy Concurrency",
+      concurrencyHint: "Recommended: 1 for Workers environment",
+
+      // Path tree selector
+      goToRoot: "Go to Root",
+      goUp: "Go Up",
+      refresh: "Refresh",
+      loading: "Loading...",
+      retry: "Click to retry",
+      emptyDirectory: "Empty Directory",
+      emptyDirectoryHint: "No items in current directory",
+      enterFolder: "Enter Folder",
     },
   },
 };

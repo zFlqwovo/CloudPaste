@@ -145,8 +145,9 @@ export const scheduledTaskRegistry = new ScheduledTaskRegistry();
  * - 注意：在应用启动阶段调用一次
  */
 export function registerScheduledHandlers() {
-  // 目前仅注册 upload_sessions 清理任务
-  // 动态导入
+  // 动态导入内建任务处理器，避免 Workers 打包阶段静态分析冲突
+
+  // 1) upload_sessions 清理任务
   import("./tasks/CleanupUploadSessionsTask.js")
     .then((mod) => {
       const TaskCtor = mod.CleanupUploadSessionsTask;
@@ -161,6 +162,25 @@ export function registerScheduledHandlers() {
     .catch((err) => {
       console.warn(
         "[ScheduledTaskRegistry] 注册 CleanupUploadSessionsTask 失败:",
+        err,
+      );
+    });
+
+  // 2) 跨驱动同步任务（基于 copy Job 的单向同步）
+  import("./tasks/ScheduledSyncCopyTask.js")
+    .then((mod) => {
+      const TaskCtor = mod.ScheduledSyncCopyTask;
+      if (TaskCtor) {
+        const taskInstance = new TaskCtor();
+        scheduledTaskRegistry.register(taskInstance);
+        console.log(
+          `[ScheduledTaskRegistry] 成功注册调度任务: ${taskInstance.id}`,
+        );
+      }
+    })
+    .catch((err) => {
+      console.warn(
+        "[ScheduledTaskRegistry] 注册 ScheduledSyncCopyTask 失败:",
         err,
       );
     });

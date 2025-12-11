@@ -255,7 +255,6 @@ scheduledRoutes.post("/api/admin/scheduled/jobs/:taskId/run", requireAdmin, asyn
   const binds = [status, startedAtIso, finishedAt];
   if (status === "failure") {
     sets.push("failure_count = failure_count + 1");
-    binds.push(1);
   }
   const sql = `
     UPDATE ${DbTables.SCHEDULED_JOBS}

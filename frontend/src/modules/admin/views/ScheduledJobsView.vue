@@ -1,16 +1,17 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, h } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { useScheduledJobs } from "@/modules/admin/composables/useScheduledJobs";
 import { useThemeMode } from "@/composables/core/useThemeMode.js";
 import { useConfirmDialog } from "@/composables/core/useConfirmDialog.js";
 import { formatDateTime, formatDateTimeWithSeconds } from "@/utils/timeUtils.js";
 import AdminTable from "@/components/common/AdminTable.vue";
 import ConfirmDialog from "@/components/common/dialogs/ConfirmDialog.vue";
-import ScheduledJobForm from "@/modules/admin/components/ScheduledJobForm.vue";
 import ScheduledJobDetailModal from "@/modules/admin/components/ScheduledJobDetailModal.vue";
 
 const { t } = useI18n();
+const router = useRouter();
 const { isDarkMode: darkMode } = useThemeMode();
 
 // 全局时钟：用于实时更新相对时间显示（倒计时）
@@ -53,12 +54,20 @@ const confirmFn = async ({ title, message, confirmType }) => {
 
 const {
   jobs, currentJob, jobRuns, loading, runsLoading, filteredJobs, enabledFilter,
-  handlerTypes, showCreateDialog, showEditDialog, showDetailDialog,
+  handlerTypes, showDetailDialog,
   loadJobs, toggleJobEnabled, deleteJob, runJobNow, loadJobRuns, loadHandlerTypes,
-  openCreateDialog, openEditDialog, closeDialogs,
   formatSchedule, formatInterval,
   loadHourlyAnalytics,
 } = useScheduledJobs();
+
+// 路由导航函数
+const navigateToCreate = () => {
+  router.push({ name: 'AdminScheduledJobCreate' });
+};
+
+const navigateToEdit = (job) => {
+  router.push({ name: 'AdminScheduledJobEdit', params: { id: job.taskId } });
+};
 
 // 搜索和选择状态
 const searchQuery = ref("");
@@ -309,11 +318,6 @@ const handleViewDetail = async (job) => {
   showDetailDialog.value = true;
 };
 
-const handleFormSuccess = async () => {
-  closeDialogs();
-  await handleRefresh();
-};
-
 // 表格列配置
 const jobColumns = computed(() => [
   // 任务名称列（第一列）
@@ -522,7 +526,7 @@ const jobColumns = computed(() => [
           disabled: row.handlerExists === false,
           onClick: (e) => {
             e.stopPropagation();
-            openEditDialog(row);
+            navigateToEdit(row);
           }
         }, [
           h("svg", {
@@ -631,7 +635,7 @@ const jobColumnClasses = {
 
           <!-- 常规按钮 -->
           <template v-else>
-            <button @click="openCreateDialog" class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white transition-all duration-200" :class="darkMode ? 'bg-primary-600 hover:bg-primary-700' : 'bg-primary-500 hover:bg-primary-600'">
+            <button @click="navigateToCreate" class="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white transition-all duration-200" :class="darkMode ? 'bg-primary-600 hover:bg-primary-700' : 'bg-primary-500 hover:bg-primary-600'">
               <svg class="h-3 w-3 sm:h-4 sm:w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
@@ -940,10 +944,10 @@ const jobColumnClasses = {
                   </button>
                   
                   <!-- 编辑按钮 -->
-                  <button 
-                    @click="openEditDialog(job)" 
-                    :disabled="job.handlerExists === false" 
-                    class="flex items-center px-3 py-1.5 rounded text-sm font-medium transition disabled:opacity-50" 
+                  <button
+                    @click="navigateToEdit(job)"
+                    :disabled="job.handlerExists === false"
+                    class="flex items-center px-3 py-1.5 rounded text-sm font-medium transition disabled:opacity-50"
                     :class="darkMode ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-amber-100 hover:bg-amber-200 text-amber-800'"
                   >
                     <svg class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -970,17 +974,6 @@ const jobColumnClasses = {
         </template>
       </AdminTable>
     </div>
-
-    <!-- 创建/编辑表单弹窗 -->
-    <ScheduledJobForm 
-      v-if="showCreateDialog || showEditDialog" 
-      :dark-mode="darkMode" 
-      :job="currentJob" 
-      :is-edit="showEditDialog" 
-      :handler-types="handlerTypes" 
-      @close="closeDialogs" 
-      @success="handleFormSuccess" 
-    />
 
     <!-- 详情弹窗组件 -->
     <ScheduledJobDetailModal

@@ -81,6 +81,8 @@ export default {
     form: {
       createTitle: "创建定时任务",
       editTitle: "编辑定时任务",
+      createDescription: "配置并创建新的定时任务",
+      editDescription: "修改现有定时任务的配置",
       name: "任务名称",
       namePlaceholder: "用于在列表和时间线中展示的名称",
       nameHint: "可选，未填写时将使用任务类型名称",
@@ -107,6 +109,7 @@ export default {
       cancel: "取消",
       create: "创建任务",
       save: "保存修改",
+      backToList: "返回列表",
       // 步骤标题
       step1Title: "选择类型",
       step2Title: "配置参数",
@@ -145,7 +148,14 @@ export default {
       recentRuns: "最近执行记录",
       noRuns: "暂无执行记录",
       notScheduled: "未安排",
-       totalSessions: "表总数：{count}",
+      totalSessions: "表总数：{count}",
+    },
+
+    // 表单页面错误提示
+    errors: {
+      jobNotFound: "定时任务不存在",
+      loadFailed: "加载定时任务失败",
+      jobNotFoundHint: "请检查任务 ID 是否正确，或返回列表重新选择",
     },
 
     // 消息提示
@@ -196,6 +206,45 @@ export default {
       enabledJobs: "已启用",
       pendingJobs: "等待触发",
       runningJobs: "运行中",
+    },
+
+    // 同步任务配置（同步任务表单和路径选择器使用）
+    syncTask: {
+      // 路径对标题
+      pairNumber: "路径对 {n}",
+      collapsePair: "收起路径对",
+      expandPair: "展开路径对",
+
+      // 源/目标路径
+      sourcePath: "源路径",
+      targetPath: "目标路径",
+      sourcePathHint: "可以是文件或文件夹路径",
+      targetPathHint: "必须是文件夹路径",
+      quickInputPlaceholder: "输入路径后按回车...",
+      copyPath: "复制路径",
+      collapse: "收起",
+      expand: "展开",
+      clearPath: "清除",
+
+      // 路径对操作
+      addPathPair: "添加路径对",
+      advancedOptions: "高级选项",
+
+      // 同步选项
+      skipExisting: "跳过已存在文件",
+      skipExistingHint: "启用后仅复制目标位置不存在的文件（增量同步）",
+      maxConcurrency: "复制并发数",
+      concurrencyHint: "Workers 环境建议使用 1",
+
+      // 路径树选择器
+      goToRoot: "返回根目录",
+      goUp: "返回上级",
+      refresh: "刷新",
+      loading: "加载中...",
+      retry: "点击重试",
+      emptyDirectory: "空目录",
+      emptyDirectoryHint: "当前目录下没有可选内容",
+      enterFolder: "进入文件夹",
     },
   },
 };

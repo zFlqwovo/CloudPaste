@@ -664,7 +664,8 @@ export class WebDavStorageDriver extends BaseDriver {
     }
 
     try {
-      await this.client.copyFile(from, to, { overwrite: false });
+      const overwrite = !skipExisting;
+      await this.client.copyFile(from, to, { overwrite });
       return { status: "success", success: true, source: from, target: to };
     } catch (error) {
       if (this._isNotSupported(error)) {

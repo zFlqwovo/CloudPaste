@@ -559,8 +559,9 @@ async function createUploadSessionsTables(db) {
 async function createIndexes(db) {
   console.log("创建数据库索引...");
 
-  // scheduled_jobs和scheduled_job_runs 表索引
+  // scheduled_jobs 表索引（幂等）
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_next_run ON ${DbTables.SCHEDULED_JOBS}(enabled, next_run_after)`).run();
+  // scheduled_job_runs 表索引（幂等）
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_task_started ON ${DbTables.SCHEDULED_JOB_RUNS}(task_id, started_at DESC)`).run();
 
   // pastes表索引
@@ -1087,7 +1088,7 @@ async function executeMigrationForVersion(db, version) {
       break;
 
     case 27:
-      // 版本27：创建 scheduled_jobs 表用于后台调度作业
+      // 版本27：创建 scheduled_jobs 表用于后台调度作业（初始版本）
       console.log("版本27：检查并创建 scheduled_jobs，scheduled_job_runs 表...");
       await createScheduledJobsTables(db);
       await createScheduledJobRunsTables(db);
