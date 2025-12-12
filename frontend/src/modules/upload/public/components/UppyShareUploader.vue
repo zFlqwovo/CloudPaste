@@ -585,10 +585,10 @@ const buildShareResultEntry = (item) => {
   }
 
   // 预览与下载统一依赖 Link JSON + share URL：
-  // - 预览：优先使用 fileshareService 基于 Link JSON 构造的预览入口，其次退回分享页
-  // - 下载：始终使用 Down 路由（getPermanentDownloadUrl）
+  // - 预览：优先使用 fileshareService 基于 Link JSON 构造的 previewUrl，其次退回分享页
+  // - 下载：基于 Link JSON 构造的 downloadUrl；downloadUrl=null 时无下载入口
   const previewUrl = fileshareService.getPermanentPreviewUrl(record) || shareUrl;
-  const downloadUrl = slug ? fileshareService.getPermanentDownloadUrl({ slug }) : "";
+  const downloadUrl = fileshareService.getPermanentDownloadUrl(record);
 
   return {
     id: record.id || meta.fileId || item?.id || slug,

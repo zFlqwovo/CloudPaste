@@ -10,6 +10,7 @@ import { WebDavStorageDriver } from "../drivers/webdav/WebDavStorageDriver.js";
 import { LocalStorageDriver } from "../drivers/local/LocalStorageDriver.js";
 import { OneDriveStorageDriver } from "../drivers/onedrive/OneDriveStorageDriver.js";
 import { GoogleDriveStorageDriver } from "../drivers/googledrive/GoogleDriveStorageDriver.js";
+import { GithubReleasesStorageDriver } from "../drivers/github/GithubReleasesStorageDriver.js";
 import { googleDriveTestConnection } from "../drivers/googledrive/tester/GoogleDriveTester.js";
 import {
   CAPABILITIES,
@@ -155,6 +156,7 @@ export class StorageFactory {
     LOCAL: "LOCAL",
     ONEDRIVE: "ONEDRIVE",
     GOOGLE_DRIVE: "GOOGLE_DRIVE",
+    GITHUB_RELEASES: "GITHUB_RELEASES",
   };
 
   // 注册驱动
@@ -477,6 +479,95 @@ export class StorageFactory {
         } catch {
           errors.push("api_address 格式无效");
         }
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * GitHub Releases 配置校验：
+   * - repo_structure 必填，按行配置：
+   *   1）owner/repo
+   *   2）别名:owner/repo
+   *   3）完整仓库 URL：https://github.com/owner/repo（可带 /releases 等后缀）
+   * - 可选字段：show_readme/show_all_version/show_source_code/token/gh_proxy/per_page；
+   * - gh_proxy 若存在，需为合法 URL。
+   * @param {object} config
+   * @returns {{valid:boolean,errors:string[]}}
+   */
+  static _validateGithubReleasesConfig(config) {
+    const errors = [];
+
+    const raw = config?.repo_structure;
+    if (!raw || typeof raw !== "string" || raw.trim().length === 0) {
+      errors.push("GitHub Releases 配置缺少必填字段: repo_structure");
+    } else {
+      const lines = raw
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith("#"));
+      if (lines.length === 0) {
+        errors.push("GitHub Releases 配置 repo_structure 不能为空");
+      } else {
+        for (const line of lines) {
+          let repoPart = line;
+
+          // 支持三种显式格式：
+          // 1）owner/repo
+          // 2）别名:owner/repo
+          // 3）https://github.com/owner/repo（可带 /releases 等后缀）
+          // URL 形式（https://github.com/...）不参与别名分割，避免将 "https:" 误判为别名
+          if (!/^https?:\/\/github\.com\//i.test(line)) {
+            const idx = line.indexOf(":");
+            if (idx >= 0) {
+              repoPart = line.slice(idx + 1).trim();
+              if (!repoPart) {
+                errors.push(
+                  `GitHub Releases 配置行格式无效，应为 owner/repo、别名:owner/repo 或 https://github.com/owner/repo: ${line}`,
+                );
+                continue;
+              }
+            }
+          }
+
+          let normalized = repoPart;
+          if (/^https?:\/\/github\.com\//i.test(repoPart)) {
+            // 完整 GitHub 仓库或 Releases URL
+            normalized = repoPart.replace(/^https?:\/\/github\.com\//i, "");
+          }
+
+          // 为了规范输入，不允许以 / 开头的 owner/repo（例如 /owner/repo）
+          if (normalized.startsWith("/")) {
+            errors.push(
+              `GitHub Releases 配置行格式无效，不支持以 / 开头的 owner/repo，请使用 owner/repo 或 别名:owner/repo 或完整仓库 URL: ${line}`,
+            );
+            continue;
+          }
+
+          const segments = normalized.split("/").filter((seg) => seg.length > 0);
+          if (segments.length < 2) {
+            errors.push(`GitHub Releases 配置行缺少 owner/repo 信息: ${line}`);
+          }
+        }
+      }
+    }
+
+    if (config?.gh_proxy) {
+      try {
+        const parsed = new URL(config.gh_proxy);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          errors.push("GitHub Releases 配置字段 gh_proxy 必须以 http:// 或 https:// 开头");
+        }
+      } catch {
+        errors.push("GitHub Releases 配置字段 gh_proxy 格式无效");
+      }
+    }
+
+    if (config?.per_page !== undefined) {
+      const value = Number(config.per_page);
+      if (!Number.isFinite(value) || value <= 0) {
+        errors.push("GitHub Releases 配置字段 per_page 必须是大于 0 的数字");
       }
     }
 
@@ -1262,6 +1353,142 @@ StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.GOOGLE_DRIVE, {
         },
       ],
       summaryFields: ["root_id", "default_folder", "use_online_api", "enable_disk_usage", "enable_shared_view"],
+    },
+  },
+});
+
+// 注册 GitHub Releases 驱动（只读）
+StorageFactory.registerDriver(StorageFactory.SUPPORTED_TYPES.GITHUB_RELEASES, {
+  ctor: GithubReleasesStorageDriver,
+  tester: null,
+  displayName: "GitHub Releases 存储",
+  validate: (cfg) => StorageFactory._validateGithubReleasesConfig(cfg),
+  capabilities: [CAPABILITIES.READER, CAPABILITIES.DIRECT_LINK, CAPABILITIES.PROXY],
+  ui: {
+    icon: "storage-github-releases",
+    i18nKey: "admin.storage.type.github_releases",
+    badgeTheme: "github",
+  },
+  configProjector(cfg, { withSecrets = false } = {}) {
+    const projected = {
+      // GitHub Releases 专用字段
+      repo_structure: cfg?.repo_structure,
+      show_readme: cfg?.show_readme ?? false,
+      show_all_version: cfg?.show_all_version ?? false,
+      show_source_code: cfg?.show_source_code ?? false,
+      show_release_notes: cfg?.show_release_notes ?? false,
+      gh_proxy: cfg?.gh_proxy,
+      per_page: cfg?.per_page,
+      total_storage_bytes: cfg?.total_storage_bytes,
+    };
+
+    if (withSecrets) {
+      projected.token = cfg?.token;
+    }
+
+    return projected;
+  },
+  configSchema: {
+    fields: [
+      {
+        name: "repo_structure",
+        type: "string",
+        required: true,
+        labelKey: "admin.storage.fields.github_releases.repo_structure",
+        ui: {
+          fullWidth: true,
+          descriptionKey: "admin.storage.description.github_releases.repo_structure",
+          placeholderKey: "admin.storage.placeholder.github_releases.repo_structure",
+        },
+      },
+      {
+        name: "show_all_version",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.show_all_version",
+        ui: {
+          descriptionKey: "admin.storage.description.github_releases.show_all_version",
+        },
+      },
+      {
+        name: "show_source_code",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.show_source_code",
+        ui: {
+          descriptionKey: "admin.storage.description.github_releases.show_source_code",
+        },
+      },
+      {
+        name: "show_readme",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.show_readme",
+        ui: {
+          descriptionKey: "admin.storage.description.github_releases.show_readme",
+        },
+      },
+      {
+        name: "show_release_notes",
+        type: "boolean",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.show_release_notes",
+        ui: {
+          descriptionKey: "admin.storage.description.github_releases.show_release_notes",
+        },
+      },
+      {
+        name: "per_page",
+        type: "number",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.per_page",
+        ui: {
+          descriptionKey: "admin.storage.description.github_releases.per_page",
+        },
+      },
+      {
+        name: "gh_proxy",
+        type: "string",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.gh_proxy",
+        validation: { rule: "url" },
+        ui: {
+          fullWidth: true,
+          placeholderKey: "admin.storage.placeholder.github_releases.gh_proxy",
+          descriptionKey: "admin.storage.description.github_releases.gh_proxy",
+        },
+      },
+      {
+        name: "token",
+        type: "secret",
+        required: false,
+        labelKey: "admin.storage.fields.github_releases.token",
+        ui: {
+          fullWidth: true,
+          placeholderKey: "admin.storage.placeholder.github_releases.token",
+          descriptionKey: "admin.storage.description.github_releases.token",
+        },
+      },
+    ],
+    layout: {
+      groups: [
+        {
+          name: "basic",
+          titleKey: "admin.storage.groups.basic",
+          fields: ["repo_structure"],
+        },
+        {
+          name: "behaviour",
+          titleKey: "admin.storage.groups.behaviour",
+          fields: [["show_all_version", "show_source_code"], ["show_readme", "show_release_notes"], "per_page"],
+        },
+        {
+          name: "advanced",
+          titleKey: "admin.storage.groups.advanced",
+          fields: ["gh_proxy", "token"],
+        },
+      ],
+      summaryFields: ["repo_structure", "show_all_version", "show_source_code", "show_release_notes"],
     },
   },
 });

@@ -95,6 +95,9 @@ const STORAGE_TYPE_BEHAVIOR_DEF = {
       return false;
     },
   },
+  GITHUB_RELEASES: {
+    secretFields: ["token"],
+  },
 };
 
 /**
@@ -126,6 +129,11 @@ export function useAdminStorageTypeBehavior(options) {
       loaded: ref(false),
     },
     GOOGLE_DRIVE: {
+      visible: ref(false),
+      revealing: ref(false),
+      loaded: ref(false),
+    },
+    GITHUB_RELEASES: {
       visible: ref(false),
       revealing: ref(false),
       loaded: ref(false),
@@ -190,6 +198,8 @@ export function useAdminStorageTypeBehavior(options) {
           } else if (type === "GOOGLE_DRIVE") {
             formData.value.client_secret = data.client_secret || "";
             formData.value.refresh_token = data.refresh_token || "";
+          } else if (type === "GITHUB_RELEASES") {
+            formData.value.token = data.token || "";
           }
           state.loaded.value = true;
         }
@@ -222,6 +232,12 @@ export function useAdminStorageTypeBehavior(options) {
     if (!meta) return false;
 
     const storageType = currentType.value;
+
+    // GitHub Releases：令牌等 secret 字段保持可选
+    if (storageType === "GITHUB_RELEASES") {
+      return !!meta.required;
+    }
+
     // OneDrive / GoogleDrive 的 refresh_token 和 client_secret 通过授权获取，新建时遵循 schema 标记
     if (
       (storageType === "ONEDRIVE" || storageType === "GOOGLE_DRIVE") &&

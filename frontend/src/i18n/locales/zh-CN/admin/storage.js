@@ -10,6 +10,7 @@ export default {
       local: "本机文件",
       onedrive: "OneDrive",
       googledrive: "Google Drive",
+      github_releases: "GitHub Releases",
     },
 
     // 分组标题
@@ -20,6 +21,7 @@ export default {
       permissions: "权限设置",
       advanced: "高级选项",
       options: "其他选项",
+      behaviour: "行为配置",
     },
 
     // 通用字段标签
@@ -74,6 +76,18 @@ export default {
         enable_disk_usage: "启用配额读取",
         enable_shared_view: "SharedWithMe视图",
       },
+
+      // GitHub Releases 特有字段
+      github_releases: {
+        repo_structure: "仓库映射规则",
+        show_all_version: "显示所有版本目录",
+        show_source_code: "显示 Source code 压缩包",
+        show_readme: "显示 README / LICENSE",
+        show_release_notes: "显示 Release Notes",
+        per_page: "每次拉取的版本数量",
+        gh_proxy: "GitHub 代理 URL",
+        token: "GitHub 访问令牌",
+      },
     },
 
     // 占位符文本
@@ -109,6 +123,14 @@ export default {
         client_secret: "Google OAuth 客户端密钥",
         refresh_token: "RefreshToken 或 Service Account JSON 的远程 URL",
         root_id: "例如：root 或某个 Shared Drive ID",
+      },
+
+      // GitHub Releases 占位符
+      github_releases: {
+        repo_structure:
+          "每行一条：owner/repo、别名:owner/repo 或完整仓库 URL（https://github.com/owner/repo），例如：ling-drag0n/CloudPaste、cloudpaste:ling-drag0n/CloudPaste 或 https://github.com/ling-drag0n/CloudPaste",
+        gh_proxy: "例如：https://gh-proxy.com/github.com",
+        token: "建议填写个人访问令牌以提升速率上限",
       },
     },
 
@@ -149,6 +171,26 @@ export default {
         root_id: "Google Drive 根目录 ID，默认为 root；如需挂载 Shared Drive，请填写对应 driveId。",
         enable_disk_usage: "启用后，读取存储配额信息，用于管理端展示和配额分析。",
         enable_shared_view: "启用后，将在对应挂载根目录下展示 \"Shared with me\" 虚拟目录，用于浏览“与我共享”文件。",
+      },
+
+      // GitHub Releases 描述
+      github_releases: {
+        repo_structure:
+          "配置 GitHub 仓库列表，每行一条。单仓库可用 owner/repo 直接挂载到仓库根目录（不额外生成 repo 目录）；多仓库必须使用 别名:owner/repo 生成一级目录避免覆盖。挂载路径本身由挂载配置决定。",
+        show_all_version:
+          "开启后，将为每个版本创建一个子目录（按 tagName 命名），目录下包含该版本的所有发布资产；关闭时只展示最新版本的资产列表。",
+        show_source_code:
+          "开启后，为每个版本额外生成 \"Source code (zip)\" 和 \"Source code (tar.gz)\" 伪文件，指向 GitHub 提供的源码压缩包。",
+        show_readme:
+          "在仓库根目录挂载 README / LICENSE 虚拟文件（如果仓库存在对应文件），文件内容通过 GitHub API 实时读取。",
+        show_release_notes:
+          "在版本目录中额外生成 RELEASE_NOTES.md 虚拟文件，内容来自 GitHub Release 的说明（Markdown）。",
+        per_page:
+          "从 GitHub Releases 接口每次获取的最大版本数量，默认 20。数值越大，请求次数越少，但单次响应体越大。",
+        gh_proxy:
+          "可选：用于加速 GitHub 下载的代理前缀，例如 https://gh-proxy.com/github.com 或 https://gh-proxy.com/https://github.com 完整填入。仅对以 https://github.com 开头的下载链接生效。",
+        token:
+          "可选：GitHub 个人访问令牌。用于访问私有仓库或提升 API 速率限制（强烈推荐配置，尤其在公开站点中使用时）。",
       },
     },
 

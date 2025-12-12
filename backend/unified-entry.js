@@ -25,8 +25,8 @@ const isCloudflareWorkers = (() => {
 
 // Cloudflare Workflows 条件导出（仅在 Workers 环境下实际使用）
 export const JobWorkflow = isCloudflareWorkers
-    ? (await import("./src/workflows/JobWorkflow.ts")).JobWorkflow
-    : class JobWorkflow {
+  ? (await import("./src/workflows/JobWorkflow.ts")).JobWorkflow
+  : class JobWorkflow {
       constructor() {
         console.warn('JobWorkflow 在 Node 环境下不可用');
       }
@@ -35,7 +35,7 @@ export const JobWorkflow = isCloudflareWorkers
       }
     };
 
-// ============ Cloudflare Workers 环境导出 ============
+// ============ Cloudflare Workers 环境导出 ============ 
 // 默认导出 fetch，只在 Workers 环境下由 Cloudflare 调用；
 // 在 Node 环境下不会被使用
 let isDbInitialized = false;
@@ -67,17 +67,17 @@ export default {
     } catch (error) {
       console.error("处理请求时发生错误:", error);
       return new Response(
-          JSON.stringify({
-            code: ApiStatus.INTERNAL_ERROR,
-            message: "服务器内部错误",
-            error: error.message,
-            success: false,
-            data: null,
-          }),
-          {
-            status: ApiStatus.INTERNAL_ERROR,
-            headers: { "Content-Type": "application/json" },
-          }
+        JSON.stringify({
+          code: ApiStatus.INTERNAL_ERROR,
+          message: "服务器内部错误",
+          error: error.message,
+          success: false,
+          data: null,
+        }),
+        {
+          status: ApiStatus.INTERNAL_ERROR,
+          headers: { "Content-Type": "application/json" },
+        }
       );
     }
   },
@@ -90,8 +90,8 @@ export default {
       }
 
       console.log(
-          "[scheduled] Cloudflare scheduled 触发，开始检查到期后台任务...",
-          new Date().toISOString(),
+        "[scheduled] Cloudflare scheduled 触发，开始检查到期后台任务...",
+        new Date().toISOString(),
       );
 
       await checkAndInitDatabase(env.DB);
@@ -102,7 +102,7 @@ export default {
   },
 };
 
-// ============ Node/Docker 环境启动逻辑 ============
+// ============ Node/Docker 环境启动逻辑 ============ 
 if (!isCloudflareWorkers) {
   const bootstrap = async () => {
     const [
@@ -154,8 +154,8 @@ if (!isCloudflareWorkers) {
         const tickStartedAt = new Date();
         const tickStartedIso = tickStartedAt.toISOString();
         console.log(
-            "[scheduled] node-schedule tick 触发",
-            { time: tickStartedIso, cron: cronExpr },
+          "[scheduled] node-schedule tick 触发",
+          { time: tickStartedIso, cron: cronExpr },
         );
 
         const startedMs = Date.now();
@@ -171,7 +171,7 @@ if (!isCloudflareWorkers) {
         }
       });
       console.log(
-          `[scheduled] 已在 Node/Docker 环境启动内部调度器，cron=${cronExpr}`,
+        `[scheduled] 已在 Node/Docker 环境启动内部调度器，cron=${cronExpr}`,
       );
     } catch (error) {
       console.error("[scheduled] 启动内部调度器失败:", error);
@@ -179,16 +179,16 @@ if (!isCloudflareWorkers) {
 
     // 使用 @hono/node-server 启动 Node 服务器
     serve(
-        {
-          fetch: (request) => app.fetch(request, bindings),
-          port,
-          // 保持默认的 overrideGlobalObjects/autoCleanupIncoming 配置
-        },
-        (info) => {
-          console.log(`CloudPaste 后端服务运行在 http://0.0.0.0:${info.port}`);
-          // 启动 Docker/Node 环境内存监控（包括容器内存检测）
-          startMemoryMonitoring();
-        }
+      {
+        fetch: (request) => app.fetch(request, bindings),
+        port,
+        // 保持默认的 overrideGlobalObjects/autoCleanupIncoming 配置
+      },
+      (info) => {
+        console.log(`CloudPaste 后端服务运行在 http://0.0.0.0:${info.port}`);
+        // 启动 Docker/Node 环境内存监控（包括容器内存检测）
+        startMemoryMonitoring();
+      }
     );
   };
 
@@ -247,7 +247,7 @@ function startMemoryMonitoring(interval = 1200000) {
 
     if (containerMem) {
       memoryInfo.container = `${Math.round(containerMem.usage / 1024 / 1024)} MB / ${Math.round(
-          containerMem.limit / 1024 / 1024
+        containerMem.limit / 1024 / 1024
       )} MB`;
       memoryInfo.containerUsage = `${Math.round((containerMem.usage / containerMem.limit) * 100)}%`;
     }
@@ -262,9 +262,9 @@ function startMemoryMonitoring(interval = 1200000) {
     } else {
       // 非容器环境回退到进程内存判断
       shouldGC =
-          mem.heapUsed / mem.heapTotal > 0.85 ||
-          mem.external > 50 * 1024 * 1024 ||
-          (mem.arrayBuffers && mem.arrayBuffers > 50 * 1024 * 1024);
+        mem.heapUsed / mem.heapTotal > 0.85 ||
+        mem.external > 50 * 1024 * 1024 ||
+        (mem.arrayBuffers && mem.arrayBuffers > 50 * 1024 * 1024);
     }
 
     if (global.gc && shouldGC) {

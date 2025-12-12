@@ -195,11 +195,11 @@ export class CopyTaskHandler implements TaskHandler {
                 if (now - lastDockerProgressTime >= DOCKER_PROGRESS_INTERVAL_MS) {
                   lastDockerProgressTime = now;
                   context
-                      .updateProgress(job.jobId, {
-                        bytesTransferred: absoluteBytes,
-                        itemResults,
-                      })
-                      .catch(() => {});
+                    .updateProgress(job.jobId, {
+                      bytesTransferred: absoluteBytes,
+                      itemResults,
+                    })
+                    .catch(() => {});
                 }
                 return;
               }
@@ -210,11 +210,11 @@ export class CopyTaskHandler implements TaskHandler {
               if (absoluteBytes - lastReported >= step) {
                 lastReportedBytesPerItem[i] = absoluteBytes;
                 context
-                    .updateProgress(job.jobId, {
-                      bytesTransferred: absoluteBytes,
-                      itemResults,
-                    })
-                    .catch(() => {});
+                  .updateProgress(job.jobId, {
+                    bytesTransferred: absoluteBytes,
+                    itemResults,
+                  })
+                  .catch(() => {});
               }
             },
           });
@@ -254,7 +254,7 @@ export class CopyTaskHandler implements TaskHandler {
             itemResults[i].retryCount = attempt;
 
             console.error(
-                `[CopyTaskHandler] 复制最终失败 [${i + 1}/${payload.items.length}]${retryInfo}${retryableInfo} ` +
+              `[CopyTaskHandler] 复制最终失败 [${i + 1}/${payload.items.length}]${retryInfo}${retryableInfo} ` +
                 `${item.sourcePath} → ${item.targetPath}: ${error.message || error}`
             );
 
@@ -262,7 +262,7 @@ export class CopyTaskHandler implements TaskHandler {
           }
 
           console.warn(
-              `[CopyTaskHandler] 复制失败 [${i + 1}/${payload.items.length}] (尝试 ${attempt + 1}/${retryPolicy.limit + 1}) ` +
+            `[CopyTaskHandler] 复制失败 [${i + 1}/${payload.items.length}] (尝试 ${attempt + 1}/${retryPolicy.limit + 1}) ` +
               `${item.sourcePath}: ${error.message || error} [将重试]`
           );
         }
