@@ -8,6 +8,33 @@ import { getEncryptionSecret } from "../../utils/environmentUtils.js";
 import { usePolicy } from "../../security/policies/policies.js";
 import { findUploadSessionById } from "../../utils/uploadSessions.js";
 
+const toAbsoluteUrlIfRelative = (requestUrl, maybeUrl) => {
+  if (typeof maybeUrl !== "string" || maybeUrl.length === 0) {
+    return maybeUrl;
+  }
+  if (!maybeUrl.startsWith("/")) {
+    return maybeUrl;
+  }
+  const origin = new URL(requestUrl).origin;
+  return new URL(maybeUrl, origin).toString();
+};
+
+const ensureAbsoluteSessionUploadUrl = (c, payload) => {
+  const session = payload?.session;
+  const uploadUrl = session?.uploadUrl;
+  const absolute = toAbsoluteUrlIfRelative(c.req.url, uploadUrl);
+  if (!session || absolute === uploadUrl) {
+    return payload;
+  }
+  return {
+    ...payload,
+    session: {
+      ...session,
+      uploadUrl: absolute,
+    },
+  };
+};
+
 const parseJsonBody = async (c, next) => {
   const body = await c.req.json();
   c.set("jsonBody", body);
@@ -64,9 +91,17 @@ export const registerMultipartRoutes = (router, helpers) => {
 
     const mountManager = new MountManager(db, encryptionSecret, repositoryFactory);
     const fileSystem = new FileSystem(mountManager);
-    const result = await fileSystem.initializeFrontendMultipartUpload(path, fileName, fileSize, userIdOrInfo, userType, partSize, partCount);
+    const result = await fileSystem.initializeFrontendMultipartUpload(
+      path,
+      fileName,
+      fileSize,
+      userIdOrInfo,
+      userType,
+      partSize,
+      partCount,
+    );
 
-    return jsonOk(c, result, "前端分片上传初始化成功");
+    return jsonOk(c, ensureAbsoluteSessionUploadUrl(c, result), "前端分片上传初始化成功");
   });
 
   router.post("/api/fs/multipart/complete", parseJsonBody, usePolicy("fs.upload", { pathResolver: jsonPathResolver() }), async (c) => {
@@ -142,7 +177,7 @@ export const registerMultipartRoutes = (router, helpers) => {
     const fileSystem = new FileSystem(mountManager);
     const result = await fileSystem.refreshMultipartUrls(path, uploadId, partNumbers, userIdOrInfo, userType);
 
-    return jsonOk(c, result, "刷新分片上传预签名URL成功");
+    return jsonOk(c, ensureAbsoluteSessionUploadUrl(c, result), "刷新分片上传预签名URL成功");
   });
 
   // 前端分片上传中转端点（single_session 场景）

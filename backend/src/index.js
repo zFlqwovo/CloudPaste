@@ -138,6 +138,7 @@ app.use("*", async (c, next) => {
         "If-Modified-Since",
         "If-Unmodified-Since",
         "Lock-Token",
+        "Content-Range",
         "Content-Length",
         "X-Requested-With",
         // FS / Share 流式上传自定义头
