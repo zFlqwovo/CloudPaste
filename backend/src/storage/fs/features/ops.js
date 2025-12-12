@@ -44,15 +44,23 @@ export async function renameItem(fs, oldPath, newPath, userIdOrInfo, userType) {
 }
 
 export async function copyItem(fs, sourcePath, targetPath, userIdOrInfo, userType, options = {}) {
+  // 目录判断：用于决定是否走目录级 orchestrator
+  const sourceIsDirectory = isDirectoryPath(sourcePath);
+
+  const targetIsDirectory = isDirectoryPath(targetPath);
+  let effectiveTargetPath = targetPath;
+  if (!sourceIsDirectory && targetIsDirectory) {
+    const sourceSegments = sourcePath.split("/").filter(Boolean);
+    const sourceFileName = sourceSegments[sourceSegments.length - 1] || "file";
+    effectiveTargetPath = `${normalizePath(targetPath, true)}${sourceFileName}`;
+  }
+
   // 先解析源与目标挂载与驱动，在 FS 层统一做跨存储决策
   const sourceCtx = await fs.mountManager.getDriverByPath(sourcePath, userIdOrInfo, userType);
-  const targetCtx = await fs.mountManager.getDriverByPath(targetPath, userIdOrInfo, userType);
+  const targetCtx = await fs.mountManager.getDriverByPath(effectiveTargetPath, userIdOrInfo, userType);
 
   const { driver: sourceDriver, mount: sourceMount, subPath: sourceSubPath } = sourceCtx;
   const { driver: targetDriver, mount: targetMount, subPath: targetSubPath } = targetCtx;
-
-  // 目录判断：用于决定是否走目录级 orchestrator
-  const sourceIsDirectory = isDirectoryPath(sourcePath);
 
   const sameMount = sourceMount.id === targetMount.id;
 
@@ -89,13 +97,16 @@ export async function copyItem(fs, sourcePath, targetPath, userIdOrInfo, userTyp
           skipped: true,
           reason: "target_exists",
           source: sourcePath,
-          target: targetPath,
+          target: effectiveTargetPath,
           contentLength: 0,
         };
       }
     } catch (checkError) {
       // exists 检查失败时继续复制（降级处理）
-      console.warn(`[copyItem] skipExisting 检查失败 for ${targetPath}:`, checkError?.message || checkError);
+      console.warn(
+          `[copyItem] skipExisting 检查失败 for ${effectiveTargetPath}:`,
+          checkError?.message || checkError,
+      );
     }
     // 标记已检查，下游无需重复检查
     options = { ...options, _skipExistingChecked: true };
@@ -111,7 +122,7 @@ export async function copyItem(fs, sourcePath, targetPath, userIdOrInfo, userTyp
       });
     }
 
-    const result = await sourceDriver.copyItem(sourcePath, targetPath, {
+    const result = await sourceDriver.copyItem(sourcePath, effectiveTargetPath, {
       mount: sourceMount,
       // 保持旧字段，同时补充明确的源/目标子路径，方便驱动精确映射存储路径
       subPath: sourceSubPath,
@@ -125,7 +136,11 @@ export async function copyItem(fs, sourcePath, targetPath, userIdOrInfo, userTyp
       ...options,
     });
 
-    fs.emitCacheInvalidation({ mount: sourceMount, paths: [sourcePath, targetPath], reason: "copy" });
+    fs.emitCacheInvalidation({
+      mount: sourceMount,
+      paths: [sourcePath, effectiveTargetPath],
+      reason: "copy",
+    });
     return result;
   }
 
@@ -133,19 +148,28 @@ export async function copyItem(fs, sourcePath, targetPath, userIdOrInfo, userTyp
   if (sourceIsDirectory) {
     // 目录：使用目录级 orchestrator，递归复制目录下所有文件
     return await copyDirectoryBetweenDrivers(
-      fs,
-      sourceCtx,
-      targetCtx,
-      sourcePath,
-      targetPath,
-      userIdOrInfo,
-      userType,
-      options,
+        fs,
+        sourceCtx,
+        targetCtx,
+        sourcePath,
+        effectiveTargetPath,
+        userIdOrInfo,
+        userType,
+        options,
     );
   }
 
   // 文件：使用单文件 orchestrator
-  return await copyBetweenDrivers(fs, sourceCtx, targetCtx, sourcePath, targetPath, userIdOrInfo, userType, options);
+  return await copyBetweenDrivers(
+      fs,
+      sourceCtx,
+      targetCtx,
+      sourcePath,
+      effectiveTargetPath,
+      userIdOrInfo,
+      userType,
+      options,
+  );
 }
 
 export async function batchRemoveItems(fs, paths, userIdOrInfo, userType) {
@@ -297,7 +321,7 @@ async function copyBetweenDrivers(fs, sourceCtx, targetCtx, sourcePath, targetPa
     const targetSegments = targetPath.split("/").filter(Boolean);
     const sourceSegments = sourcePath.split("/").filter(Boolean);
     const sourceFileName =
-      sourceSegments[sourceSegments.length - 1] || "file";
+        sourceSegments[sourceSegments.length - 1] || "file";
     const targetLeaf = targetSegments[targetSegments.length - 1] || "";
     const targetIsDirectory = isDirectoryPath(targetPath);
 
@@ -437,14 +461,14 @@ async function copyDirectoryBetweenDrivers(fs, sourceCtx, targetCtx, sourcePath,
             const fileTargetCtx = await fs.mountManager.getDriverByPath(fileTargetPath, userIdOrInfo, userType);
 
             const fileResult = await copyBetweenDrivers(
-              fs,
-              fileSourceCtx,
-              fileTargetCtx,
-              fileSourcePath,
-              fileTargetPath,
-              userIdOrInfo,
-              userType,
-              options
+                fs,
+                fileSourceCtx,
+                fileTargetCtx,
+                fileSourcePath,
+                fileTargetPath,
+                userIdOrInfo,
+                userType,
+                options
             );
 
             // 处理复制结果：成功、跳过、失败
